@@ -16,6 +16,7 @@ from schema import (
     ROLES,
     SimConfig,
 )
+from society_evolution import SocietyEvolution
 
 
 # ================================
@@ -229,4 +230,8 @@ def generate_society(config: SimConfig):
 
 if __name__ == "__main__":
     conf = SimConfig(num_agents=10000, seed=69)
-    generate_society(conf)
+    conf.wealth_dim_idx = DIMENSIONS.index("Wealth")
+    df_meta, exposures, personalities = generate_society(conf)
+    if conf.enable_evolution:
+        evolver = SocietyEvolution(conf, df_meta, exposures, personalities)
+        df_meta, exposures, personalities = evolver.evolve()

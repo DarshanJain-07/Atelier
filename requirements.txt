@@ -1,0 +1,13 @@
+torch
+pandas
+numpy
+seaborn
+matplotlib
+uvicorn
+fastapi
+pydantic
+python-dotenv
+transformers
+pyarrow
+scipy
+requests

@@ -141,9 +141,13 @@ class SocietyEvolution:
         probs = probs / probs.sum(dim=1, keepdim=True)
 
         # Sample new role
-        new_roles = torch.multinomial(probs, 1).squeeze()
+        new_roles_indices = torch.multinomial(probs, 1).squeeze().numpy()
 
-        self.metadata["Role"] = new_roles.numpy()
+        # Map indices to generic class names since original roles are removed
+        role_map = {0: "Underclass", 1: "Working Class", 2: "Middle Class", 3: "Upper Middle", 4: "Elite"}
+        mapped_roles = [role_map.get(idx, "Unknown") for idx in new_roles_indices]
+
+        self.metadata["Role"] = mapped_roles
 
     def evolve(self):
         """

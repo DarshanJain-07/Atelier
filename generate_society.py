@@ -6,14 +6,7 @@ import pandas as pd
 import torch
 
 from schema import (
-    ARCHETYPES,
     DIMENSIONS,
-    REGION_ROLE_PROBS,
-    REGION_WEIGHTS,
-    REGIONS,
-    ROLE_STARTING_STATS,
-    ROLE_TIER_MAP,
-    ROLES,
     SimConfig,
 )
 from society_evolution import SocietyEvolution
@@ -126,7 +119,7 @@ def generate_hybrid_wealth(
 
 
 # ================================
-# Main Generator
+# Main Generator (Bias-Free)
 # ================================
 def generate_society(config: SimConfig):
 
@@ -136,65 +129,38 @@ def generate_society(config: SimConfig):
     if not os.path.exists(config.output_dir):
         os.makedirs(config.output_dir)
 
-    print(f"Generating {config.num_agents} Agents via Density Field...")
+    print(f"Generating {config.num_agents} Agents via Bias-Free Continuous Field...")
 
     num_dims = len(DIMENSIONS)
     wealth_idx = DIMENSIONS.index("Wealth")
+    num_personalities = 5
+    total_dims = num_dims * 2 + num_personalities
 
-    # --- Density Construction ---
-    all_role_means = []
-    for role in ROLES:
-        dna = torch.cat([ARCHETYPES[role]["exp"], ARCHETYPES[role]["big5"]])
-        all_role_means.append(dna)
+    # ---- Continuous random trait field ----
+    # Mean 0, Std 1 for exposures and affinities
+    traits = torch.randn(config.num_agents, total_dims)
 
-    means_tensor = torch.stack(all_role_means)
-
-    regions_arr = np.random.choice(REGIONS, size=config.num_agents, p=REGION_WEIGHTS)
-    final_traits = torch.zeros(config.num_agents, 17)
-
-    for region in REGIONS:
-        mask = torch.from_numpy(regions_arr == region)
-        count = int(mask.sum().item())
-        if count == 0:
-            continue
-
-        role_weights = torch.tensor(REGION_ROLE_PROBS[region])
-        component_indices = torch.multinomial(role_weights, count, replacement=True)
-
-        std = 0.15 + (config.mutation_temperature * 0.1)
-        batch_means = means_tensor[component_indices]
-        noise = torch.randn(count, 17) * std
-
-        final_traits[mask] = batch_means + noise
-
-    exposures = final_traits[:, :num_dims]
-    personalities = final_traits[:, num_dims:]
+    exposures = traits[:, :num_dims]
+    # Sigmoid to bound personalities between 0 and 1
+    personalities = torch.sigmoid(traits[:, num_dims : num_dims + num_personalities])
+    raw_affinities = traits[:, num_dims + num_personalities :]
 
     exposures, personalities = apply_random_mutations(
         exposures, personalities, config.mutation_temperature, config.seed
     )
 
-    # --- Classification ---
-    dist_to_archetypes = torch.cdist(final_traits, means_tensor)
-    closest_role_indices = torch.argmin(dist_to_archetypes, dim=1)
-    roles_arr = np.array([ROLES[idx] for idx in closest_role_indices])
-    tiers_arr = np.array([ROLE_TIER_MAP[r] for r in roles_arr])
-
-    role_wealth_bases = np.array([ROLE_STARTING_STATS[r][0] for r in roles_arr])
-    role_influence_bases = np.array([ROLE_STARTING_STATS[r][1] for r in roles_arr])
-
-    # ---------------------------
-    # Influence Generation
-    # ---------------------------
-    influence_scores = role_influence_bases * (
-        1 + np.random.lognormal(0, 0.5 + config.mutation_temperature, config.num_agents)
+    # ---- Influence (no role-based anchoring) ----
+    influence_scores = np.random.lognormal(
+        mean=1.0,
+        sigma=0.5 + config.mutation_temperature,
+        size=config.num_agents
     )
 
-    # ---------------------------
-    # Hybrid Wealth Generation
-    # ---------------------------
+    # ---- Wealth (no role multipliers) ----
+    wealth_base = np.ones(config.num_agents)
+
     wealth_values = generate_hybrid_wealth(
-        role_wealth_bases,
+        wealth_base,
         influence_scores,
         config.mutation_temperature,
         config.seed,
@@ -210,28 +176,45 @@ def generate_society(config: SimConfig):
     )
     personalities = torch.clamp(personalities, 0.0, 1.0)
 
+    # --- Affinity Normalization (Cognitive Bandwidth) ---
+    # Apply Bell Curve: mean=0.55, std=0.2, clamped to [0.1, 1.0]
+    cognitive_bandwidth = torch.clamp(
+        torch.randn(config.num_agents, 1) * 0.2 + 0.55, min=0.1, max=1.0
+    )
+
+    # Ensure affinities are positive before normalization (using absolute values or clamping)
+    # Using absolute value makes sense for Gaussian noise to capture intensity
+    positive_affinities = torch.clamp(torch.abs(raw_affinities), min=0.01)
+
+    # L1 Normalize to sum to 1.0, then scale by bandwidth
+    normalized_affinities = positive_affinities / positive_affinities.sum(
+        dim=1, keepdim=True
+    )
+    affinities = normalized_affinities * cognitive_bandwidth
+
     df_metadata = pd.DataFrame(
         {
             "Agent_ID": range(config.num_agents),
-            "Role": roles_arr,
-            "Region": regions_arr,
-            "Tier": tiers_arr,
+            "Role": ["Agent"] * config.num_agents,
+            "Region": ["Global"] * config.num_agents,
             "Influence": np.round(influence_scores, 3),
+            "Cognitive_Bandwidth": np.round(cognitive_bandwidth.squeeze().numpy(), 3),
         }
     )
 
     df_metadata.to_parquet(f"{config.output_dir}/metadata.parquet")
     torch.save(exposures, f"{config.output_dir}/exposures.pt")
     torch.save(personalities, f"{config.output_dir}/personalities.pt")
+    torch.save(affinities, f"{config.output_dir}/affinities.pt")
 
-    print(f"Society Generated in '{config.output_dir}' (Hybrid Wealth + Density)")
-    return df_metadata, exposures, personalities
+    print(f"Society Generated in '{config.output_dir}' (Bias-Free)")
+    return df_metadata, exposures, personalities, affinities
 
 
 if __name__ == "__main__":
     conf = SimConfig(num_agents=10000, seed=69)
     conf.wealth_dim_idx = DIMENSIONS.index("Wealth")
-    df_meta, exposures, personalities = generate_society(conf)
+    df_meta, exposures, personalities, affinities = generate_society(conf)
     if conf.enable_evolution:
         evolver = SocietyEvolution(conf, df_meta, exposures, personalities)
         df_meta, exposures, personalities = evolver.evolve()

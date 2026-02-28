@@ -1,0 +1,7 @@
+.env
+.venv/
+society_data/
+__pycache__
+plan.md
+.vscode
+results/

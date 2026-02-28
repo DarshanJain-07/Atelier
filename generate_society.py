@@ -154,7 +154,7 @@ def generate_society(config: SimConfig):
 
     for region in REGIONS:
         mask = torch.from_numpy(regions_arr == region)
-        count = mask.sum().item()
+        count = int(mask.sum().item())
         if count == 0:
             continue
 

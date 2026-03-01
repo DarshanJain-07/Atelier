@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Tuple, cast
 import numpy as np
 import pandas as pd
 import torch
+import torch.nn.functional as F
 import uvicorn
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
@@ -22,7 +23,7 @@ from physics_engine import SocialPhysicsEngine
 # Import our Core Logic
 from schema import DIMENSIONS, EMOTION_LABELS, PSYCH_PROJECTION, SimConfig
 from society_evolution import SocietyEvolution
-from validation import Validator
+from validation import Validator, GoEmotionsValidator
 
 load_dotenv()
 
@@ -32,6 +33,7 @@ if not os.getenv("GEMINI_API_KEY"):
 
 app = FastAPI()
 validator = Validator()
+go_validator = GoEmotionsValidator()
 
 # Enable CORS - Restrict this in production!
 app.add_middleware(
@@ -61,6 +63,32 @@ class RunProfile(BaseModel):
     emotion_temperature: float = Field(default=0.2, ge=0.0, le=1.0)
     panic_threshold: float = Field(default=-1.2, le=0.0)
 
+    # Researcher (Cognitive)
+    cross_dim_interaction_strength: float = 0.3
+    threat_sensitivity_gain: float = 1.5
+    k_processing_tanh_gain: float = 1.5
+    relevance_importance_weight: float = 0.7
+    relevance_base_weight: float = 0.3
+    threat_amplifier_gain: float = 1.5
+    stress_neurotic_amplification: float = 1.5
+    stress_openness_reduction: float = 0.5
+    stress_extraversion_boost: float = 0.7
+
+    # Researcher (Physics)
+    outrage_gain: float = 2.5
+    max_viral_multiplier: float = 10.0
+    saturation_midpoint: float = 1.5
+
+    # Researcher (Distortion)
+    distortion_max_noise: float = 0.4
+    distortion_neurotic_gain: float = 0.6
+
+    # Researcher (Evolution)
+    evolution_generations: int = 10
+    inheritance_fraction: float = 0.7
+    shock_frequency: float = 0.1
+    shock_magnitude: float = 0.2
+
 
 class SimulationRequest(BaseModel):
     news_text: str
@@ -85,6 +113,24 @@ def prepare_society_sync(run: RunProfile, run_output_dir: str):
         emotion_temperature=run.emotion_temperature,
         panic_threshold=run.panic_threshold,
         output_dir=run_output_dir,
+        cross_dim_interaction_strength=run.cross_dim_interaction_strength,
+        threat_sensitivity_gain=run.threat_sensitivity_gain,
+        k_processing_tanh_gain=run.k_processing_tanh_gain,
+        relevance_importance_weight=run.relevance_importance_weight,
+        relevance_base_weight=run.relevance_base_weight,
+        threat_amplifier_gain=run.threat_amplifier_gain,
+        stress_neurotic_amplification=run.stress_neurotic_amplification,
+        stress_openness_reduction=run.stress_openness_reduction,
+        stress_extraversion_boost=run.stress_extraversion_boost,
+        outrage_gain=run.outrage_gain,
+        max_viral_multiplier=run.max_viral_multiplier,
+        saturation_midpoint=run.saturation_midpoint,
+        distortion_max_noise=run.distortion_max_noise,
+        distortion_neurotic_gain=run.distortion_neurotic_gain,
+        evolution_generations=run.evolution_generations,
+        inheritance_fraction=run.inheritance_fraction,
+        shock_frequency=run.shock_frequency,
+        shock_magnitude=run.shock_magnitude,
     )
     config.wealth_dim_idx = DIMENSIONS.index("Wealth")
 
@@ -180,9 +226,10 @@ async def run_simulation(req: SimulationRequest):
         print(f"[{request_id}] Analyzing News with LLM...")
         llm_task = asyncio.to_thread(get_world_state, req.news_text)
 
-        # Start Baseline Task
-        print(f"[{request_id}] Analyzing News with Baseline AI...")
+        # Start Baseline Tasks
+        print(f"[{request_id}] Analyzing News with Baseline AIs...")
         baseline_task = asyncio.to_thread(validator.get_baseline_prob, req.news_text)
+        go_baseline_task = asyncio.to_thread(go_validator.get_baseline_prob, req.news_text)
 
         # Start Society Generation/Evolution Tasks
         society_tasks = []
@@ -193,8 +240,14 @@ async def run_simulation(req: SimulationRequest):
                 asyncio.to_thread(prepare_society_sync, run, run_output_dir)
             )
 
-        # Wait for LLM, Baseline, and all society tasks to complete concurrently
-        results = await asyncio.gather(llm_task, baseline_task, *society_tasks, return_exceptions=True)
+        # Wait for all tasks to complete concurrently
+        results = await asyncio.gather(
+            llm_task, 
+            baseline_task, 
+            go_baseline_task, 
+            *society_tasks, 
+            return_exceptions=True
+        )
 
         # Parse LLM result
         llm_result = results[0]
@@ -204,14 +257,18 @@ async def run_simulation(req: SimulationRequest):
         llm_result = cast(Tuple[torch.Tensor, float, bool], llm_result)
         world_tensor, urgency, is_personal = llm_result
 
-        # Parse Baseline result
+        # Parse Baseline results
         baseline_result = results[1]
         if isinstance(baseline_result, Exception):
             raise baseline_result
+            
+        go_baseline_result = results[2]
+        if isinstance(go_baseline_result, Exception):
+            raise go_baseline_result
 
         # Process each run
         all_results = []
-        for i, (run, society_result) in enumerate(zip(req.runs, results[2:])):
+        for i, (run, society_result) in enumerate(zip(req.runs, results[3:])):
             if isinstance(society_result, Exception):
                 print(f"[{request_id}] Run {i} Error: {society_result}")
                 all_results.append({"error": str(society_result)})
@@ -226,13 +283,28 @@ async def run_simulation(req: SimulationRequest):
 
             config, metadata, exposures, personalities, affinities = society_result
 
+            # --- ROLE FILTERING ---
+            if run.role != "All":
+                mask = metadata["Role"] == run.role
+                metadata = metadata[mask].reset_index(drop=True)
+                indices = np.where(mask.to_numpy())[0]
+                exposures = exposures[indices]
+                personalities = personalities[indices]
+                affinities = affinities[indices]
+                print(f"[{request_id}] Filtered Run {i} to Role: {run.role} ({len(metadata)} agents)")
+
             limit = min(run.agent_count, len(metadata))
+            if limit == 0:
+                all_results.append({"error": f"No agents found for role: {run.role}"})
+                continue
+
+            metadata = metadata.iloc[:limit]
             exposures = exposures[:limit]
             personalities = personalities[:limit]
             affinities = affinities[:limit]
 
             try:
-                influence = metadata["Influence"].to_numpy(dtype=np.float32)[:limit]
+                influence = metadata["Influence"].to_numpy(dtype=np.float32)
             except Exception as e:
                 raise ValueError(f"Type conversion failed for metadata columns: {e}")
 
@@ -251,6 +323,11 @@ async def run_simulation(req: SimulationRequest):
             projection_matrix = PSYCH_PROJECTION.to(device)
             final_emotions = torch.matmul(context_vector, projection_matrix)
 
+            # --- SHARPENING ---
+            # Use Softmax with temperature to amplify the primary emotion of each agent.
+            # This ensures the Physics Engine detects a clear 'Dominant Emotion'.
+            final_emotions = F.softmax(final_emotions / max(0.01, config.emotion_temperature), dim=1)
+
             # 6. Social Physics
             phys_engine = SocialPhysicsEngine(config)
             social_state = phys_engine.aggregate_society(
@@ -260,6 +337,10 @@ async def run_simulation(req: SimulationRequest):
             # 7. Validation
             validation_result = validator.calculate_kl_divergence(
                 social_state["objective_center"], baseline_result
+            )
+            
+            go_validation_result = go_validator.calculate_kl_divergence(
+                social_state["objective_center"], go_baseline_result
             )
 
             # Prepare emotions for UI
@@ -287,6 +368,7 @@ async def run_simulation(req: SimulationRequest):
                     "polarization": round(social_state["polarization"], 3),
                     "divergence": validation_result["kl_divergence"],
                     "validation_details": validation_result,
+                    "go_validation_details": go_validation_result,
                     "agent_states": current_agent_emotions,
                     "agent_influence": influence.tolist(),
                     "agent_metadata": agent_data,

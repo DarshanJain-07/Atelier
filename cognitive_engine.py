@@ -115,7 +115,7 @@ class CognitiveEngine:
 
         # Smooth stress scaling
         stress_factor = torch.sigmoid(
-            self.config.stress_gain * (urgency - threshold)
+            torch.tensor(self.config.stress_gain * (urgency - threshold), dtype=torch.float32, device=attention_weights.device)
         )  # (N,1)
 
         biased = attention_weights.clone()
@@ -124,21 +124,21 @@ class CognitiveEngine:
         # Neuroticism → amplify dominant interpretation
         # --------------------------------------------------
         dominant_val, dominant_idx = torch.max(biased, dim=1, keepdim=True)
-        amplification = 1.0 + stress_factor * neuroticism * 1.5
+        amplification = 1.0 + stress_factor * neuroticism * self.config.stress_neurotic_amplification
 
         biased.scatter_(1, dominant_idx, dominant_val * amplification)
 
         # --------------------------------------------------
         # Low Openness → reduce diversity
         # --------------------------------------------------
-        diversity_scale = 1.0 - stress_factor * (1 - openness) * 0.5
+        diversity_scale = 1.0 - stress_factor * (1 - openness) * self.config.stress_openness_reduction
         biased = biased * diversity_scale
 
         # --------------------------------------------------
         # Extraversion → increase emotional intensity
         # (global scaling of attention sharpness)
         # --------------------------------------------------
-        intensity_boost = 1.0 + stress_factor * extraversion * 0.7
+        intensity_boost = 1.0 + stress_factor * extraversion * self.config.stress_extraversion_boost
         biased = biased * intensity_boost
 
         # --------------------------------------------------
@@ -178,7 +178,7 @@ class CognitiveEngine:
         # 1. Signal Distortion
         # ---------------------------------
         distorted_world = self.distort_signal(
-            world_tensor_raw.to(device),
+            world_tensor_raw.squeeze().to(device),
             personalities,
         )  # (N,12)
 

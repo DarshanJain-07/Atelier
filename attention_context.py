@@ -54,29 +54,18 @@ class AttentionContext:
         agreeableness = personalities[:, 3:4]
         neuroticism = personalities[:, 4:5]
 
-        personality_mod = torch.zeros_like(Q_base)
+        # Calculate activations
+        O_act = torch.sigmoid(openness * 3.0 - 1.0)
+        C_act = F.relu(conscientiousness - 0.3) * 1.5
+        E_act = torch.sigmoid(extraversion * 2.0)
+        A_act = torch.tanh(agreeableness * 2.0)
+        N_act = torch.tanh(neuroticism * 2.5)
 
-        openness_boost = torch.sigmoid(openness * 3.0 - 1.0)
-        personality_mod[:, 6] += openness_boost.squeeze() * 0.8
-        personality_mod[:, 7] += openness_boost.squeeze() * 0.5
-        personality_mod[:, 11] += openness_boost.squeeze() * 0.6
+        # Shape (N, 5)
+        activations = torch.cat([O_act, C_act, E_act, A_act, N_act], dim=1)
 
-        neurotic_concern = torch.tanh(neuroticism * 2.5)
-        personality_mod[:, 1] += neurotic_concern.squeeze() * 1.2
-        personality_mod[:, 2] += neurotic_concern.squeeze() * 0.9
-
-        consc_mod = F.relu(conscientiousness - 0.3) * 1.5
-        personality_mod[:, 0] += consc_mod.squeeze() * 0.6
-        personality_mod[:, 3] += consc_mod.squeeze() * 0.7
-
-        extra_mod = torch.sigmoid(extraversion * 2.0)
-        personality_mod[:, 5] += extra_mod.squeeze() * 0.5
-        personality_mod[:, 9] += extra_mod.squeeze() * 0.4
-
-        agree_mod = torch.tanh(agreeableness * 2.0)
-        personality_mod[:, 4] += agree_mod.squeeze() * 0.8
-        personality_mod[:, 9] += agree_mod.squeeze() * 0.6
-        personality_mod[:, 8] += agree_mod.squeeze() * 0.5
+        from schema import PERSONALITY_QUERY_MATRIX
+        personality_mod = torch.matmul(activations, PERSONALITY_QUERY_MATRIX.to(Q_base.device))
 
         self.Q = torch.tanh(Q_base + personality_mod)
         return self
@@ -108,10 +97,10 @@ class AttentionContext:
         K_positive = F.relu(K)
         K_negative = F.relu(-K)
 
-        threat_sensitivity = 1.0 + neuroticism * 1.5
+        threat_sensitivity = 1.0 + neuroticism * self.config.threat_sensitivity_gain
         K_processed = K_positive - (K_negative * threat_sensitivity)
 
-        self.K = torch.tanh(K_processed * 1.5)
+        self.K = torch.tanh(K_processed * self.config.k_processing_tanh_gain)
         return self
 
     def cross_dimension_layer(self):
@@ -119,21 +108,12 @@ class AttentionContext:
             raise ValueError("cross_dimension_layer called before Q is initialized")
 
         Q = self.Q
-        interaction_strength = 0.3
+        from schema import CROSS_DIM_INTERACTIONS
 
-        safety_influence = Q[:, 1:2] * interaction_strength
-        Q[:, 2] += safety_influence.squeeze() * 0.4
-        Q[:, 9] += safety_influence.squeeze() * 0.3
+        influence = Q * self.config.cross_dim_interaction_strength
+        Q_cross = torch.matmul(influence, CROSS_DIM_INTERACTIONS.to(Q.device))
 
-        wealth_influence = Q[:, 0:1] * interaction_strength
-        Q[:, 3] += wealth_influence.squeeze() * 0.3
-        Q[:, 7] += wealth_influence.squeeze() * 0.2
-
-        innovation_influence = Q[:, 6:7] * interaction_strength
-        Q[:, 11] += innovation_influence.squeeze() * 0.3
-        Q[:, 10] += innovation_influence.squeeze() * 0.2
-
-        self.Q = torch.tanh(Q)
+        self.Q = torch.tanh(Q + Q_cross)
         return self
 
     def relevance_layer(self):
@@ -149,9 +129,9 @@ class AttentionContext:
         base_relevance = Q * K
 
         is_threat = (K < 0).float()
-        threat_amplifier = 1.0 + (is_threat * 1.5)
+        threat_amplifier = 1.0 + (is_threat * self.config.threat_amplifier_gain)
 
-        self.relevance = (0.7 * importance + 0.3 * base_relevance) * threat_amplifier
+        self.relevance = (self.config.relevance_importance_weight * importance + self.config.relevance_base_weight * base_relevance) * threat_amplifier
         return self
 
     def temperature_layer(self):
@@ -165,8 +145,8 @@ class AttentionContext:
         base_temperature = 1.0
         temp_modulation = (
             base_temperature
-            + (conscientiousness - 0.5) * 0.8
-            - (neuroticism - 0.5) * 0.6
+            + (conscientiousness - 0.5) * self.config.temp_conscientiousness_weight
+            - (neuroticism - 0.5) * self.config.temp_neuroticism_weight
         )
         temp_modulation = torch.clamp(temp_modulation, 0.5, 2.0)
 
@@ -180,8 +160,7 @@ class AttentionContext:
         personalities = self.personalities
         extraversion = personalities[:, 2:3]
 
-        threshold_base = 0.1
-        threshold = threshold_base - (extraversion - 0.5) * 0.15
+        threshold = self.config.threshold_base - (extraversion - 0.5) * self.config.threshold_extraversion_weight
         threshold = torch.clamp(threshold, 0.0, 0.3)
 
         mask = (torch.abs(self.relevance) > threshold).float()

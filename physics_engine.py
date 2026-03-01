@@ -81,9 +81,13 @@ class SocialPhysicsEngine:
         distances = torch.norm(emotion_tensor - center_of_gravity, dim=1)
 
         outrage_gain = getattr(self.config, "outrage_gain", 2.5)
-        # Clamp distance to prevent infinity in exponent
-        clamped_distances = torch.clamp(distances, max=5.0)
-        outrage_boost = torch.exp(clamped_distances * outrage_gain)
+        
+        # Sigmoid Saturation Model: simulates algorithm caps and user fatigue.
+        # Prevents extreme outliers from generating infinite viral weight.
+        max_multiplier = getattr(self.config, "max_viral_multiplier", 10.0)
+        midpoint = getattr(self.config, "saturation_midpoint", 1.5)
+        
+        outrage_boost = 1.0 + max_multiplier * torch.sigmoid(outrage_gain * (distances - midpoint))
 
         viral_weights = weights * outrage_boost
         viral_weights = viral_weights / viral_weights.sum()
@@ -143,8 +147,9 @@ class SocialPhysicsEngine:
 
         max_val, dominant_idx = torch.max(viral_center, dim=0)
 
-        # 0.18 threshold to ensure weak distributions are flagged as Neutral
-        if max_val < 0.18:
+        # Lower threshold: 0.15 is significantly above random chance (1/8 = 0.125)
+        # for an 8-emotion distribution.
+        if max_val < 0.15:
             dominant_label = "Neutral"
         else:
             dominant_label = EMOTION_LABELS[int(dominant_idx.item())]

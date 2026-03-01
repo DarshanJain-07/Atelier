@@ -256,6 +256,8 @@ class SimConfig:
 
     # --- Physics Engine Parameters ---
     outrage_gain: float = 2.5
+    max_viral_multiplier: float = 10.0
+    saturation_midpoint: float = 1.5
     elite_percentile: float = 0.95
 
     mutation_temperature: float = 0.7  # 0.0 to 1.0 (How many "Outlier" agents?)

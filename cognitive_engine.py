@@ -87,9 +87,12 @@ class CognitiveEngine:
         if ctx.relevance is None:
             raise ValueError("Attention pipeline failed: relevance was never computed")
 
+        # Extract raw engagement energy before Softmax normalizes it
+        raw_energy = torch.norm(ctx.relevance, dim=1)
+
         # Final Softmax
         attention_weights = F.softmax(ctx.relevance, dim=1)
-        return attention_weights
+        return attention_weights, raw_energy
 
     #
     def apply_stress_bias(self, attention_weights, personality, urgency):
@@ -187,7 +190,7 @@ class CognitiveEngine:
         # ---------------------------------
         # 3. Attention Computation
         # ---------------------------------
-        attention_weights = self.calculate_attention(
+        attention_weights, engagement_scores = self.calculate_attention(
             exposures,
             personalities,
             perceived_world,
@@ -209,4 +212,4 @@ class CognitiveEngine:
         context_vector = perceived_world * attention_weights
         context_vector = torch.clamp(context_vector, -2.0, 2.0)
 
-        return context_vector, attention_weights
+        return context_vector, attention_weights, engagement_scores

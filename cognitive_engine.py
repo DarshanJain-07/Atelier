@@ -1,7 +1,7 @@
 import torch
 import torch.nn.functional as F
 
-from attention import AttentionContext
+from attention_context import AttentionContext
 from schema import SimConfig
 
 
@@ -57,9 +57,10 @@ class CognitiveEngine:
         personalities: torch.Tensor,
         world_tensor: torch.Tensor,
         is_personal: bool,
-    ) -> torch.Tensor:
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         """
         Runs modular attention pipeline.
+        Returns: (attention_weights, raw_energy)
         """
 
         ctx = AttentionContext(

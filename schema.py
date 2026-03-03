@@ -32,6 +32,10 @@ EMOTION_LABELS: List[str] = [
     "Anticipation",
 ]
 
+VALENCE_WEIGHTS = torch.tensor(
+    [1.0, 0.5, -0.8, 0.0, -1.0, -0.5, -0.8, 0.5], dtype=torch.float32
+)
+
 # --- CONSTANTS ---
 # Map the 12 Dimensions to 8 Plutchik Emotions
 # Shape: (12 Input Dims, 8 Output Emotions)
@@ -174,10 +178,10 @@ PERSONALITY_QUERY_MATRIX = torch.tensor(
 
 # Cross Dimension Interaction Matrix
 CROSS_DIM_INTERACTIONS = torch.zeros((12, 12), dtype=torch.float32)
-CROSS_DIM_INTERACTIONS[1, 2] = 0.4   # Safety -> Stability
-CROSS_DIM_INTERACTIONS[1, 9] = 0.3   # Safety -> Care
-CROSS_DIM_INTERACTIONS[0, 3] = 0.3   # Wealth -> Reputation
-CROSS_DIM_INTERACTIONS[0, 7] = 0.2   # Wealth -> Freedom
+CROSS_DIM_INTERACTIONS[1, 2] = 0.4  # Safety -> Stability
+CROSS_DIM_INTERACTIONS[1, 9] = 0.3  # Safety -> Care
+CROSS_DIM_INTERACTIONS[0, 3] = 0.3  # Wealth -> Reputation
+CROSS_DIM_INTERACTIONS[0, 7] = 0.2  # Wealth -> Freedom
 CROSS_DIM_INTERACTIONS[6, 10] = 0.2  # Innovation -> Short_Term
 CROSS_DIM_INTERACTIONS[6, 11] = 0.3  # Innovation -> Long_Term
 
@@ -209,7 +213,7 @@ class SimConfig:
     stress_gain: float = 8.0  # if not already defined
     use_social_conformity: bool = False
     conformity_gain: float = 0.5  # optional but recommended
-    
+
     jealousy_factor: float = 1.0
     resentment_factor: float = 1.0
     protection_factor: float = 1.0
@@ -219,17 +223,17 @@ class SimConfig:
     cross_dim_interaction_strength: float = 0.3
     threat_sensitivity_gain: float = 1.5
     k_processing_tanh_gain: float = 1.5
-    
+
     relevance_importance_weight: float = 0.7
     relevance_base_weight: float = 0.3
     threat_amplifier_gain: float = 1.5
 
     temp_conscientiousness_weight: float = 0.8
     temp_neuroticism_weight: float = 0.6
-    
+
     threshold_base: float = 0.1
     threshold_extraversion_weight: float = 0.15
-    
+
     stress_neurotic_amplification: float = 1.5
     stress_openness_reduction: float = 0.5
     stress_extraversion_boost: float = 0.7
@@ -237,7 +241,7 @@ class SimConfig:
     use_power_law_influence: bool = False  # Enable Weighted Aggregation (Pareto)
     use_maslow_gating: bool = True  # Enable Survival Override (Fear Gating)
     wealth_dim_idx = DIMENSIONS.index("Wealth")
-    
+
     # --- Society Evolution ---
     enable_evolution: bool = True
     evolution_generations: int = 10
@@ -259,6 +263,7 @@ class SimConfig:
     max_viral_multiplier: float = 10.0
     saturation_midpoint: float = 1.5
     elite_percentile: float = 0.95
+    dominant_emotion_threshold: float = 0.1
 
     mutation_temperature: float = 0.7  # 0.0 to 1.0 (How many "Outlier" agents?)
     emotion_temperature: float = (

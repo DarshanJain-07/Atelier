@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 
-from schema import EMOTION_LABELS
+from schema import EMOTION_LABELS, VALENCE_WEIGHTS
 
 
 class SocialPhysicsEngine:
@@ -80,12 +80,12 @@ class SocialPhysicsEngine:
 
         distances = torch.norm(emotion_tensor - center_of_gravity, dim=1)
 
-        outrage_gain = getattr(self.config, "outrage_gain", 2.5)
+        outrage_gain = self.config.outrage_gain
         
         # Sigmoid Saturation Model: simulates algorithm caps and user fatigue.
         # Prevents extreme outliers from generating infinite viral weight.
-        max_multiplier = getattr(self.config, "max_viral_multiplier", 10.0)
-        midpoint = getattr(self.config, "saturation_midpoint", 1.5)
+        max_multiplier = self.config.max_viral_multiplier
+        midpoint = self.config.saturation_midpoint
         
         outrage_boost = 1.0 + max_multiplier * torch.sigmoid(outrage_gain * (distances - midpoint))
 
@@ -98,7 +98,7 @@ class SocialPhysicsEngine:
         # 3️⃣ Elite Emotional Center
         # ============================================================
 
-        elite_percentile = getattr(self.config, "elite_percentile", 0.95)
+        elite_percentile = self.config.elite_percentile
         threshold = torch.quantile(weights, elite_percentile)
 
         elite_mask = weights >= threshold
@@ -136,10 +136,9 @@ class SocialPhysicsEngine:
         # Positive: Joy (+1), Trust (+0.5), Anticipation (+0.5), Surprise (0)
         # Negative: Sadness (-1), Disgust (-0.5), Anger (-0.8), Fear (-0.8)
         # Assuming EMOTION_LABELS order: ["Joy", "Trust", "Fear", "Surprise", "Sadness", "Disgust", "Anger", "Anticipation"]
-        valence_weights = torch.tensor([1.0, 0.5, -0.8, 0.0, -1.0, -0.5, -0.8, 0.5], dtype=torch.float32)
         
         # Calculate single valence score for the objective center (-1.0 to 1.0)
-        valence_score = torch.dot(center_of_gravity, valence_weights).item()
+        valence_score = torch.dot(center_of_gravity, VALENCE_WEIGHTS).item()
 
         # ============================================================
         # 6️⃣ Dominant Emotion (Viral State)
@@ -147,9 +146,9 @@ class SocialPhysicsEngine:
 
         max_val, dominant_idx = torch.max(viral_center, dim=0)
 
-        # Lower threshold: 0.15 is significantly above random chance (1/8 = 0.125)
+        # Lower threshold is significantly above random chance (1/8 = 0.125)
         # for an 8-emotion distribution.
-        if max_val < 0.15:
+        if max_val < self.config.dominant_emotion_threshold:
             dominant_label = "Neutral"
         else:
             dominant_label = EMOTION_LABELS[int(dominant_idx.item())]

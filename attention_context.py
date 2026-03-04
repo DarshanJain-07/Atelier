@@ -88,18 +88,18 @@ class AttentionContext:
         # pays high attention to a random personal event.
         proximity = torch.pow(torch.rand(Q.shape[0], 1, device=device), 10.0)
 
-        personal_mask = torch.zeros_like(Q)
-        personal_mask[:, 0] = 1.0
-        personal_mask[:, 1] = 1.0
-        personal_mask[:, 3] = 1.0
-
         # Maximum boost scalar
         max_boost = torch.exp(torch.tensor(1.5, device=device))
         
-        # Agent-specific boost depends on proximity and empathy
-        agent_boost = 1.0 + max_boost * proximity * (0.5 + 0.5 * agreeableness)
+        # For personal events, baseline interest should be severely suppressed unless proximity is high.
+        # Most of the population will ignore the event.
+        base_multiplier = 0.05
         
-        Q = Q * (1.0 + personal_mask * (agent_boost - 1.0))
+        # Agent-specific multiplier: low for strangers, high for close ones
+        agent_multiplier = base_multiplier + max_boost * proximity * (0.5 + 0.5 * agreeableness)
+        
+        # Scale all dimensions of attention based on relevance/proximity
+        Q = Q * agent_multiplier
         self.Q = torch.clamp(Q, -2.5, 2.5)
 
         return self

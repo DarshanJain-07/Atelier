@@ -160,7 +160,6 @@ class SocietyEvolution:
             self.apply_reinvestment()
             self.apply_economic_shocks(gen)
             self.apply_mobility()
-            self.apply_mobility()
 
             if self.config.use_dynamic_roles:
                 self.reassign_roles()

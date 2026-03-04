@@ -105,47 +105,6 @@ def get_world_state(user_input: str) -> Tuple[torch.Tensor, float, bool]:
     *   Set "Is_Personal" to true ONLY if the text explicitly mentions "My", "I", "Me" (e.g., "My name in files").
     *   "Trump in epstein files" is NOT personal. Leaders, Animals, Events etc are not personal
 
-    ### 4. FEW-SHOT EXAMPLES:
-    Input: "Major protests break out in the capital over economic recession fears."
-    Output:
-    {
-      "Reasoning": "Protests and recession fears are 'Significant' events (±0.3 - 0.5). Time pressure is near future.",
-      "Urgency": 0.5,
-      "Is_Personal": false,
-      "Wealth": -0.5,
-      "Physical_Safety": -0.4,
-      "Stability": -0.5,
-      "Reputation": -0.4,
-      "Fairness": -0.4,
-      "In_Group": 0.3,
-      "Innovation": 0.0,
-      "Freedom": -0.1,
-      "Sanctity": 0.0,
-      "Care": 0.0,
-      "Short_Term": 0.6,
-      "Long_Term": 0.2
-    }
-
-    Input: "My wallet was stolen during my morning commute."
-    Output:
-    {
-      "Reasoning": "Explicit use of 'My' makes it personal. The event is a significant personal loss but not civilization-altering.",
-      "Urgency": 0.8,
-      "Is_Personal": true,
-      "Wealth": -0.4,
-      "Physical_Safety": -0.3,
-      "Stability": -0.3,
-      "Reputation": 0.0,
-      "Fairness": -0.3,
-      "In_Group": 0.0,
-      "Innovation": 0.0,
-      "Freedom": 0.0,
-      "Sanctity": 0.0,
-      "Care": 0.0,
-      "Short_Term": 0.8,
-      "Long_Term": 0.0
-    }
-
     Output JSON only.
     """
 

@@ -1,0 +1,882 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>ATELIER</title>
+        <link rel="stylesheet" href="style.css" />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
+            rel="stylesheet"
+        />
+    </head>
+    <body>
+        <!-- TOP TELEMETRY BAR -->
+        <header class="telemetry-bar">
+            <!-- LEFT: BRAND -->
+            <div class="brand">
+                <div class="brand-icon">
+                    <div class="icon-inner"></div>
+                </div>
+                <span>ATELIER</span>
+            </div>
+
+            <!-- RIGHT: METRICS + GEAR -->
+            <div class="telemetry-right">
+                <div class="metrics-ticker">
+                    <div
+                        class="metric"
+                        data-tooltip="The raw majority emotion across the entire population, unweighted by influence."
+                    >
+                        <span class="label">MAJORITY</span>
+                        <span class="value" id="val-majority">--</span>
+                    </div>
+                    <div class="separator"></div>
+                    <div
+                        class="metric"
+                        data-tooltip="The most influential emotion, weighted by agent influence and outrage contagion."
+                    >
+                        <span class="label">DOMINANT</span>
+                        <span class="value" id="val-sentiment">--</span>
+                    </div>
+                    <div class="separator"></div>
+                    <div
+                        class="metric"
+                        data-tooltip="Measures societal fragmentation. High values indicate strong emotional disagreement among agents; low values indicate consensus."
+                    >
+                        <span class="label">POLARIZATION</span>
+                        <span class="value" id="val-polarization">--</span>
+                    </div>
+                    <div class="separator"></div>
+                    <div
+                        class="metric"
+                        data-tooltip="Measures deviation from standard AI sentiment baselines. Higher values suggest the simulation has detected complex, human-centric nuances that standard models miss."
+                    >
+                        <span class="label">ROBERTA DIV</span>
+                        <span class="value" id="val-divergence">--</span>
+                    </div>
+                    <div class="separator"></div>
+                    <div
+                        class="metric"
+                        data-tooltip="Measures deviation from GoEmotions 28-class baseline."
+                    >
+                        <span class="label">GO DIV</span>
+                        <span class="value" id="val-go-divergence">--</span>
+                    </div>
+                    <div class="separator"></div>
+                    <div class="metric">
+                        <span class="label">STATUS</span>
+                        <span class="value" id="sys-status">--</span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <div class="app-body">
+            <!-- MAIN VISUALIZATION LAYER -->
+            <main class="canvas-wrapper">
+                <div class="grid-background"></div>
+
+                <div class="axis-label axis-joy">JOY</div>
+                <div class="axis-label axis-trust">TRUST</div>
+                <div class="axis-label axis-fear">FEAR</div>
+                <div class="axis-label axis-surprise">SURPRISE</div>
+                <div class="axis-label axis-sadness">SADNESS</div>
+                <div class="axis-label axis-disgust">DISGUST</div>
+                <div class="axis-label axis-anger">ANGER</div>
+                <div class="axis-label axis-anticipation">ANTICIPATION</div>
+
+                <canvas id="agent-canvas"></canvas>
+            </main>
+
+            <!-- RETRACTABLE SIDEBAR -->
+            <aside class="sidebar" id="config-sidebar">
+                <div class="sidebar-tabs">
+                    <button class="tab-btn active" id="tab-basic">BASIC</button>
+                    <button class="tab-btn" id="tab-researcher">
+                        RESEARCH
+                    </button>
+                </div>
+                <div class="sidebar-content" id="sidebar-basic">
+                    <div class="config-section">
+                        <label class="section-title" data-tooltip="Set the roles of agents to observe.">SCOPE</label>
+                        <div class="select-wrapper">
+                            <select id="filter-role">
+                                <option value="All" selected>All Roles</option>
+                                <option value="Underclass">Underclass</option>
+                                <option value="Working Class">
+                                    Working Class
+                                </option>
+                                <option value="Middle Class">
+                                    Middle Class
+                                </option>
+                                <option value="Upper Middle">
+                                    Upper Middle
+                                </option>
+                                <option value="Elite">Elite</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="config-section">
+                        <label class="section-title" data-tooltip="Toggle core simulation mechanisms.">PARAMETERS</label>
+                        <div class="toggle-grid">
+                            <button
+                                class="toggle-btn active"
+                                id="tog-distortion"
+                                onclick="this.classList.toggle('active')"
+                                data-tooltip="Enable signal distortion (Telephone Game / Entropy)"
+                            >
+                                Distortion
+                            </button>
+                            <button
+                                class="toggle-btn active"
+                                id="tog-pressure"
+                                onclick="this.classList.toggle('active')"
+                                data-tooltip="Enable time pressure (Cognitive Tunneling / Urgency)"
+                            >
+                                Time Pressure
+                            </button>
+                            <button
+                                class="toggle-btn active"
+                                id="tog-maslow"
+                                onclick="this.classList.toggle('active')"
+                                data-tooltip="Enable Maslow gating (Survival Override / Fear Gating)"
+                            >
+                                Maslow Gate
+                            </button>
+                            <button
+                                class="toggle-btn active"
+                                id="tog-power-law"
+                                onclick="this.classList.toggle('active')"
+                                data-tooltip="Enable power law influence (Weighted Aggregation / Pareto Distribution)"
+                            >
+                                Power Law
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="config-section">
+                        <label class="section-title" data-tooltip="Total number of agents simulated in the population.">POPULATION</label>
+                        <div class="range-wrapper">
+                            <input
+                                type="range"
+                                id="param-count"
+                                min="1000"
+                                max="15000"
+                                step="1000"
+                                value="5000"
+                            />
+                            <span class="range-val" id="disp-count">5.0k</span>
+                        </div>
+                    </div>
+
+                    <div class="config-section">
+                        <label
+                            class="section-title"
+                            data-tooltip="Controls the mutation rate. Higher values increase randomness in agent personalities and beliefs, creating more outliers."
+                            >TEMPERATURE</label
+                        >
+                        <div class="range-wrapper">
+                            <input
+                                type="range"
+                                id="param-temp"
+                                min="0"
+                                max="1.0"
+                                step="0.1"
+                                value="0.7"
+                            />
+                            <span class="range-val" id="disp-temp">0.7</span>
+                        </div>
+                    </div>
+
+                    <div class="config-section">
+                        <label class="section-title" data-tooltip="Manage parallel simulation runs for comparison.">BATCH MATRIX</label>
+                        <div id="batch-container" class="batch-list">
+                            <!-- Run Profiles will be injected here -->
+                        </div>
+                        <button
+                            id="btn-add-run"
+                            class="action-btn-outline action-btn-add-run"
+                        >
+                            + ADD EXPERIMENT
+                        </button>
+                    </div>
+                </div>
+
+                <div class="sidebar-content hidden" id="sidebar-researcher">
+                    <div class="config-section">
+                        <label
+                            class="section-title"
+                            data-tooltip="Controls the sharpness of emotions. Lower values mean more pronounced dominant emotions."
+                            >EMOTION TEMP</label
+                        >
+                        <div class="range-wrapper">
+                            <input
+                                type="range"
+                                id="param-emotion-temp"
+                                min="0.01"
+                                max="1.0"
+                                step="0.01"
+                                value="0.2"
+                            />
+                            <span class="range-val" id="disp-emotion-temp"
+                                >0.2</span
+                            >
+                        </div>
+                    </div>
+
+                    <div class="config-section">
+                        <label
+                            class="section-title"
+                            data-tooltip="Panic threshold. If safety falls below this, FEAR is triggered."
+                            >PANIC THRESHOLD</label
+                        >
+                        <div class="range-wrapper">
+                            <input
+                                type="range"
+                                id="param-panic-thresh"
+                                min="-3.0"
+                                max="0.0"
+                                step="0.1"
+                                value="-1.2"
+                            />
+                            <span class="range-val" id="disp-panic-thresh"
+                                >-1.2</span
+                            >
+                        </div>
+                    </div>
+
+                    <div class="config-section">
+                        <label class="section-title" data-tooltip="Parameters governing how agents perceive and process information.">COGNITIVE ENGINE</label>
+                        <div class="sidebar-grid">
+                            <div class="sidebar-field">
+                                <label data-tooltip="Interaction strength between different world dimensions.">Cross Dim</label
+                                ><input
+                                    type="number"
+                                    id="res-cross-dim"
+                                    step="0.1"
+                                    value="0.3"
+                                    class="sidebar-input"
+                                />
+                            </div>
+                            <div class="sidebar-field">
+                                <label data-tooltip="Threat sensitivity multiplier for perception.">Threat Sens</label
+                                ><input
+                                    type="number"
+                                    id="res-threat-sens"
+                                    step="0.1"
+                                    value="1.5"
+                                    class="sidebar-input"
+                                />
+                            </div>
+                        </div>
+                        <div class="sidebar-grid">
+                            <div class="sidebar-field">
+                                <label data-tooltip="Processing speed/gain factor in processing functions.">K Process</label
+                                ><input
+                                    type="number"
+                                    id="res-k-process"
+                                    step="0.1"
+                                    value="1.5"
+                                    class="sidebar-input"
+                                />
+                            </div>
+                            <div class="sidebar-field">
+                                <label data-tooltip="Weight of importance in relevance calculation.">Rel Imp Wt</label
+                                ><input
+                                    type="number"
+                                    id="res-rel-imp"
+                                    step="0.1"
+                                    value="0.7"
+                                    class="sidebar-input"
+                                />
+                            </div>
+                        </div>
+                        <div class="sidebar-grid">
+                            <div class="sidebar-field">
+                                <label data-tooltip="Base weight in relevance calculation.">Rel Base Wt</label
+                                ><input
+                                    type="number"
+                                    id="res-rel-base"
+                                    step="0.1"
+                                    value="0.3"
+                                    class="sidebar-input"
+                                />
+                            </div>
+                            <div class="sidebar-field">
+                                <label data-tooltip="Amplification factor for identified threats.">Threat Amp</label
+                                ><input
+                                    type="number"
+                                    id="res-threat-amp"
+                                    step="0.1"
+                                    value="1.5"
+                                    class="sidebar-input"
+                                />
+                            </div>
+                        </div>
+                    </div>
+                    <div class="config-section">
+                        <label class="section-title" data-tooltip="How psychological traits react under high urgency/stress.">STRESS MULTIPLIERS</label>
+                        <div class="sidebar-grid">
+                            <div class="sidebar-field">
+                                <label data-tooltip="Amplification of neuroticism under stress.">Neur Amp</label
+                                ><input
+                                    type="number"
+                                    id="res-stress-neur"
+                                    step="0.1"
+                                    value="1.5"
+                                    class="sidebar-input"
+                                />
+                            </div>
+                            <div class="sidebar-field">
+                                <label data-tooltip="Reduction of openness under stress.">Open Red</label
+                                ><input
+                                    type="number"
+                                    id="res-stress-open"
+                                    step="0.1"
+                                    value="0.5"
+                                    class="sidebar-input"
+                                />
+                            </div>
+                        </div>
+                        <div class="sidebar-grid">
+                            <div class="sidebar-field">
+                                <label data-tooltip="Boost to extraversion under stress.">Ext Boost</label
+                                ><input
+                                    type="number"
+                                    id="res-stress-ext"
+                                    step="0.1"
+                                    value="0.7"
+                                    class="sidebar-input"
+                                />
+                            </div>
+                        </div>
+                    </div>
+                    <div class="config-section">
+                        <label class="section-title" data-tooltip="Parameters controlling the spread of emotion through the network.">PHYSICS ENGINE</label>
+                        <div class="sidebar-grid">
+                            <div class="sidebar-field">
+                                <label data-tooltip="Multiplier for outrage propagation.">Outrage Gain</label
+                                ><input
+                                    type="number"
+                                    id="res-outrage"
+                                    step="0.1"
+                                    value="2.5"
+                                    class="sidebar-input"
+                                />
+                            </div>
+                            <div class="sidebar-field">
+                                <label data-tooltip="Maximum viral multiplier for information spread.">Viral Mult</label
+                                ><input
+                                    type="number"
+                                    id="res-viral"
+                                    step="0.1"
+                                    value="10.0"
+                                    class="sidebar-input"
+                                />
+                            </div>
+                        </div>
+                        <div class="sidebar-grid">
+                            <div class="sidebar-field">
+                                <label data-tooltip="Midpoint for saturation curve in social influence.">Saturation</label
+                                ><input
+                                    type="number"
+                                    id="res-sat"
+                                    step="0.1"
+                                    value="1.5"
+                                    class="sidebar-input"
+                                />
+                            </div>
+                        </div>
+                    </div>
+                    <div class="config-section">
+                        <label class="section-title" data-tooltip="Settings for noise and information loss."
+                            >DISTORTION & ENTROPY</label
+                        >
+                        <div class="sidebar-grid">
+                            <div class="sidebar-field">
+                                <label data-tooltip="Maximum noise added during signal distortion.">Max Noise</label
+                                ><input
+                                    type="number"
+                                    id="res-dist-max"
+                                    step="0.1"
+                                    value="0.4"
+                                    class="sidebar-input"
+                                />
+                            </div>
+                            <div class="sidebar-field">
+                                <label data-tooltip="Additional distortion noise based on neuroticism.">Neur Gain</label
+                                ><input
+                                    type="number"
+                                    id="res-dist-neur"
+                                    step="0.1"
+                                    value="0.6"
+                                    class="sidebar-input"
+                                />
+                            </div>
+                        </div>
+                    </div>
+                    <div class="config-section">
+                        <label class="section-title" data-tooltip="Settings for the long-term societal evolution loop.">EVOLUTION</label>
+                        <div class="sidebar-grid">
+                            <div class="sidebar-field">
+                                <label data-tooltip="Number of evolution cycles to run.">Generations</label
+                                ><input
+                                    type="number"
+                                    id="res-evo-gen"
+                                    step="1"
+                                    value="10"
+                                    class="sidebar-input"
+                                />
+                            </div>
+                            <div class="sidebar-field">
+                                <label data-tooltip="Fraction of wealth/influence inherited by the next generation.">Inherit Frac</label
+                                ><input
+                                    type="number"
+                                    id="res-evo-inh"
+                                    step="0.1"
+                                    value="0.7"
+                                    class="sidebar-input"
+                                />
+                            </div>
+                        </div>
+                        <div class="sidebar-grid">
+                            <div class="sidebar-field">
+                                <label data-tooltip="Frequency of random societal shocks.">Shock Freq</label
+                                ><input
+                                    type="number"
+                                    id="res-evo-shock-freq"
+                                    step="0.1"
+                                    value="0.1"
+                                    class="sidebar-input"
+                                />
+                            </div>
+                            <div class="sidebar-field">
+                                <label data-tooltip="Magnitude of random societal shocks.">Shock Mag</label
+                                ><input
+                                    type="number"
+                                    id="res-evo-shock-mag"
+                                    step="0.1"
+                                    value="0.2"
+                                    class="sidebar-input"
+                                />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- RUN FILMSTRIP (Only shows after multi-run) -->
+            <div id="run-filmstrip" class="run-filmstrip hidden">
+                <!-- Mini result cards -->
+            </div>
+        </div>
+
+        <!-- BOTTOM INPUT BAR -->
+        <footer class="input-bar">
+            <div class="input-container">
+                <div class="input-icon">
+                    <svg
+                        width="18"
+                        height="18"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                    >
+                        <path d="M4 6h16M4 12h16M4 18h8" />
+                    </svg>
+                </div>
+                <input
+                    type="text"
+                    id="news-input"
+                    placeholder="Market volatility following unexpected fed rate hike"
+                    autocomplete="off"
+                    value="Market volatility following unexpected fed rate hike"
+                />
+                <div class="separator"></div>
+                <div class="separator"></div>
+                <div class="separator"></div>
+                <div class="separator"></div>
+                <button
+                    id="settings-btn"
+                    class="icon-btn settings-trigger"
+                    title="Configure Model"
+                >
+                    <svg
+                        width="18"
+                        height="18"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                    >
+                        <circle cx="12" cy="12" r="3"></circle>
+                        <path
+                            d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"
+                        ></path>
+                    </svg>
+                </button>
+                <button
+                    id="history-btn"
+                    class="icon-btn settings-trigger"
+                    title="Simulation History"
+                >
+                    <svg
+                        width="18"
+                        height="18"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                    >
+                        <path
+                            d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                        ></path>
+                    </svg>
+                </button>
+                <button
+                    id="filmstrip-toggle-btn"
+                    class="icon-btn settings-trigger hidden"
+                    title="Toggle Filmstrip"
+                >
+                    <svg
+                        width="18"
+                        height="18"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                    >
+                        <rect
+                            x="2"
+                            y="2"
+                            width="20"
+                            height="20"
+                            rx="2.18"
+                            ry="2.18"
+                        ></rect>
+                        <line x1="7" y1="2" x2="7" y2="22"></line>
+                        <line x1="17" y1="2" x2="17" y2="22"></line>
+                        <line x1="2" y1="12" x2="22" y2="12"></line>
+                    </svg>
+                </button>
+            </div>
+
+            <div class="action-group">
+                <button id="btn-run" class="run-btn">RUN MODEL</button>
+            </div>
+        </footer>
+
+        <!-- HOVER TOOLTIP -->
+        <div id="tooltip" class="agent-card">
+            <div class="card-header">
+                <span class="agent-id">ID: <span id="tt-id">--</span></span>
+                <span class="agent-role" id="tt-role">--</span>
+            </div>
+            <div class="card-body">
+                <div class="data-row">
+                    <span>Influence</span>
+                    <span id="tt-influence" class="mono">--</span>
+                </div>
+                <div class="data-row highlight">
+                    <span>State</span> <span id="tt-state">--</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- INTERACTIVE AGENT DOSSIER -->
+        <div id="dossier-card" class="dossier-card hidden">
+            <div class="dossier-header">
+                <div class="dossier-id-badge">
+                    AGENT <span id="ds-id">0000</span>
+                </div>
+                <button id="ds-close" class="close-btn">&times;</button>
+            </div>
+
+            <div class="dossier-tabs">
+                <button class="tab-btn active" id="tab-agent">
+                    INDIVIDUAL
+                </button>
+                <button class="tab-btn" id="tab-cluster">
+                    CLUSTER AGGREGATE
+                </button>
+            </div>
+
+            <div class="dossier-main">
+                <!-- INDIVIDUAL VIEW -->
+                <div id="view-agent">
+                    <div class="dossier-info info-grid-1col">                        <div class="info-group">
+                            <label>ROLE</label>
+                            <div id="ds-role" class="info-value">--</div>
+                        </div>
+                    </div>
+
+                    <div class="dossier-personality">
+                        <label class="section-label"
+                            >PSYCHOMETRIC PROFILE (BIG 5)</label
+                        >
+                        <div class="traits-container">
+                            <div class="trait-row">
+                                <div class="trait-header">
+                                    <span class="trait-name">Openness</span>
+                                    <span id="val-openness" class="trait-val"
+                                        >0%</span
+                                    >
+                                </div>
+                                <div class="trait-bar-bg">
+                                    <div
+                                        id="bar-openness"
+                                        class="trait-bar"
+                                    ></div>
+                                </div>
+                            </div>
+                            <div class="trait-row">
+                                <div class="trait-header">
+                                    <span class="trait-name"
+                                        >Conscientiousness</span
+                                    >
+                                    <span
+                                        id="val-conscientiousness"
+                                        class="trait-val"
+                                        >0%</span
+                                    >
+                                </div>
+                                <div class="trait-bar-bg">
+                                    <div
+                                        id="bar-conscientiousness"
+                                        class="trait-bar"
+                                    ></div>
+                                </div>
+                            </div>
+                            <div class="trait-row">
+                                <div class="trait-header">
+                                    <span class="trait-name">Extraversion</span>
+                                    <span
+                                        id="val-extraversion"
+                                        class="trait-val"
+                                        >0%</span
+                                    >
+                                </div>
+                                <div class="trait-bar-bg">
+                                    <div
+                                        id="bar-extraversion"
+                                        class="trait-bar"
+                                    ></div>
+                                </div>
+                            </div>
+                            <div class="trait-row">
+                                <div class="trait-header">
+                                    <span class="trait-name"
+                                        >Agreeableness</span
+                                    >
+                                    <span
+                                        id="val-agreeableness"
+                                        class="trait-val"
+                                        >0%</span
+                                    >
+                                </div>
+                                <div class="trait-bar-bg">
+                                    <div
+                                        id="bar-agreeableness"
+                                        class="trait-bar"
+                                    ></div>
+                                </div>
+                            </div>
+                            <div class="trait-row">
+                                <div class="trait-header">
+                                    <span class="trait-name">Neuroticism</span>
+                                    <span id="val-neuroticism" class="trait-val"
+                                        >0%</span
+                                    >
+                                </div>
+                                <div class="trait-bar-bg">
+                                    <div
+                                        id="bar-neuroticism"
+                                        class="trait-bar"
+                                    ></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CLUSTER VIEW -->
+                <div id="view-cluster" class="hidden">
+                    <div class="dossier-personality">
+                        <label class="section-label"
+                            >MEAN PERSONALITY (<span id="ds-cluster-name"
+                                >--</span
+                            >)</label
+                        >
+                        <div class="traits-container">
+                            <div class="trait-row">
+                                <div class="trait-header">
+                                    <span class="trait-name">Openness</span>
+                                    <span id="c-val-openness" class="trait-val"
+                                        >0%</span
+                                    >
+                                </div>
+                                <div class="trait-bar-bg">
+                                    <div
+                                        id="c-bar-openness"
+                                        class="trait-bar trait-bar-blue"
+                                    ></div>
+                                </div>
+                            </div>
+                            <div class="trait-row">
+                                <div class="trait-header">
+                                    <span class="trait-name"
+                                        >Conscientiousness</span
+                                    >
+                                    <span
+                                        id="c-val-conscientiousness"
+                                        class="trait-val"
+                                        >0%</span
+                                    >
+                                </div>
+                                <div class="trait-bar-bg">
+                                    <div
+                                        id="c-bar-conscientiousness"
+                                        class="trait-bar trait-bar-blue"
+                                    ></div>
+                                </div>
+                            </div>
+                            <div class="trait-row">
+                                <div class="trait-header">
+                                    <span class="trait-name">Extraversion</span>
+                                    <span
+                                        id="c-val-extraversion"
+                                        class="trait-val"
+                                        >0%</span
+                                    >
+                                </div>
+                                <div class="trait-bar-bg">
+                                    <div
+                                        id="c-bar-extraversion"
+                                        class="trait-bar trait-bar-blue"
+                                    ></div>
+                                </div>
+                            </div>
+                            <div class="trait-row">
+                                <div class="trait-header">
+                                    <span class="trait-name"
+                                        >Agreeableness</span
+                                    >
+                                    <span
+                                        id="c-val-agreeableness"
+                                        class="trait-val"
+                                        >0%</span
+                                    >
+                                </div>
+                                <div class="trait-bar-bg">
+                                    <div
+                                        id="c-bar-agreeableness"
+                                        class="trait-bar trait-bar-blue"
+                                    ></div>
+                                </div>
+                            </div>
+                            <div class="trait-row">
+                                <div class="trait-header">
+                                    <span class="trait-name">Neuroticism</span>
+                                    <span
+                                        id="c-val-neuroticism"
+                                        class="trait-val"
+                                        >0%</span
+                                    >
+                                </div>
+                                <div class="trait-bar-bg">
+                                    <div
+                                        id="c-bar-neuroticism"
+                                        class="trait-bar trait-bar-blue"
+                                    ></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="dist-container">
+                        <div class="dist-group">
+                            <label
+                                class="section-label margin-y-12"
+                                >ROLE DISTRIBUTION</label
+                            >
+                            <div id="ds-cluster-roles">
+                                <!-- Dynamic -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SESSION HISTORY PANEL -->
+        <div id="history-panel" class="history-panel hidden">
+            <div class="history-header">
+                <div class="history-title">SESSION HISTORY</div>
+                <div class="history-actions">
+                    <input
+                        type="file"
+                        id="load-history-input"
+                        accept=".json"
+                        class="hidden"
+                    />
+                    <button
+                        id="load-history-btn"
+                        class="icon-btn-small"
+                        title="Load History JSON"
+                    >
+                        <svg
+                            width="14"
+                            height="14"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                        >
+                            <path
+                                d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4m4-10l5-5 5 5m-5-5v12"
+                            />
+                        </svg>
+                    </button>
+                    <button
+                        id="download-all-btn"
+                        class="icon-btn-small"
+                        title="Download Session Data"
+                    >
+                        <svg
+                            width="14"
+                            height="14"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                        >
+                            <path
+                                d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4m4-5l5 5 5-5m-5 5V3"
+                            />
+                        </svg>
+                    </button>
+                    <button id="close-history" class="close-btn">
+                        &times;
+                    </button>
+                </div>
+            </div>
+            <div class="history-graph-container" id="history-graph">
+                <!-- Dynamically generated graph nodes -->
+                <div class="empty-history-msg">
+                    No simulations recorded in this session.
+                </div>
+            </div>
+        </div>
+
+        <script src="script.js"></script>
+    </body>
+</html>

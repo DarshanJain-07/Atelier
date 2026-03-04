@@ -74,16 +74,32 @@ class AttentionContext:
         if not self.is_personal:
             return self
         if self.Q is None:
-            raise ValueError("cross_dimension_layer called before Q is initialized")
+            raise ValueError("personal_event_layer called before Q is initialized")
 
         Q = self.Q
+        device = Q.device
+        personalities = self.personalities
+        
+        # Empathy determines how much an agent cares about others' personal events
+        agreeableness = personalities[:, 3:4]
+        
+        # Simulate proximity/relevance to the personal event.
+        # A highly skewed distribution (pow 10) ensures only a small localized cluster
+        # pays high attention to a random personal event.
+        proximity = torch.pow(torch.rand(Q.shape[0], 1, device=device), 10.0)
+
         personal_mask = torch.zeros_like(Q)
         personal_mask[:, 0] = 1.0
         personal_mask[:, 1] = 1.0
         personal_mask[:, 3] = 1.0
 
-        personal_boost = 1.0 + torch.exp(torch.tensor(1.5))
-        Q = Q * (1.0 + personal_mask * (personal_boost - 1.0))
+        # Maximum boost scalar
+        max_boost = torch.exp(torch.tensor(1.5, device=device))
+        
+        # Agent-specific boost depends on proximity and empathy
+        agent_boost = 1.0 + max_boost * proximity * (0.5 + 0.5 * agreeableness)
+        
+        Q = Q * (1.0 + personal_mask * (agent_boost - 1.0))
         self.Q = torch.clamp(Q, -2.5, 2.5)
 
         return self
@@ -118,9 +134,9 @@ class AttentionContext:
 
     def relevance_layer(self):
         if self.Q is None:
-            raise ValueError("cross_dimension_layer called before Q is initialized")
+            raise ValueError("relevance_layer called before Q is initialized")
         if self.K is None:
-            raise ValueError("cross_dimension_layer called before K is initialized")
+            raise ValueError("relevance_layer called before K is initialized")
 
         Q = self.Q
         K = self.K

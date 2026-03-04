@@ -224,7 +224,7 @@ function renderFilmstrip(results) {
             <div class="filmstrip-emotion" style="color: ${PALETTE[res.dominant_emotion]}">${res.dominant_emotion.toUpperCase()}</div>
             <div class="filmstrip-stats">
                 <span>POL: ${res.polarization}</span>
-                <span>DIV: ${res.divergence.toFixed(2)} | GO: ${res.go_validation_details ? res.go_validation_details.kl_divergence.toFixed(2) : "--"}</span>
+                <span>W-DIST: ${res.divergence.toFixed(2)} | KL: ${res.kl_divergence.toFixed(2)}</span>
             </div>
         `;
     filmstrip.appendChild(card);
@@ -290,7 +290,7 @@ function displayResult(data) {
     : divVal.toFixed(3);
 
   const goDivVal = data.go_validation_details
-    ? parseFloat(data.go_validation_details.kl_divergence)
+    ? parseFloat(data.go_validation_details.wasserstein_distance)
     : NaN;
   const goDivEl = document.getElementById("val-go-divergence");
   if (goDivEl) {

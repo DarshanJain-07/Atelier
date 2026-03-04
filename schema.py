@@ -256,7 +256,17 @@ class SimConfig:
     use_dynamic_roles: bool = True
     role_temperature: float = 0.5
     elite_wealth_threshold: float = 0.95
+    use_ideological_drift: bool = True
+    ideological_drift_rate: float = 0.05
+    ideological_drift_noise: float = 0.02
+    elite_influence_drift_chance: float = 0.20  # Chance society drifts toward elite ideology instead of global mean
+    use_ideological_repulsion: bool = True
+    repulsion_threshold: float = 0.5  # If similarity to societal mean is less than this, agents repel
+    repulsion_rate: float = 0.02
     record_history: bool = False
+
+    # --- Initialization Parameters ---
+    initial_trait_std_dev: float = 0.33  # Standard deviation for generating initial trait bell curves
 
     # --- Physics Engine Parameters ---
     outrage_gain: float = 2.5

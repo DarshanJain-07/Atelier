@@ -36,7 +36,8 @@ def apply_random_mutations(exposures, personalities, temperature, seed):
 
     for _ in range(num_changes):
         col_indices = torch.randint(0, num_dims, (len(mutant_indices),), generator=rng)
-        random_values = (torch.rand(len(mutant_indices), generator=rng) * 2) - 1.0
+        # Use normal distribution for mutations to preserve bell curve (avoid uniformity/bimodality)
+        random_values = torch.clamp(torch.randn(len(mutant_indices), generator=rng) * 0.4, -1.0, 1.0)
         exposures[mutant_indices, col_indices] = random_values
 
     for _ in range(num_changes):
@@ -137,8 +138,8 @@ def generate_society(config: SimConfig):
     total_dims = num_dims * 2 + num_personalities
 
     # ---- Continuous random trait field ----
-    # Mean 0, Std 1 for exposures and affinities
-    traits = torch.randn(config.num_agents, total_dims)
+    # Mean 0, Std set by config to fit nicely in [-1, 1] without hard clamping
+    traits = torch.randn(config.num_agents, total_dims) * config.initial_trait_std_dev
 
     exposures = traits[:, :num_dims]
     # Sigmoid to bound personalities between 0 and 1
@@ -168,12 +169,10 @@ def generate_society(config: SimConfig):
 
     exposures[:, wealth_idx] = torch.tensor(wealth_values).float()
 
-    # Clamp non-wealth traits only
+    # Clamp non-wealth traits to strict bounds (most are already in bounds due to std 0.33)
     non_wealth_mask = torch.ones(num_dims, dtype=torch.bool)
     non_wealth_mask[wealth_idx] = False
-    exposures[:, non_wealth_mask] = torch.clamp(
-        exposures[:, non_wealth_mask], -1.0, 1.0
-    )
+    exposures[:, non_wealth_mask] = torch.clamp(exposures[:, non_wealth_mask], -1.0, 1.0)
     personalities = torch.clamp(personalities, 0.0, 1.0)
 
     # --- Affinity Normalization (Cognitive Bandwidth) ---

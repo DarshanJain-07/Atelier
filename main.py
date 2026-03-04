@@ -23,7 +23,7 @@ from physics_engine import SocialPhysicsEngine
 # Import our Core Logic
 from schema import DIMENSIONS, EMOTION_LABELS, PSYCH_PROJECTION, SimConfig
 from society_evolution import SocietyEvolution
-from validation import Validator, GoEmotionsValidator
+from validation import Validator
 
 load_dotenv()
 
@@ -33,7 +33,6 @@ if not os.getenv("GEMINI_API_KEY"):
 
 app = FastAPI()
 validator = Validator()
-go_validator = GoEmotionsValidator()
 
 # Enable CORS - Restrict this in production!
 app.add_middleware(
@@ -229,7 +228,6 @@ async def run_simulation(req: SimulationRequest):
         # Start Baseline Tasks
         print(f"[{request_id}] Analyzing News with Baseline AIs...")
         baseline_task = asyncio.to_thread(validator.get_baseline_prob, req.news_text)
-        go_baseline_task = asyncio.to_thread(go_validator.get_baseline_prob, req.news_text)
 
         # Start Society Generation/Evolution Tasks
         society_tasks = []
@@ -242,11 +240,10 @@ async def run_simulation(req: SimulationRequest):
 
         # Wait for all tasks to complete concurrently
         results = await asyncio.gather(
-            llm_task, 
-            baseline_task, 
-            go_baseline_task, 
-            *society_tasks, 
-            return_exceptions=True
+            llm_task,
+            baseline_task,
+            *society_tasks,
+            return_exceptions=True,
         )
 
         # Parse LLM result
@@ -261,14 +258,10 @@ async def run_simulation(req: SimulationRequest):
         baseline_result = results[1]
         if isinstance(baseline_result, Exception):
             raise baseline_result
-            
-        go_baseline_result = results[2]
-        if isinstance(go_baseline_result, Exception):
-            raise go_baseline_result
 
         # Process each run
         all_results = []
-        for i, (run, society_result) in enumerate(zip(req.runs, results[3:])):
+        for i, (run, society_result) in enumerate(zip(req.runs, results[2:])):
             if isinstance(society_result, Exception):
                 print(f"[{request_id}] Run {i} Error: {society_result}")
                 all_results.append({"error": str(society_result)})
@@ -291,7 +284,9 @@ async def run_simulation(req: SimulationRequest):
                 exposures = exposures[indices]
                 personalities = personalities[indices]
                 affinities = affinities[indices]
-                print(f"[{request_id}] Filtered Run {i} to Role: {run.role} ({len(metadata)} agents)")
+                print(
+                    f"[{request_id}] Filtered Run {i} to Role: {run.role} ({len(metadata)} agents)"
+                )
 
             limit = min(run.agent_count, len(metadata))
             if limit == 0:
@@ -326,7 +321,9 @@ async def run_simulation(req: SimulationRequest):
             # --- SHARPENING ---
             # Use Softmax with temperature to amplify the primary emotion of each agent.
             # This ensures the Physics Engine detects a clear 'Dominant Emotion'.
-            final_emotions = F.softmax(final_emotions / max(0.01, config.emotion_temperature), dim=1)
+            final_emotions = F.softmax(
+                final_emotions / max(0.01, config.emotion_temperature), dim=1
+            )
 
             # 6. Social Physics
             phys_engine = SocialPhysicsEngine(config)
@@ -335,12 +332,8 @@ async def run_simulation(req: SimulationRequest):
             )
 
             # 7. Validation
-            validation_result = validator.calculate_kl_divergence(
+            validation_result = validator.calculate_divergence(
                 social_state["objective_center"], baseline_result
-            )
-            
-            go_validation_result = go_validator.calculate_kl_divergence(
-                social_state["objective_center"], go_baseline_result
             )
 
             # Prepare emotions for UI
@@ -366,9 +359,12 @@ async def run_simulation(req: SimulationRequest):
                     "config": run.model_dump(),
                     "dominant_emotion": social_state["dominant_emotion"],
                     "polarization": round(social_state["polarization"], 3),
-                    "divergence": validation_result["kl_divergence"],
+                    "divergence": validation_result[
+                        "wasserstein_distance"
+                    ],  # Keep key for UI compatibility
+                    "wasserstein_distance": validation_result["wasserstein_distance"],
+                    "kl_divergence": validation_result["kl_divergence"],
                     "validation_details": validation_result,
-                    "go_validation_details": go_validation_result,
                     "agent_states": current_agent_emotions,
                     "agent_influence": influence.tolist(),
                     "agent_metadata": agent_data,

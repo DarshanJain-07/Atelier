@@ -11,3 +11,5 @@ transformers
 pyarrow
 scipy
 requests
+scikit-learn
+python-louvain

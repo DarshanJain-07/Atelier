@@ -32,6 +32,13 @@
     /* [FIX] Removed global outline: none; which broke keyboard navigation */
 }
 
+button,
+input,
+select,
+textarea {
+    font-family: inherit;
+}
+
 /* [FIX] Added explicit accessibility focus ring for keyboard users */
 :focus-visible {
     outline: 2px solid var(--accent);
@@ -380,7 +387,8 @@ select:hover {
     position: relative;
 }
 
-[data-tooltip]:hover::after {
+[data-tooltip]:hover::after,
+[data-tooltip]:focus-visible::after {
     content: attr(data-tooltip);
     position: absolute;
     left: var(--tt-left, 50%);
@@ -391,7 +399,8 @@ select:hover {
     border-radius: 6px;
     border: 1px solid var(--border);
     font-size: 0.7rem;
-    width: var(--tt-width, 220px);
+    width: max-content;
+    max-width: 220px;
     white-space: normal;
     line-height: 1.4;
     text-align: center;
@@ -417,46 +426,45 @@ select:hover {
 
 /* Tooltip Positioning */
 .toggle-btn[data-tooltip]:hover::after,
+.toggle-btn[data-tooltip]:focus-visible::after,
 .section-title[data-tooltip]:hover::after,
-label[data-tooltip]:hover::after {
-    bottom: calc(100% + 10px);
-    --y-slide: 4px;
+.section-title[data-tooltip]:focus-visible::after,
+label[data-tooltip]:hover::after,
+label[data-tooltip]:focus-visible::after {
+    top: calc(100% + 10px);
+    --y-slide: -4px;
 }
 
-.metric[data-tooltip]:hover::after {
+.metric[data-tooltip]:hover::after,
+.metric[data-tooltip]:focus-visible::after {
     top: calc(100% + 10px);
     --y-slide: -4px;
 }
 
 /* Sidebar Tooltip Boundary Fixes */
 .sidebar .section-title[data-tooltip] {
-    --tt-left: 10;
+    --tt-left: 0;
     --tt-x: 0;
-    --tt-width: 180px;
 }
 .sidebar-grid .sidebar-field:nth-child(odd) label[data-tooltip] {
     --tt-left: 0;
     --tt-x: 0;
-    --tt-width: 160px;
 }
 .sidebar-grid .sidebar-field:nth-child(even) label[data-tooltip] {
     --tt-left: auto;
     --tt-right: 0;
     --tt-x: 0;
-    --tt-width: 160px;
 }
 .toggle-grid .toggle-btn:nth-child(1)[data-tooltip],
 .toggle-grid .toggle-btn:nth-child(2)[data-tooltip] {
     --tt-left: 0;
     --tt-x: 0;
-    --tt-width: 150px;
 }
 .toggle-grid .toggle-btn:nth-child(3)[data-tooltip],
 .toggle-grid .toggle-btn:nth-child(4)[data-tooltip] {
     --tt-left: auto;
     --tt-right: 0;
     --tt-x: 0;
-    --tt-width: 150px;
 }
 
 .range-wrapper {
@@ -1536,4 +1544,88 @@ input[type="range"]::-moz-range-track {
     .axis-label {
         font-size: 0.5rem; /* Scale down axis labels */
     }
+}
+
+/* Explainability Panel */
+.explainability-panel {
+    position: absolute;
+    bottom: 90px;
+    right: 24px;
+    width: 420px;
+    max-height: 600px;
+    background: var(--bg-panel);
+    border: 1px solid var(--border-highlight);
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    z-index: 1000;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.7);
+    overflow: hidden;
+    animation: historySlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.explainability-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.explainability-title {
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+}
+
+.explainability-content {
+    padding: 20px;
+    overflow-y: auto;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.explain-section h4 {
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    color: #10b981;
+    margin: 0 0 8px 0;
+}
+
+.explain-section p {
+    font-size: 0.85rem;
+    line-height: 1.5;
+    color: var(--text-main);
+    margin: 0;
+}
+
+.demo-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.demo-item {
+    background: rgba(255, 255, 255, 0.03);
+    border-left: 2px solid #10b981;
+    padding: 10px;
+    border-radius: 4px;
+}
+
+.demo-item-name {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-main);
+    margin-bottom: 4px;
+}
+
+.demo-item-desc {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    line-height: 1.4;
 }

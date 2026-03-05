@@ -205,7 +205,7 @@ class SimConfig:
     distortion_min_alpha: float = 0.01
 
     use_engagement_gate: bool = True
-    engagement_threshold: float = 0.25  # Energy required to meaningfully react
+    engagement_threshold: float = 0.15  # Lowered from 0.25 to prevent dead zone for average agents
     engagement_gain: float = 10.0  # Sharpness of transition
 
     use_time_pressure: bool = True  # Enable "Cognitive Tunneling" (Urgency)
@@ -231,7 +231,7 @@ class SimConfig:
     temp_conscientiousness_weight: float = 0.8
     temp_neuroticism_weight: float = 0.6
 
-    threshold_base: float = 0.1
+    threshold_base: float = 0.05  # Lowered from 0.1 to allow smaller emotional responses through
     threshold_extraversion_weight: float = 0.15
 
     stress_neurotic_amplification: float = 1.5
@@ -269,11 +269,15 @@ class SimConfig:
     initial_trait_std_dev: float = 0.33  # Standard deviation for generating initial trait bell curves
 
     # --- Physics Engine Parameters ---
-    outrage_gain: float = 2.5
+    outrage_gain: float = 5.0
     max_viral_multiplier: float = 10.0
-    saturation_midpoint: float = 1.5
+    saturation_midpoint: float = 0.5
     elite_percentile: float = 0.95
     dominant_emotion_threshold: float = 0.1
+
+    # --- Cascade Parameters ---
+    cascade_knn_k: int = 8
+    cascade_threshold: float = 0.06
 
     mutation_temperature: float = 0.7  # 0.0 to 1.0 (How many "Outlier" agents?)
     emotion_temperature: float = (

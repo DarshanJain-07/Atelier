@@ -91,8 +91,8 @@ class CognitiveEngine:
         # Extract raw engagement energy before Softmax normalizes it
         raw_energy = torch.norm(ctx.relevance, dim=1)
 
-        # Final Softmax
-        attention_weights = F.softmax(ctx.relevance, dim=1)
+        # Final Softmax (multiplied by 5.0 to prevent uniform flat distributions)
+        attention_weights = F.softmax(ctx.relevance * 5.0, dim=1)
         return attention_weights, raw_energy
 
     #

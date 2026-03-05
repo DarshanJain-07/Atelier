@@ -334,6 +334,35 @@ function displayResult(data) {
   }
 
   calculateClusterAggregates();
+
+  // 5. Update Explainability UI
+  const explainBtn = document.getElementById("btn-explain");
+  if (data.explainability) {
+    explainBtn.classList.remove("hidden");
+    // Format bold text as HTML strong
+    const formatBold = (str) => str.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    
+    document.getElementById("ex-cognitive").innerHTML = formatBold(data.explainability.cognitive_drivers || "--");
+    document.getElementById("ex-shift-story").innerHTML = formatBold(data.explainability.shift_story || "--");
+    document.getElementById("ex-viral").innerHTML = formatBold(data.explainability.viral_dynamics || "--");
+    document.getElementById("ex-tug-of-war").innerHTML = formatBold(data.explainability.tug_of_war || "--");
+    document.getElementById("ex-structure").innerHTML = formatBold(data.explainability.societal_structure || "--");
+    
+    const demoList = document.getElementById("ex-demographics");
+    demoList.innerHTML = "";
+    if (data.explainability.demographics && data.explainability.demographics.length > 0) {
+      data.explainability.demographics.forEach(demo => {
+        const item = document.createElement("div");
+        item.className = "demo-item";
+        item.innerHTML = `<div class="demo-item-name">${demo.name}</div><div class="demo-item-desc">${formatBold(demo.description)}</div>`;
+        demoList.appendChild(item);
+      });
+    } else {
+      demoList.innerHTML = "<div>No specific demographics found.</div>";
+    }
+  } else {
+    explainBtn.classList.add("hidden");
+  }
 }
 
 // --- CLUSTER AGGREGATE CALCULATION ---
@@ -803,6 +832,15 @@ function animate() {
 window.addEventListener("resize", resize);
 document.getElementById("btn-run").addEventListener("click", runSimulation);
 document.getElementById("param-count").addEventListener("input", initAgents);
+
+// Explainability Toggle
+const explainPanel = document.getElementById("explainability-panel");
+document.getElementById("btn-explain").addEventListener("click", () => {
+  explainPanel.classList.toggle("hidden");
+});
+document.getElementById("close-explainability").addEventListener("click", () => {
+  explainPanel.classList.add("hidden");
+});
 
 // Settings Panel Toggle
 document.getElementById("settings-btn").addEventListener("click", () => {

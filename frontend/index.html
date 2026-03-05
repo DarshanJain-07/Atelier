@@ -25,7 +25,7 @@
             <div class="telemetry-right">
                 <div class="metrics-ticker">
                     <div
-                        class="metric"
+                        class="metric" tabindex="0"
                         data-tooltip="The raw majority emotion across the entire population, unweighted by influence."
                     >
                         <span class="label">MAJORITY</span>
@@ -33,7 +33,7 @@
                     </div>
                     <div class="separator"></div>
                     <div
-                        class="metric"
+                        class="metric" tabindex="0"
                         data-tooltip="The most influential emotion, weighted by agent influence and outrage contagion."
                     >
                         <span class="label">DOMINANT</span>
@@ -41,7 +41,7 @@
                     </div>
                     <div class="separator"></div>
                     <div
-                        class="metric"
+                        class="metric" tabindex="0"
                         data-tooltip="Measures societal fragmentation. High values indicate strong emotional disagreement among agents; low values indicate consensus."
                     >
                         <span class="label">POLARIZATION</span>
@@ -49,7 +49,7 @@
                     </div>
                     <div class="separator"></div>
                     <div
-                        class="metric"
+                        class="metric" tabindex="0"
                         data-tooltip="Measures deviation from standard AI sentiment baselines. Higher values suggest the simulation has detected complex, human-centric nuances that standard models miss."
                     >
                         <span class="label">ROBERTA DIV</span>
@@ -57,14 +57,14 @@
                     </div>
                     <div class="separator"></div>
                     <div
-                        class="metric"
+                        class="metric" tabindex="0"
                         data-tooltip="Measures deviation from GoEmotions 28-class baseline."
                     >
                         <span class="label">GO DIV</span>
                         <span class="value" id="val-go-divergence">--</span>
                     </div>
                     <div class="separator"></div>
-                    <div class="metric">
+                    <div class="metric" tabindex="0">
                         <span class="label">STATUS</span>
                         <span class="value" id="sys-status">--</span>
                     </div>
@@ -73,6 +73,40 @@
         </header>
 
         <div class="app-body">
+            <!-- EXPLAINABILITY OVERLAY -->
+            <div id="explainability-panel" class="explainability-panel hidden">
+                <div class="explainability-header">
+                    <div class="explainability-title">REASONING TRACES</div>
+                    <button id="close-explainability" class="close-btn" aria-label="Close explainability">&times;</button>
+                </div>
+                <div class="explainability-content">
+                    <div class="explain-section">
+                        <h4>COGNITIVE DRIVERS</h4>
+                        <p id="ex-cognitive">--</p>
+                    </div>
+                    <div class="explain-section">
+                        <h4>THE SHIFT</h4>
+                        <p id="ex-shift-story">--</p>
+                    </div>
+                    <div class="explain-section">
+                        <h4>VIRAL DYNAMICS</h4>
+                        <p id="ex-viral">--</p>
+                    </div>
+                    <div class="explain-section">
+                        <h4>TUG OF WAR</h4>
+                        <p id="ex-tug-of-war">--</p>
+                    </div>
+                    <div class="explain-section">
+                        <h4>SOCIETAL STRUCTURE</h4>
+                        <p id="ex-structure">--</p>
+                    </div>
+                    <div class="explain-section">
+                        <h4>DEMOGRAPHICS</h4>
+                        <div id="ex-demographics" class="demo-list">--</div>
+                    </div>
+                </div>
+            </div>
+
             <!-- MAIN VISUALIZATION LAYER -->
             <main class="canvas-wrapper">
                 <div class="grid-background"></div>
@@ -86,7 +120,7 @@
                 <div class="axis-label axis-anger">ANGER</div>
                 <div class="axis-label axis-anticipation">ANTICIPATION</div>
 
-                <canvas id="agent-canvas"></canvas>
+                <canvas id="agent-canvas" aria-label="Agent state visualization"></canvas>
             </main>
 
             <!-- RETRACTABLE SIDEBAR -->
@@ -99,7 +133,7 @@
                 </div>
                 <div class="sidebar-content" id="sidebar-basic">
                     <div class="config-section">
-                        <label class="section-title" data-tooltip="Set the roles of agents to observe.">SCOPE</label>
+                        <label class="section-title" tabindex="0" data-tooltip="Set the roles of agents to observe.">SCOPE</label>
                         <div class="select-wrapper">
                             <select id="filter-role">
                                 <option value="All" selected>All Roles</option>
@@ -119,7 +153,7 @@
                     </div>
 
                     <div class="config-section">
-                        <label class="section-title" data-tooltip="Toggle core simulation mechanisms.">PARAMETERS</label>
+                        <label class="section-title" tabindex="0" data-tooltip="Toggle core simulation mechanisms.">PARAMETERS</label>
                         <div class="toggle-grid">
                             <button
                                 class="toggle-btn active"
@@ -157,7 +191,7 @@
                     </div>
 
                     <div class="config-section">
-                        <label class="section-title" data-tooltip="Total number of agents simulated in the population.">POPULATION</label>
+                        <label class="section-title" tabindex="0" for="param-count" data-tooltip="Total number of agents simulated in the population.">POPULATION</label>
                         <div class="range-wrapper">
                             <input
                                 type="range"
@@ -173,7 +207,8 @@
 
                     <div class="config-section">
                         <label
-                            class="section-title"
+                            class="section-title" tabindex="0"
+                            for="param-temp"
                             data-tooltip="Controls the mutation rate. Higher values increase randomness in agent personalities and beliefs, creating more outliers."
                             >TEMPERATURE</label
                         >
@@ -191,7 +226,7 @@
                     </div>
 
                     <div class="config-section">
-                        <label class="section-title" data-tooltip="Manage parallel simulation runs for comparison.">BATCH MATRIX</label>
+                        <label class="section-title" tabindex="0" data-tooltip="Manage parallel simulation runs for comparison.">BATCH MATRIX</label>
                         <div id="batch-container" class="batch-list">
                             <!-- Run Profiles will be injected here -->
                         </div>
@@ -207,7 +242,7 @@
                 <div class="sidebar-content hidden" id="sidebar-researcher">
                     <div class="config-section">
                         <label
-                            class="section-title"
+                            class="section-title" tabindex="0"
                             data-tooltip="Controls the sharpness of emotions. Lower values mean more pronounced dominant emotions."
                             >EMOTION TEMP</label
                         >
@@ -228,7 +263,7 @@
 
                     <div class="config-section">
                         <label
-                            class="section-title"
+                            class="section-title" tabindex="0"
                             data-tooltip="Panic threshold. If safety falls below this, FEAR is triggered."
                             >PANIC THRESHOLD</label
                         >
@@ -248,7 +283,7 @@
                     </div>
 
                     <div class="config-section">
-                        <label class="section-title" data-tooltip="Parameters governing how agents perceive and process information.">COGNITIVE ENGINE</label>
+                        <label class="section-title" tabindex="0" data-tooltip="Parameters governing how agents perceive and process information.">COGNITIVE ENGINE</label>
                         <div class="sidebar-grid">
                             <div class="sidebar-field">
                                 <label data-tooltip="Interaction strength between different world dimensions.">Cross Dim</label
@@ -317,7 +352,7 @@
                         </div>
                     </div>
                     <div class="config-section">
-                        <label class="section-title" data-tooltip="How psychological traits react under high urgency/stress.">STRESS MULTIPLIERS</label>
+                        <label class="section-title" tabindex="0" data-tooltip="How psychological traits react under high urgency/stress.">STRESS MULTIPLIERS</label>
                         <div class="sidebar-grid">
                             <div class="sidebar-field">
                                 <label data-tooltip="Amplification of neuroticism under stress.">Neur Amp</label
@@ -354,7 +389,7 @@
                         </div>
                     </div>
                     <div class="config-section">
-                        <label class="section-title" data-tooltip="Parameters controlling the spread of emotion through the network.">PHYSICS ENGINE</label>
+                        <label class="section-title" tabindex="0" data-tooltip="Parameters controlling the spread of emotion through the network.">PHYSICS ENGINE</label>
                         <div class="sidebar-grid">
                             <div class="sidebar-field">
                                 <label data-tooltip="Multiplier for outrage propagation.">Outrage Gain</label
@@ -362,7 +397,7 @@
                                     type="number"
                                     id="res-outrage"
                                     step="0.1"
-                                    value="2.5"
+                                    value="5.0"
                                     class="sidebar-input"
                                 />
                             </div>
@@ -384,14 +419,14 @@
                                     type="number"
                                     id="res-sat"
                                     step="0.1"
-                                    value="1.5"
+                                    value="0.5"
                                     class="sidebar-input"
                                 />
                             </div>
                         </div>
                     </div>
                     <div class="config-section">
-                        <label class="section-title" data-tooltip="Settings for noise and information loss."
+                        <label class="section-title" tabindex="0" data-tooltip="Settings for noise and information loss."
                             >DISTORTION & ENTROPY</label
                         >
                         <div class="sidebar-grid">
@@ -418,7 +453,7 @@
                         </div>
                     </div>
                     <div class="config-section">
-                        <label class="section-title" data-tooltip="Settings for the long-term societal evolution loop.">EVOLUTION</label>
+                        <label class="section-title" tabindex="0" data-tooltip="Settings for the long-term societal evolution loop.">EVOLUTION</label>
                         <div class="sidebar-grid">
                             <div class="sidebar-field">
                                 <label data-tooltip="Number of evolution cycles to run.">Generations</label
@@ -491,6 +526,7 @@
                 <input
                     type="text"
                     id="news-input"
+                    aria-label="News Headline Input"
                     placeholder="Market volatility following unexpected fed rate hike"
                     autocomplete="off"
                     value="Market volatility following unexpected fed rate hike"
@@ -502,6 +538,7 @@
                 <button
                     id="settings-btn"
                     class="icon-btn settings-trigger"
+                    aria-label="Configure Model"
                     title="Configure Model"
                 >
                     <svg
@@ -523,6 +560,7 @@
                 <button
                     id="history-btn"
                     class="icon-btn settings-trigger"
+                    aria-label="Simulation History"
                     title="Simulation History"
                 >
                     <svg
@@ -543,6 +581,7 @@
                 <button
                     id="filmstrip-toggle-btn"
                     class="icon-btn settings-trigger hidden"
+                    aria-label="Toggle Filmstrip"
                     title="Toggle Filmstrip"
                 >
                     <svg
@@ -571,6 +610,7 @@
             </div>
 
             <div class="action-group">
+                <button id="btn-explain" class="run-btn hidden" style="background: rgba(16, 185, 129, 0.2); border-color: #10b981; color: #10b981; margin-right: 10px;">EXPLAIN</button>
                 <button id="btn-run" class="run-btn">RUN MODEL</button>
             </div>
         </footer>
@@ -598,7 +638,7 @@
                 <div class="dossier-id-badge">
                     AGENT <span id="ds-id">0000</span>
                 </div>
-                <button id="ds-close" class="close-btn">&times;</button>
+                <button id="ds-close" class="close-btn" aria-label="Close dossier">&times;</button>
             </div>
 
             <div class="dossier-tabs">
@@ -831,6 +871,7 @@
                     <button
                         id="load-history-btn"
                         class="icon-btn-small"
+                        aria-label="Load History JSON"
                         title="Load History JSON"
                     >
                         <svg
@@ -849,6 +890,7 @@
                     <button
                         id="download-all-btn"
                         class="icon-btn-small"
+                        aria-label="Download Session Data"
                         title="Download Session Data"
                     >
                         <svg
@@ -864,7 +906,7 @@
                             />
                         </svg>
                     </button>
-                    <button id="close-history" class="close-btn">
+                    <button id="close-history" class="close-btn" aria-label="Close history">
                         &times;
                     </button>
                 </div>

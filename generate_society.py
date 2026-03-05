@@ -156,6 +156,29 @@ def generate_society(config: SimConfig):
         sigma=0.5 + config.mutation_temperature,
         size=config.num_agents
     )
+    
+    if getattr(config, "use_power_law_influence", False):
+        alpha = 1.16  # standard 80/20 rule pareto
+        pareto_multiplier = (np.random.pareto(alpha, config.num_agents) + 1) * 2.0
+        influence_scores *= pareto_multiplier
+
+    # To create a realistic correlation between structural influence and susceptibility,
+    # we slightly modify personalities of top influencers to be less susceptible 
+    # (lower agreeableness, lower openness to external change)
+    # and lower influencers to be more standard.
+    
+    # rank influence to get percentiles
+    influence_ranks = np.argsort(np.argsort(influence_scores)) / (config.num_agents - 1)
+    
+    # Agreeableness is index 3, Openness is index 0
+    # Top influencers (rank near 1.0) get a reduction in agreeableness and openness
+    stubbornness_modifier = torch.tensor(influence_ranks, dtype=torch.float32).unsqueeze(1) * 0.3
+    
+    # Reduce agreeableness (index 3) and openness (index 0)
+    # Give them a minimum floor so they can still be occasionally swayed (e.g. by board members/peers)
+    personalities[:, 0] = torch.clamp(personalities[:, 0] - stubbornness_modifier.squeeze() * 0.4, 0.3, 1.0)
+    personalities[:, 3] = torch.clamp(personalities[:, 3] - stubbornness_modifier.squeeze() * 0.4, 0.3, 1.0)
+
 
     # ---- Wealth (no role multipliers) ----
     wealth_base = np.ones(config.num_agents)
@@ -167,7 +190,17 @@ def generate_society(config: SimConfig):
         config.seed,
     )
 
-    exposures[:, wealth_idx] = torch.tensor(wealth_values).float()
+    # Normalize wealth to [-1, 1] for the exposures tensor (RDE layer assumes [-1, 1])
+    # We use log1p to compress the heavy tail, then min-max scale, then shift.
+    log_wealth = np.log1p(wealth_values)
+    min_w = np.min(log_wealth)
+    max_w = np.max(log_wealth)
+    if max_w > min_w:
+        wealth_normalized = 2.0 * ((log_wealth - min_w) / (max_w - min_w)) - 1.0
+    else:
+        wealth_normalized = np.zeros_like(log_wealth)
+
+    exposures[:, wealth_idx] = torch.tensor(wealth_normalized).float()
 
     # Clamp non-wealth traits to strict bounds (most are already in bounds due to std 0.33)
     non_wealth_mask = torch.ones(num_dims, dtype=torch.bool)

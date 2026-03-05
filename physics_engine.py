@@ -174,6 +174,10 @@ class SocialPhysicsEngine:
             "confidence": round(max_val.item(), 3),
             "sentiment_valence": round(valence_score, 3),
 
+            # Virality metrics
+            "mean_outrage_multiplier": round(outrage_boost.mean().item(), 3),
+            "max_outrage_multiplier": round(outrage_boost.max().item(), 3),
+
             # Stability metrics
             "polarization": polarization,
             "entropy": entropy,

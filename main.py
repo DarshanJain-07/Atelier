@@ -19,6 +19,7 @@ from cognitive_engine import CognitiveEngine
 from generate_society import generate_society
 from input_layer import get_world_state
 from physics_engine import SocialPhysicsEngine
+from explainability import ExplainabilityEngine
 
 # Import our Core Logic
 from schema import DIMENSIONS, EMOTION_LABELS, PSYCH_PROJECTION, SimConfig
@@ -74,9 +75,9 @@ class RunProfile(BaseModel):
     stress_extraversion_boost: float = 0.7
 
     # Researcher (Physics)
-    outrage_gain: float = 2.5
+    outrage_gain: float = 5.0
     max_viral_multiplier: float = 10.0
-    saturation_midpoint: float = 1.5
+    saturation_midpoint: float = 0.5
 
     # Researcher (Distortion)
     distortion_max_noise: float = 0.4
@@ -336,6 +337,16 @@ async def run_simulation(req: SimulationRequest):
                 social_state["objective_center"], baseline_result
             )
 
+            # 8. Explainability
+            explain_engine = ExplainabilityEngine()
+            explainability_data = explain_engine.generate_explanation(
+                social_state=social_state,
+                metadata=metadata.iloc[:limit],
+                personalities=personalities,
+                final_emotions=final_emotions,
+                attention_weights=attention_weights
+            )
+
             # Prepare emotions for UI
             emotion_indices = torch.argmax(final_emotions, dim=1).tolist()
             current_agent_emotions = [EMOTION_LABELS[idx] for idx in emotion_indices]
@@ -365,6 +376,7 @@ async def run_simulation(req: SimulationRequest):
                     "wasserstein_distance": validation_result["wasserstein_distance"],
                     "kl_divergence": validation_result["kl_divergence"],
                     "validation_details": validation_result,
+                    "explainability": explainability_data,
                     "agent_states": current_agent_emotions,
                     "agent_influence": influence.tolist(),
                     "agent_metadata": agent_data,

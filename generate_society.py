@@ -313,10 +313,13 @@ def generate_society(config: SimConfig):
     return df_metadata, exposures, personalities, affinities, adjacency_matrix
 
 
-if __name__ == "__main__":
+def main():
     conf = SimConfig(num_agents=10000, seed=69)
     conf.wealth_dim_idx = DIMENSIONS.index("Wealth")
-    df_meta, exposures, personalities, affinities = generate_society(conf)
+    df_meta, exposures, personalities, affinities, adjacency_matrix = generate_society(conf)
     if conf.enable_evolution:
         evolver = SocietyEvolution(conf, df_meta, exposures, personalities)
         df_meta, exposures, personalities = evolver.evolve()
+
+if __name__ == "__main__":
+    main()

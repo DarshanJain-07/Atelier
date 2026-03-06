@@ -14,6 +14,14 @@ load_dotenv()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 MODEL = "gemini-3-flash-preview"
 
+class LLMGenerationError(Exception):
+    """Raised when the LLM API call fails or returns an unexpected format."""
+    pass
+
+class DimensionParseError(Exception):
+    """Raised when the dimension extraction process fails after max retries."""
+    pass
+
 
 class WorldState(BaseModel):
     Reasoning: str
@@ -148,14 +156,14 @@ def get_world_state(user_input: str) -> Tuple[torch.Tensor, float, bool]:
             )
 
             if resp.status_code != 200:
-                raise Exception(f"API Error {resp.status_code}: {resp.text}")
+                raise LLMGenerationError(f"API Error {resp.status_code}: {resp.text}")
 
             data = resp.json()
 
             try:
                 text_response = data["candidates"][0]["content"]["parts"][0]["text"]
             except (KeyError, IndexError) as e:
-                raise Exception(f"Unexpected API response format: {data}") from e
+                raise LLMGenerationError(f"Unexpected API response format: {data}") from e
 
             parsed_json = json.loads(text_response)
 
@@ -165,7 +173,7 @@ def get_world_state(user_input: str) -> Tuple[torch.Tensor, float, bool]:
 
         except Exception as e:
             if attempt == max_retries - 1:
-                raise Exception(f"Dimension Retrieval Failure: {e}")
+                raise DimensionParseError(f"Dimension Retrieval Failure: {e}") from e
 
             print(f"Retrying after error: {e}")
             time.sleep(base_delay * (2**attempt))

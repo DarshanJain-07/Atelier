@@ -174,7 +174,7 @@ class ExplainabilityEngine:
         elif gini > 0.4:
             desc += f"Society exhibits moderate influence distribution. The top 10% control **{top_10_share:.1f}%** of the narrative."
         else:
-            desc += f"Society is relatively egalitarian. Influence is widely distributed among the population."
+            desc += "Society is relatively egalitarian. Influence is widely distributed among the population."
             
         return desc
         
@@ -210,7 +210,7 @@ class ExplainabilityEngine:
         if np.any(secure_mask):
             secure_emotions = emotion_indices[secure_mask]
             dom_idx = np.bincount(secure_emotions).argmax()
-            dom_emotion = EMOTION_LABELS[dom_idx]
+            dom_emotion = EMOTION_LABELS[int(dom_idx)]
             archetypes.append({
                 "name": "Secure Elites",
                 "description": f"Highly influential but emotionally stable individuals predominantly felt **{dom_emotion}**."
@@ -221,7 +221,7 @@ class ExplainabilityEngine:
         if np.any(vuln_mask):
             vuln_emotions = emotion_indices[vuln_mask]
             dom_idx = np.bincount(vuln_emotions).argmax()
-            dom_emotion = EMOTION_LABELS[dom_idx]
+            dom_emotion = EMOTION_LABELS[int(dom_idx)]
             archetypes.append({
                 "name": "Vulnerable Population",
                 "description": f"Individuals with less influence and higher anxiety were driven by **{dom_emotion}**."
@@ -232,7 +232,7 @@ class ExplainabilityEngine:
         if np.any(anx_elite_mask):
             anx_emotions = emotion_indices[anx_elite_mask]
             dom_idx = np.bincount(anx_emotions).argmax()
-            dom_emotion = EMOTION_LABELS[dom_idx]
+            dom_emotion = EMOTION_LABELS[int(dom_idx)]
             archetypes.append({
                 "name": "Anxious Elites",
                 "description": f"Influential but highly reactive individuals predominantly felt **{dom_emotion}**."
@@ -243,7 +243,7 @@ class ExplainabilityEngine:
         if np.any(stoic_mask):
             stoic_emotions = emotion_indices[stoic_mask]
             dom_idx = np.bincount(stoic_emotions).argmax()
-            dom_emotion = EMOTION_LABELS[dom_idx]
+            dom_emotion = EMOTION_LABELS[int(dom_idx)]
             archetypes.append({
                 "name": "Stoic Public",
                 "description": f"Everyday citizens with lower emotional volatility largely reacted with **{dom_emotion}**."

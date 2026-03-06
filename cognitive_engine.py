@@ -1,5 +1,6 @@
 import torch
 import torch.nn.functional as F
+from typing import Optional
 
 from attention_context import AttentionContext
 from schema import SimConfig
@@ -164,7 +165,7 @@ class CognitiveEngine:
         exposures: torch.Tensor,
         personalities: torch.Tensor,
         agent_affinities: torch.Tensor,
-        agent_memory: torch.Tensor = None,
+        agent_memory: Optional[torch.Tensor] = None,
     ):
         """
         Full cognitive simulation pipeline.

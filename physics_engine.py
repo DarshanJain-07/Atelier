@@ -80,7 +80,7 @@ class SocialPhysicsEngine:
         if adjacency_matrix is not None:
             # Each agent's emotional baseline is now the weighted average of their connections
             # adjacency_matrix is row-normalized, so mm acts as a weighted mean
-            local_centers = torch.sparse.mm(adjacency_matrix.to(emotion_tensor.device), emotion_tensor)
+            local_centers = torch.smm(adjacency_matrix.to(emotion_tensor.device), emotion_tensor)
         else:
             # If no topology, the local context is just the global context for everyone
             local_centers = center_of_gravity.unsqueeze(0).expand(N, -1)

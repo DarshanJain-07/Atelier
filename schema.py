@@ -238,9 +238,26 @@ class SimConfig:
     stress_openness_reduction: float = 0.5
     stress_extraversion_boost: float = 0.7
 
+    # --- Agent Memory Parameters ---
+    use_agent_memory: bool = True
+    memory_decay_rate: float = 0.7  # How much memory is retained each event (0.0 to 1.0)
+    memory_desensitization_gain: float = 0.5  # How much past identical events suppress current reaction
+    memory_trigger_stacking_gain: float = 1.2  # How much past stress amplifies new similar threats
+
+    # --- Algorithmic Amplification (2-Pass Filter Bubble) ---
+    use_algorithmic_amplification: bool = False
+    algo_sample_size: float = 0.1  # Fraction of population used for initial A/B test
+    algo_exaggeration_factor: float = 1.5  # How much to amplify the dimensions that cause highest engagement
+
     use_power_law_influence: bool = False  # Enable Weighted Aggregation (Pareto)
     use_maslow_gating: bool = True  # Enable Survival Override (Fear Gating)
     wealth_dim_idx = DIMENSIONS.index("Wealth")
+
+    # --- Network Topology Parameters ---
+    use_network_topology: bool = True
+    base_connections: int = 15  # Average connections for a normal user
+    max_connections: int = 500  # Cap on connections for elite influencers
+    homophily_strength: float = 2.0  # How strongly they prefer similar agents
 
     # --- Society Evolution ---
     enable_evolution: bool = True
@@ -274,6 +291,8 @@ class SimConfig:
     saturation_midpoint: float = 0.5
     elite_percentile: float = 0.95
     dominant_emotion_threshold: float = 0.1
+    elite_divergence_threshold: float = 0.4
+    polarization_threshold: float = 0.5
 
     # --- Cascade Parameters ---
     cascade_knn_k: int = 8

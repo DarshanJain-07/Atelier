@@ -24,7 +24,7 @@ class SocialPhysicsEngine:
     # Core Aggregation
     # ============================================================
 
-    def aggregate_society(self, emotion_tensor, influence_scores, engagement_scores=None):
+    def aggregate_society(self, emotion_tensor, influence_scores, engagement_scores=None, adjacency_matrix=None):
         """
         Calculates the socio-emotional metrics for a single event.
         
@@ -33,6 +33,7 @@ class SocialPhysicsEngine:
             influence_scores: (N,) structural influence weights.
             engagement_scores: (N,) optional tensor from Cognitive Engine. Used to determine
                                active engagement (Skin in the Game).
+            adjacency_matrix: (N, N) sparse tensor representing network topology.
         """
         N = emotion_tensor.shape[0]
 
@@ -69,16 +70,29 @@ class SocialPhysicsEngine:
         weights = weights / weights.sum()
 
         # ============================================================
-        # 1️⃣ Objective Center of Gravity
+        # 1️⃣ Objective Center of Gravity (Global)
         # ============================================================
-
         center_of_gravity = (emotion_tensor * weights.unsqueeze(1)).sum(dim=0)
+        
+        # ============================================================
+        # 1.5️⃣ Topological Context (Local Echo Chambers)
+        # ============================================================
+        if adjacency_matrix is not None:
+            # Each agent's emotional baseline is now the weighted average of their connections
+            # adjacency_matrix is row-normalized, so mm acts as a weighted mean
+            local_centers = torch.sparse.mm(adjacency_matrix.to(emotion_tensor.device), emotion_tensor)
+        else:
+            # If no topology, the local context is just the global context for everyone
+            local_centers = center_of_gravity.unsqueeze(0).expand(N, -1)
 
         # ============================================================
         # 2️⃣ Nonlinear Outrage Contagion (Viral State)
         # ============================================================
 
-        distances = torch.norm(emotion_tensor - center_of_gravity, dim=1)
+        # Outrage is now triggered by how far you are from your LOCAL echo chamber.
+        # If your echo chamber is calm but you are furious, you generate huge virality.
+        # If your whole echo chamber is furious with you, it's just normal consensus for your bubble (lower virality boost).
+        distances = torch.norm(emotion_tensor - local_centers, dim=1)
 
         outrage_gain = self.config.outrage_gain
         
@@ -160,6 +174,39 @@ class SocialPhysicsEngine:
         elite_divergence = torch.norm(elite_center - center_of_gravity).item()
 
         # ============================================================
+        # 8️⃣ Endogenous Event Generation
+        # ============================================================
+        
+        action_vector = None
+        action_name = None
+        
+        elite_div_threshold = getattr(self.config, "elite_divergence_threshold", 0.4)
+        pol_threshold = getattr(self.config, "polarization_threshold", 0.5)
+
+        if elite_divergence > elite_div_threshold and polarization > pol_threshold:
+            # Populist Uprising
+            action_vector = [0.0] * 12
+            action_vector[1] = -0.5 # Negative Safety
+            action_vector[2] = -0.8 # Negative Stability
+            action_vector[4] = -0.9 # Negative Fairness
+            action_vector[7] = 0.5  # Positive Freedom
+            action_name = "Populist Uprising"
+        elif elite_divergence > elite_div_threshold:
+            # Policy Shift (Elite push through changes)
+            action_vector = [0.0] * 12
+            action_vector[0] = 0.4  # Wealth impact
+            action_vector[4] = -0.3 # Negative Fairness
+            action_vector[6] = 0.6  # Positive Innovation
+            action_name = "Elite Policy Shift"
+        elif polarization > pol_threshold:
+            # Protest
+            action_vector = [0.0] * 12
+            action_vector[2] = -0.6 # Negative Stability
+            action_vector[4] = -0.5 # Negative Fairness
+            action_vector[5] = 0.7  # Positive In-Group
+            action_name = "Civil Protest"
+
+        # ============================================================
         # Final State Object
         # ============================================================
 
@@ -183,6 +230,8 @@ class SocialPhysicsEngine:
             "entropy": entropy,
             "bimodality": bimodality,
             "elite_divergence": elite_divergence,
+            "action_vector": action_vector,
+            "action_name": action_name,
 
             "labels": EMOTION_LABELS,
         }

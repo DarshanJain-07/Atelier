@@ -122,6 +122,70 @@ def generate_hybrid_wealth(
 # ================================
 # Main Generator (Bias-Free)
 # ================================
+def create_topology(config: SimConfig, exposures: torch.Tensor, personalities: torch.Tensor, influence_scores: np.ndarray):
+    """
+    Creates a sparse K-Nearest Neighbor adjacency matrix based on influence.
+    High influence = larger out-degree (k).
+    Edges are weighted by homophily (cosine similarity of traits).
+    """
+    N = config.num_agents
+    
+    # 1. Determine out-degree (k) per agent based on influence
+    inf_mean = np.mean(influence_scores)
+    k_array = np.clip((influence_scores / inf_mean) * config.base_connections, 1, config.max_connections).astype(int)
+    
+    # 2. Build feature matrix for KNN
+    features = torch.cat([exposures, personalities], dim=1)
+    
+    # L2 normalize features
+    features_norm = features / (torch.norm(features, dim=1, keepdim=True) + 1e-8)
+    
+    indices_list = []
+    values_list = []
+    
+    # Process in batches to save memory
+    batch_size = 1000
+    for i in range(0, N, batch_size):
+        end = min(i + batch_size, N)
+        batch_features = features_norm[i:end]
+        
+        # similarity: (batch_size, N)
+        sim = torch.mm(batch_features, features_norm.T)
+        
+        # Add homophily bias. Exponentiate to punish low similarity heavily.
+        sim = torch.pow((sim + 1.0) / 2.0, getattr(config, "homophily_strength", 2.0))
+        
+        # Self-loops must be removed
+        for j in range(end - i):
+            sim[j, i+j] = -1.0
+        
+        # For each agent in batch, get top k
+        for idx_in_batch in range(end - i):
+            global_idx = i + idx_in_batch
+            k = k_array[global_idx]
+            
+            top_vals, top_indices = torch.topk(sim[idx_in_batch], k)
+            
+            for j in range(k):
+                indices_list.append([global_idx, top_indices[j].item()])
+                values_list.append(top_vals[j].item())
+                
+    indices_tensor = torch.tensor(indices_list, dtype=torch.long).T
+    values_tensor = torch.tensor(values_list, dtype=torch.float32)
+    
+    sparse_adj = torch.sparse_coo_tensor(indices_tensor, values_tensor, size=(N, N))
+    
+    # Row normalize so each agent's local center is a proper mean
+    dense_sums = torch.sparse.sum(sparse_adj, dim=1).to_dense()
+    dense_sums = torch.clamp(dense_sums, min=1e-8)
+    
+    row_indices = indices_tensor[0]
+    normalized_values = values_tensor / dense_sums[row_indices]
+    
+    normalized_sparse_adj = torch.sparse_coo_tensor(indices_tensor, normalized_values, size=(N, N)).coalesce()
+    return normalized_sparse_adj
+
+
 def generate_society(config: SimConfig):
 
     torch.manual_seed(config.seed)
@@ -239,8 +303,14 @@ def generate_society(config: SimConfig):
     torch.save(personalities, f"{config.output_dir}/personalities.pt")
     torch.save(affinities, f"{config.output_dir}/affinities.pt")
 
+    adjacency_matrix = None
+    if getattr(config, "use_network_topology", False):
+        print("Generating Network Topology (Sparse KNN Adjacency Matrix)...")
+        adjacency_matrix = create_topology(config, exposures, personalities, influence_scores)
+        torch.save(adjacency_matrix, f"{config.output_dir}/adjacency.pt")
+
     print(f"Society Generated in '{config.output_dir}' (Bias-Free)")
-    return df_metadata, exposures, personalities, affinities
+    return df_metadata, exposures, personalities, affinities, adjacency_matrix
 
 
 if __name__ == "__main__":

@@ -164,12 +164,15 @@ class CognitiveEngine:
         exposures: torch.Tensor,
         personalities: torch.Tensor,
         agent_affinities: torch.Tensor,
+        agent_memory: torch.Tensor = None,
     ):
         """
         Full cognitive simulation pipeline.
         Returns:
             context_vector: (N, 12)
             attention_weights: (N, 12)
+            engagement_scores: (N,)
+            updated_memory: (N, 12) or None
         """
 
         device = exposures.device
@@ -183,13 +186,43 @@ class CognitiveEngine:
         )  # (N,12)
 
         # ---------------------------------
-        # 2. Affinity Modulation
+        # 2. Memory Layer (Desensitization & Trigger Stacking)
         # ---------------------------------
-        # Raw volume is scaled by the agent's specific cognitive bandwidth and affinities
-        perceived_world = distorted_world * agent_affinities.to(device)
+        if agent_memory is not None and getattr(self.config, "use_agent_memory", False):
+            mem = agent_memory.to(device)
+            
+            # Desensitization (Fatigue): If current event aligns with recent memory, reduce impact
+            # We use an exponential scaling so repeated hits rapidly approach 1.0 (total fatigue)
+            alignment = mem * distorted_world
+            fatigue_mask = torch.clamp(alignment, min=0.0)
+            fatigue_penalty = 1.0 - torch.exp(-fatigue_mask * getattr(self.config, "memory_desensitization_gain", 2.0))
+            
+            # Trigger Stacking: Total past stress makes them hyper-reactive to NEW threats
+            threat_mask = (distorted_world < 0).float()
+            # Calculate total past stress across ALL dimensions
+            total_stress = torch.sum(torch.abs(mem), dim=1, keepdim=True)
+            
+            # Only stack triggers on dimensions that aren't currently fatiguing them
+            fresh_threat_mask = threat_mask * (fatigue_mask < 0.1).float()
+            
+            # Logarithmic scaling so it doesn't break the math, but still gives a massive boost
+            trigger_stack_boost = torch.log1p(total_stress) * fresh_threat_mask * getattr(self.config, "memory_trigger_stacking_gain", 3.0)
+            
+            # Apply memory modifications: 
+            # 1. Fatigue multiplies the raw signal down toward 0. 
+            # 2. Trigger stacking adds an amplification if it's a fresh threat.
+            perceived_world = distorted_world * (1.0 - torch.clamp(fatigue_penalty, max=0.95)) + (distorted_world * trigger_stack_boost)
+        else:
+            perceived_world = distorted_world
 
         # ---------------------------------
-        # 3. Attention Computation
+        # 3. Affinity Modulation
+        # ---------------------------------
+        # Raw volume is scaled by the agent's specific cognitive bandwidth and affinities
+        perceived_world = perceived_world * agent_affinities.to(device)
+
+        # ---------------------------------
+        # 4. Attention Computation
         # ---------------------------------
         attention_weights, engagement_scores = self.calculate_attention(
             exposures,
@@ -199,7 +232,7 @@ class CognitiveEngine:
         )
 
         # ---------------------------------
-        # 4. Stress Bias
+        # 5. Stress Bias
         # ---------------------------------
         attention_weights = self.apply_stress_bias(
             attention_weights,
@@ -208,9 +241,18 @@ class CognitiveEngine:
         )
 
         # ---------------------------------
-        # 5. Context Construction
+        # 6. Context Construction
         # ---------------------------------
         context_vector = perceived_world * attention_weights
         context_vector = torch.clamp(context_vector, -2.0, 2.0)
 
-        return context_vector, attention_weights, engagement_scores
+        # ---------------------------------
+        # 7. Memory Update
+        # ---------------------------------
+        updated_memory = agent_memory
+        if agent_memory is not None and getattr(self.config, "use_agent_memory", False):
+            decay = getattr(self.config, "memory_decay_rate", 0.7)
+            # They remember what they actually internalized
+            updated_memory = (agent_memory.to(device) * decay) + context_vector
+
+        return context_vector, attention_weights, engagement_scores, updated_memory

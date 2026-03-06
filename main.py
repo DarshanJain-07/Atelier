@@ -138,7 +138,7 @@ def prepare_society_sync(run: RunProfile, run_output_dir: str):
 
     if cache_key in SOCIETY_CACHE:
         print(f"Cache Hit for {cache_key}")
-        metadata_full, exposures_full, personalities_full, affinities_full = (
+        metadata_full, exposures_full, personalities_full, affinities_full, memory_full, adjacency_matrix = (
             SOCIETY_CACHE[cache_key]
         )
         return (
@@ -147,10 +147,12 @@ def prepare_society_sync(run: RunProfile, run_output_dir: str):
             exposures_full,
             personalities_full,
             affinities_full,
+            memory_full,
+            adjacency_matrix,
         )
 
     print(f"Cache Miss. Generating & Caching {cache_key}")
-    metadata_full, exposures_full, personalities_full, affinities_full = (
+    metadata_full, exposures_full, personalities_full, affinities_full, adjacency_matrix = (
         generate_society(config)
     )
 
@@ -165,13 +167,17 @@ def prepare_society_sync(run: RunProfile, run_output_dir: str):
             print(f"Evolution failed or skipped: {e}")
             pass
 
+    memory_full = torch.zeros_like(exposures_full)
+
     SOCIETY_CACHE[cache_key] = (
         metadata_full,
         exposures_full,
         personalities_full,
         affinities_full,
+        memory_full,
+        adjacency_matrix,
     )
-    return config, metadata_full, exposures_full, personalities_full, affinities_full
+    return config, metadata_full, exposures_full, personalities_full, affinities_full, memory_full, adjacency_matrix
 
 
 def cleanup_memory():
@@ -270,24 +276,37 @@ async def run_simulation(req: SimulationRequest):
 
             society_result = cast(
                 Tuple[
-                    SimConfig, pd.DataFrame, torch.Tensor, torch.Tensor, torch.Tensor
+                    SimConfig, pd.DataFrame, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, Any
                 ],
                 society_result,
             )
 
-            config, metadata, exposures, personalities, affinities = society_result
+            config, metadata_full, exposures_full, personalities_full, affinities_full, memory_full, adjacency_matrix_full = society_result
 
             # --- ROLE FILTERING ---
             if run.role != "All":
-                mask = metadata["Role"] == run.role
-                metadata = metadata[mask].reset_index(drop=True)
+                mask = metadata_full["Role"] == run.role
+                metadata = metadata_full[mask].reset_index(drop=True)
                 indices = np.where(mask.to_numpy())[0]
-                exposures = exposures[indices]
-                personalities = personalities[indices]
-                affinities = affinities[indices]
+                exposures = exposures_full[indices]
+                personalities = personalities_full[indices]
+                affinities = affinities_full[indices]
+                memory = memory_full[indices]
+                
+                # Topological subsetting is complex for sparse matrices without breaking normalizations.
+                # For role-filtered sub-populations, we disable network topology to preserve accuracy.
+                adjacency_matrix = None
+                
                 print(
                     f"[{request_id}] Filtered Run {i} to Role: {run.role} ({len(metadata)} agents)"
                 )
+            else:
+                metadata = metadata_full.copy()
+                exposures = exposures_full
+                personalities = personalities_full
+                affinities = affinities_full
+                memory = memory_full
+                adjacency_matrix = adjacency_matrix_full
 
             limit = min(run.agent_count, len(metadata))
             if limit == 0:
@@ -298,22 +317,90 @@ async def run_simulation(req: SimulationRequest):
             exposures = exposures[:limit]
             personalities = personalities[:limit]
             affinities = affinities[:limit]
+            memory = memory[:limit]
+            
+            if adjacency_matrix is not None and limit < len(metadata_full):
+                 # Same logic: if we truncated the population, topology breaks.
+                 adjacency_matrix = None
 
             try:
                 influence = metadata["Influence"].to_numpy(dtype=np.float32)
             except Exception as e:
                 raise ValueError(f"Type conversion failed for metadata columns: {e}")
 
-            # 5. Cognitive Engine
+            # 5. Cognitive Engine & Algorithmic Amplification
             cog_engine = CognitiveEngine(config)
-            context_vector, attention_weights, engagement_scores = cog_engine.run(
-                world_tensor_raw=world_tensor,
+            
+            if getattr(config, "use_algorithmic_amplification", False):
+                # --- PASS 1: The A/B Test ---
+                sample_size = int(limit * getattr(config, "algo_sample_size", 0.1))
+                sample_size = max(1, sample_size)
+                
+                # We don't want to update global memory during the A/B test pass, so we clone it
+                ab_memory = memory[:sample_size].clone() if memory is not None else None
+                
+                _, ab_attention, ab_engagement, _ = cog_engine.run(
+                    world_tensor_raw=world_tensor,
+                    urgency=urgency,
+                    is_personal=is_personal,
+                    exposures=exposures[:sample_size],
+                    personalities=personalities[:sample_size],
+                    agent_affinities=affinities[:sample_size],
+                    agent_memory=ab_memory,
+                )
+                
+                # --- The Algorithm's Intervention ---
+                # Which dimensions received the highest attention * weighted by how engaged the user was?
+                engagement_weighted_attention = ab_attention * ab_engagement.unsqueeze(1)
+                avg_attention_per_dim = engagement_weighted_attention.mean(dim=0)
+                
+                # Find the top 2 dimensions that caused the most engagement
+                top_dims = torch.topk(avg_attention_per_dim, k=2).indices
+                
+                # Mutate the world tensor to exaggerate those specific dimensions
+                mutated_world_tensor = world_tensor.clone()
+                exaggeration = getattr(config, "algo_exaggeration_factor", 1.5)
+                
+                for dim_idx in top_dims:
+                    current_val = mutated_world_tensor[0, dim_idx].item()
+                    
+                    # If the dimension is already active, exaggerate it
+                    if abs(current_val) > 0.05:
+                        mutated_world_tensor[0, dim_idx] *= exaggeration
+                    else:
+                        # The algorithm "hallucinates" or injects a threat/benefit 
+                        # to manufacture engagement where none existed.
+                        # We inject a moderate threat (-0.3) because fear drives engagement.
+                        mutated_world_tensor[0, dim_idx] = -0.3
+                
+                # Clamp the mutated tensor to realistic boundaries
+                mutated_world_tensor = torch.clamp(mutated_world_tensor, -1.0, 1.0)
+                
+                print(f"[{request_id}] Algorithmic Pass 1 Complete. Mutated Dimensions {top_dims.tolist()} by {exaggeration}x")
+                
+                # Use the mutated tensor for the real broadcast
+                final_world_tensor = mutated_world_tensor
+            else:
+                final_world_tensor = world_tensor
+
+            # --- PASS 2: The Viral Broadcast ---
+            context_vector, attention_weights, engagement_scores, updated_memory = cog_engine.run(
+                world_tensor_raw=final_world_tensor,
                 urgency=urgency,
                 is_personal=is_personal,
                 exposures=exposures,
                 personalities=personalities,
                 agent_affinities=affinities,
+                agent_memory=memory,
             )
+
+            # --- MEMORY UPDATE ---
+            # Update the global memory array for this specific run
+            if getattr(config, "use_agent_memory", False):
+                if run.role != "All":
+                    memory_full[indices[:limit]] = updated_memory.to(memory_full.device)
+                else:
+                    memory_full[:limit] = updated_memory.to(memory_full.device)
 
             device = context_vector.device
             projection_matrix = PSYCH_PROJECTION.to(device)
@@ -329,8 +416,46 @@ async def run_simulation(req: SimulationRequest):
             # 6. Social Physics
             phys_engine = SocialPhysicsEngine(config)
             social_state = phys_engine.aggregate_society(
-                final_emotions, influence, engagement_scores
+                final_emotions, influence, engagement_scores, adjacency_matrix
             )
+
+            # --- ENDOGENOUS EVENT FEEDBACK LOOP (Autopoietic Simulation) ---
+            action_vector = social_state.get("action_vector")
+            action_name = social_state.get("action_name")
+            
+            if action_vector is not None:
+                print(f"[{request_id}] ⚠️ Autopoietic Trigger: {action_name} generated.")
+                action_tensor = torch.tensor([action_vector], dtype=torch.float32, device=final_world_tensor.device)
+                
+                # Feedback loop into cognitive engine without user input
+                context_vector_2, attention_weights_2, engagement_scores_2, updated_memory_2 = cog_engine.run(
+                    world_tensor_raw=action_tensor,
+                    urgency=0.8, # High urgency for endogenous events
+                    is_personal=True, # Protests/uprisings are personal
+                    exposures=exposures,
+                    personalities=personalities,
+                    agent_affinities=affinities,
+                    agent_memory=updated_memory,
+                )
+                
+                if getattr(config, "use_agent_memory", False):
+                    if run.role != "All":
+                        memory_full[indices[:limit]] = updated_memory_2.to(memory_full.device)
+                    else:
+                        memory_full[:limit] = updated_memory_2.to(memory_full.device)
+
+                final_emotions_2 = torch.matmul(context_vector_2, projection_matrix)
+                final_emotions_2 = F.softmax(
+                    final_emotions_2 / max(0.01, config.emotion_temperature), dim=1
+                )
+                
+                # Re-aggregate society with the new emotional state
+                social_state = phys_engine.aggregate_society(
+                    final_emotions_2, influence, engagement_scores_2, adjacency_matrix
+                )
+                final_emotions = final_emotions_2
+                attention_weights = attention_weights_2
+                social_state["endogenous_event"] = action_name
 
             # 7. Validation
             validation_result = validator.calculate_divergence(

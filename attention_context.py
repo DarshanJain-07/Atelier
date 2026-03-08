@@ -1,11 +1,15 @@
 import torch
 import torch.nn.functional as F
-from schema import PERSONALITY_QUERY_MATRIX, CROSS_DIM_INTERACTIONS
+
+from schema import CROSS_DIM_INTERACTIONS, PERSONALITY_QUERY_MATRIX
 
 # Global cache for device-specific constants to avoid repeated CPU->GPU transfers
 _DEVICE_CACHE = {}
 
-def get_cached_constant(name: str, tensor: torch.Tensor, device: torch.device) -> torch.Tensor:
+
+def get_cached_constant(
+    name: str, tensor: torch.Tensor, device: torch.device
+) -> torch.Tensor:
     key = (name, device)
     if key not in _DEVICE_CACHE:
         _DEVICE_CACHE[key] = tensor.to(device)
@@ -74,7 +78,9 @@ class AttentionContext:
         # Shape (N, 5)
         activations = torch.cat([O_act, C_act, E_act, A_act, N_act], dim=1)
 
-        matrix = get_cached_constant("PERSONALITY_QUERY_MATRIX", PERSONALITY_QUERY_MATRIX, Q_base.device)
+        matrix = get_cached_constant(
+            "PERSONALITY_QUERY_MATRIX", PERSONALITY_QUERY_MATRIX, Q_base.device
+        )
         personality_mod = torch.matmul(activations, matrix)
 
         self.Q = torch.tanh(Q_base + personality_mod)
@@ -89,10 +95,10 @@ class AttentionContext:
         Q = self.Q
         device = Q.device
         personalities = self.personalities
-        
+
         # Empathy determines how much an agent cares about others' personal events
         agreeableness = personalities[:, 3:4]
-        
+
         # Simulate proximity/relevance to the personal event.
         # A highly skewed distribution (pow 10) ensures only a small localized cluster
         # pays high attention to a random personal event.
@@ -100,14 +106,16 @@ class AttentionContext:
 
         # Maximum boost scalar
         max_boost = torch.exp(torch.tensor(1.5, device=device))
-        
+
         # For personal events, baseline interest should be severely suppressed unless proximity is high.
         # Most of the population will ignore the event.
         base_multiplier = 0.05
-        
+
         # Agent-specific multiplier: low for strangers, high for close ones
-        agent_multiplier = base_multiplier + max_boost * proximity * (0.5 + 0.5 * agreeableness)
-        
+        agent_multiplier = base_multiplier + max_boost * proximity * (
+            0.5 + 0.5 * agreeableness
+        )
+
         # Scale all dimensions of attention based on relevance/proximity
         Q = Q * agent_multiplier
         self.Q = torch.clamp(Q, -2.5, 2.5)
@@ -136,7 +144,9 @@ class AttentionContext:
         Q = self.Q
 
         influence = Q * self.config.cross_dim_interaction_strength
-        matrix = get_cached_constant("CROSS_DIM_INTERACTIONS", CROSS_DIM_INTERACTIONS, Q.device)
+        matrix = get_cached_constant(
+            "CROSS_DIM_INTERACTIONS", CROSS_DIM_INTERACTIONS, Q.device
+        )
         Q_cross = torch.matmul(influence, matrix)
 
         self.Q = torch.tanh(Q + Q_cross)
@@ -157,7 +167,10 @@ class AttentionContext:
         is_threat = (K < 0).float()
         threat_amplifier = 1.0 + (is_threat * self.config.threat_amplifier_gain)
 
-        self.relevance = (self.config.relevance_importance_weight * importance + self.config.relevance_base_weight * base_relevance) * threat_amplifier
+        self.relevance = (
+            self.config.relevance_importance_weight * importance
+            + self.config.relevance_base_weight * base_relevance
+        ) * threat_amplifier
         return self
 
     def temperature_layer(self):
@@ -186,7 +199,10 @@ class AttentionContext:
         personalities = self.personalities
         extraversion = personalities[:, 2:3]
 
-        threshold = self.config.threshold_base - (extraversion - 0.5) * self.config.threshold_extraversion_weight
+        threshold = (
+            self.config.threshold_base
+            - (extraversion - 0.5) * self.config.threshold_extraversion_weight
+        )
         threshold = torch.clamp(threshold, 0.0, 0.3)
 
         mask = (torch.abs(self.relevance) > threshold).float()

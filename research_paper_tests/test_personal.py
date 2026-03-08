@@ -11,13 +11,16 @@ I updated the `personal_event_layer` to fundamentally change how personal events
 
 This change ensures that a personal event is essentially ignored by the general population while still triggering strong reactions among the small number of people directly related to it.
 """
+
 import sys
 import os
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import torch
 from attention_context import AttentionContext
 from schema import DIMENSIONS
+
 
 class DummyConfig:
     def __init__(self):
@@ -38,27 +41,39 @@ class DummyConfig:
         self.engagement_gain = 2.0
         self.engagement_threshold = 0.5
 
+
 def test_personal_event():
     torch.manual_seed(42)
     n_population = 100
     exposures = torch.rand(n_population, len(DIMENSIONS))
     personalities = torch.rand(n_population, 5)
     world_tensor = torch.rand(1, len(DIMENSIONS))
-    
+
     config = DummyConfig()
-    
+
     # Non-personal event
-    ctx_non_personal = AttentionContext(exposures, personalities, world_tensor, False, config)
+    ctx_non_personal = AttentionContext(
+        exposures, personalities, world_tensor, False, config
+    )
     ctx_non_personal.rde_layer().personality_query_layer().personal_event_layer().key_processing_layer().cross_dimension_layer().relevance_layer().temperature_layer().threshold_layer().engagement_layer()
-    reacting_non_personal = (torch.norm(ctx_non_personal.relevance, dim=1) > 0).float().sum().item()
-    
+    reacting_non_personal = (
+        (torch.norm(ctx_non_personal.relevance, dim=1) > 0).float().sum().item()
+    )
+
     # Personal event
-    ctx_personal = AttentionContext(exposures, personalities, world_tensor, True, config)
+    ctx_personal = AttentionContext(
+        exposures, personalities, world_tensor, True, config
+    )
     ctx_personal.rde_layer().personality_query_layer().personal_event_layer().key_processing_layer().cross_dimension_layer().relevance_layer().temperature_layer().threshold_layer().engagement_layer()
-    reacting_personal = (torch.norm(ctx_personal.relevance, dim=1) > 0).float().sum().item()
-    
-    print(f"Non-personal event: {reacting_non_personal} people reacting out of {n_population}")
+    reacting_personal = (
+        (torch.norm(ctx_personal.relevance, dim=1) > 0).float().sum().item()
+    )
+
+    print(
+        f"Non-personal event: {reacting_non_personal} people reacting out of {n_population}"
+    )
     print(f"Personal event: {reacting_personal} people reacting out of {n_population}")
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     test_personal_event()

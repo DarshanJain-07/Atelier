@@ -18,7 +18,7 @@ class Validator:
         self.tokenizer = None
         self.model = None
         self.device = None
-    
+
     def _load_model(self):
         if self.model is not None:
             return
@@ -26,7 +26,9 @@ class Validator:
         print("Loading Baseline AI (RoBERTa)...")
         try:
             self.tokenizer = AutoTokenizer.from_pretrained(HF_MODEL_NAME)
-            self.model = AutoModelForSequenceClassification.from_pretrained(HF_MODEL_NAME)
+            self.model = AutoModelForSequenceClassification.from_pretrained(
+                HF_MODEL_NAME
+            )
             self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
             self.model.to(self.device)
             print("Baseline AI Loaded.")
@@ -36,7 +38,7 @@ class Validator:
 
     def get_baseline_prob(self, text: str):
         self._load_model()
-        
+
         inputs = self.tokenizer(
             text, return_tensors="pt", truncation=True, max_length=512
         ).to(self.device)

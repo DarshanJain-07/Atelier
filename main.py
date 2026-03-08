@@ -16,13 +16,18 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from cognitive_engine import CognitiveEngine
+from explainability import ExplainabilityEngine
 from generate_society import generate_society
 from input_layer import get_world_state
 from physics_engine import SocialPhysicsEngine
-from explainability import ExplainabilityEngine
 
 # Import our Core Logic
-from schema import DIMENSION_INDICES, DIMENSIONS, EMOTION_LABELS, PSYCH_PROJECTION, SimConfig
+from schema import (
+    DIMENSION_INDICES,
+    EMOTION_LABELS,
+    PSYCH_PROJECTION,
+    SimConfig,
+)
 from society_evolution import SocietyEvolution
 from validation import Validator
 
@@ -138,9 +143,14 @@ def prepare_society_sync(run: RunProfile, run_output_dir: str):
 
     if cache_key in SOCIETY_CACHE:
         print(f"Cache Hit for {cache_key}")
-        metadata_full, exposures_full, personalities_full, affinities_full, memory_full, adjacency_matrix = (
-            SOCIETY_CACHE[cache_key]
-        )
+        (
+            metadata_full,
+            exposures_full,
+            personalities_full,
+            affinities_full,
+            memory_full,
+            adjacency_matrix,
+        ) = SOCIETY_CACHE[cache_key]
         return (
             config,
             metadata_full,
@@ -152,9 +162,13 @@ def prepare_society_sync(run: RunProfile, run_output_dir: str):
         )
 
     print(f"Cache Miss. Generating & Caching {cache_key}")
-    metadata_full, exposures_full, personalities_full, affinities_full, adjacency_matrix = (
-        generate_society(config)
-    )
+    (
+        metadata_full,
+        exposures_full,
+        personalities_full,
+        affinities_full,
+        adjacency_matrix,
+    ) = generate_society(config)
 
     # Evolution phase
     if getattr(config, "enable_evolution", True):
@@ -177,7 +191,15 @@ def prepare_society_sync(run: RunProfile, run_output_dir: str):
         memory_full,
         adjacency_matrix,
     )
-    return config, metadata_full, exposures_full, personalities_full, affinities_full, memory_full, adjacency_matrix
+    return (
+        config,
+        metadata_full,
+        exposures_full,
+        personalities_full,
+        affinities_full,
+        memory_full,
+        adjacency_matrix,
+    )
 
 
 def subset_adjacency(adj, keep_indices):
@@ -188,132 +210,63 @@ def subset_adjacency(adj, keep_indices):
     """
     if adj is None:
         return None
-    
+
     device = adj.device
-    
+
     # 1. Create a mask of nodes to keep
     N = adj.shape[0]
-    
+
     # Check if keep_indices is a tensor or list
     if not isinstance(keep_indices, torch.Tensor):
         keep_indices = torch.tensor(keep_indices, device=device, dtype=torch.long)
     else:
         keep_indices = keep_indices.to(device)
-        
+
     M = keep_indices.numel()
     if M == 0:
         return None
-        
+
     # Mapping from old_index -> new_index (0..M)
     # Initialize with -1
     mapping = torch.full((N,), -1, dtype=torch.long, device=device)
     mapping[keep_indices] = torch.arange(M, device=device)
-    
+
     # 2. Filter edges
     adj = adj.coalesce()
     indices = adj.indices()
     values = adj.values()
-    
+
     row, col = indices[0], indices[1]
-    
+
     # Keep edge only if BOTH src and dst are in the subset
     # We use the mapping to check: if mapping[idx] != -1, it's kept
     new_row = mapping[row]
     new_col = mapping[col]
-    
+
     # Filter where both are valid (>= 0)
     mask = (new_row >= 0) & (new_col >= 0)
-    
+
     if not mask.any():
         return None
-        
+
     final_row = new_row[mask]
     final_col = new_col[mask]
     final_values = values[mask]
-    
+
     # 3. Create new sparse tensor
     new_indices = torch.stack([final_row, final_col])
-    
+
     # 4. Renormalize rows
     # Construct temp to get row sums
     temp_adj = torch.sparse_coo_tensor(new_indices, final_values, size=(M, M))
     row_sums = torch.sparse.sum(temp_adj, dim=1).to_dense()
-    
+
     # Avoid division by zero
     row_sums[row_sums == 0] = 1.0
-    
+
     # Normalize
     final_values = final_values / row_sums[final_row]
-    
-    return torch.sparse_coo_tensor(new_indices, final_values, size=(M, M)).coalesce()
 
-
-def subset_adjacency(adj, keep_indices):
-    """
-    Slices a sparse adjacency matrix to keep only rows/cols specified in 'keep_indices'.
-    Remaps indices to 0..len(keep_indices).
-    Renormalizes rows to sum to 1.
-    """
-    if adj is None:
-        return None
-    
-    device = adj.device
-    
-    # 1. Create a mask of nodes to keep
-    N = adj.shape[0]
-    
-    # Check if keep_indices is a tensor or list
-    if not isinstance(keep_indices, torch.Tensor):
-        keep_indices = torch.tensor(keep_indices, device=device, dtype=torch.long)
-    else:
-        keep_indices = keep_indices.to(device)
-        
-    M = keep_indices.numel()
-    if M == 0:
-        return None
-        
-    # Mapping from old_index -> new_index (0..M)
-    # Initialize with -1
-    mapping = torch.full((N,), -1, dtype=torch.long, device=device)
-    mapping[keep_indices] = torch.arange(M, device=device)
-    
-    # 2. Filter edges
-    adj = adj.coalesce()
-    indices = adj.indices()
-    values = adj.values()
-    
-    row, col = indices[0], indices[1]
-    
-    # Keep edge only if BOTH src and dst are in the subset
-    # We use the mapping to check: if mapping[idx] != -1, it's kept
-    new_row = mapping[row]
-    new_col = mapping[col]
-    
-    # Filter where both are valid (>= 0)
-    mask = (new_row >= 0) & (new_col >= 0)
-    
-    if not mask.any():
-        return None
-        
-    final_row = new_row[mask]
-    final_col = new_col[mask]
-    final_values = values[mask]
-    
-    # 3. Create new sparse tensor
-    new_indices = torch.stack([final_row, final_col])
-    
-    # 4. Renormalize rows
-    # Construct temp to get row sums
-    temp_adj = torch.sparse_coo_tensor(new_indices, final_values, size=(M, M))
-    row_sums = torch.sparse.sum(temp_adj, dim=1).to_dense()
-    
-    # Avoid division by zero
-    row_sums[row_sums == 0] = 1.0
-    
-    # Normalize
-    # We need to map row indices back to values to divide correctly
-    final_values = final_values / row_sums[final_row]
-    
     return torch.sparse_coo_tensor(new_indices, final_values, size=(M, M)).coalesce()
 
 
@@ -402,7 +355,7 @@ async def run_simulation(req: SimulationRequest):
             raise baseline_result
 
         # Process each run
-        all_results = []
+        all_results: list[dict[str, Any]] = []
         for i, (run, society_result) in enumerate(zip(req.runs, results[2:])):
             if isinstance(society_result, Exception):
                 print(f"[{request_id}] Run {i} Error: {society_result}")
@@ -411,35 +364,55 @@ async def run_simulation(req: SimulationRequest):
 
             society_result = cast(
                 Tuple[
-                    SimConfig, pd.DataFrame, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, Any
+                    SimConfig,
+                    pd.DataFrame,
+                    torch.Tensor,
+                    torch.Tensor,
+                    torch.Tensor,
+                    torch.Tensor,
+                    Any,
                 ],
                 society_result,
             )
 
-            config, metadata_full, exposures_full, personalities_full, affinities_full, memory_full, adjacency_matrix_full = society_result
+            (
+                config,
+                metadata_full,
+                exposures_full,
+                personalities_full,
+                affinities_full,
+                memory_full,
+                adjacency_matrix_full,
+            ) = society_result
 
             # --- ROLE FILTERING ---
             if run.role != "All":
                 mask = metadata_full["Role"] == run.role
                 indices_np = np.where(mask.to_numpy())[0]
                 indices_torch = torch.tensor(indices_np, dtype=torch.long)
-                
+
                 metadata = metadata_full.iloc[indices_np].reset_index(drop=True)
                 exposures = exposures_full[indices_np]
                 personalities = personalities_full[indices_np]
                 affinities = affinities_full[indices_np]
                 memory = memory_full[indices_np]
-                
+
                 # Slicing sparse adjacency matrix to preserve physics within the subgroup
                 if adjacency_matrix_full is not None:
-                    adjacency_matrix = subset_adjacency(adjacency_matrix_full, indices_torch)
+                    adjacency_matrix = subset_adjacency(
+                        adjacency_matrix_full, indices_torch
+                    )
                     if adjacency_matrix is not None:
-                         print(f"[{request_id}] Resliced Adjacency Matrix for Role: {run.role} (Nodes: {len(indices_np)})")
+                        print(
+                            f"[{request_id}] Resliced Adjacency Matrix for Role: {run.role} (Nodes: {len(indices_np)})"
+                        )
                     else:
-                         print(f"[{request_id}] Adjacency Slice Empty/Failed for Role: {run.role}")
+                        print(
+                            f"[{request_id}] Adjacency Slice Empty/Failed for Role: {run.role}"
+                        )
                 else:
                     adjacency_matrix = None
-                    
+
                 print(
                     f"[{request_id}] Filtered Run {i} to Role: {run.role} ({len(metadata)} agents)"
                 )
@@ -455,18 +428,18 @@ async def run_simulation(req: SimulationRequest):
             if limit == 0:
                 all_results.append({"error": f"No agents found for role: {run.role}"})
                 continue
-            
+
             current_count = len(metadata)
             metadata = metadata.iloc[:limit]
             exposures = exposures[:limit]
             personalities = personalities[:limit]
             affinities = affinities[:limit]
             memory = memory[:limit]
-            
+
             if adjacency_matrix is not None and limit < current_count:
-                 # Further subsetting if limit < filtered_population
-                 limit_indices = torch.arange(limit, dtype=torch.long)
-                 adjacency_matrix = subset_adjacency(adjacency_matrix, limit_indices)
+                # Further subsetting if limit < filtered_population
+                limit_indices = torch.arange(limit, dtype=torch.long)
+                adjacency_matrix = subset_adjacency(adjacency_matrix, limit_indices)
 
             try:
                 influence = metadata["Influence"].to_numpy(dtype=np.float32)
@@ -475,15 +448,15 @@ async def run_simulation(req: SimulationRequest):
 
             # 5. Cognitive Engine & Algorithmic Amplification
             cog_engine = CognitiveEngine(config)
-            
+
             if getattr(config, "use_algorithmic_amplification", False):
                 # --- PASS 1: The A/B Test ---
                 sample_size = int(limit * getattr(config, "algo_sample_size", 0.1))
                 sample_size = max(1, sample_size)
-                
+
                 # We don't want to update global memory during the A/B test pass, so we clone it
                 ab_memory = memory[:sample_size].clone() if memory is not None else None
-                
+
                 _, ab_attention, ab_engagement, _ = cog_engine.run(
                     world_tensor_raw=world_tensor,
                     urgency=urgency,
@@ -493,57 +466,65 @@ async def run_simulation(req: SimulationRequest):
                     agent_affinities=affinities[:sample_size],
                     agent_memory=ab_memory,
                 )
-                
+
                 # --- The Algorithm's Intervention ---
                 # Which dimensions received the highest attention * weighted by how engaged the user was?
-                engagement_weighted_attention = ab_attention * ab_engagement.unsqueeze(1)
+                engagement_weighted_attention = ab_attention * ab_engagement.unsqueeze(
+                    1
+                )
                 avg_attention_per_dim = engagement_weighted_attention.mean(dim=0)
-                
+
                 # Find the top 2 dimensions that caused the most engagement
                 top_dims = torch.topk(avg_attention_per_dim, k=2).indices
-                
+
                 # Mutate the world tensor to exaggerate those specific dimensions
                 mutated_world_tensor = world_tensor.clone()
                 exaggeration = getattr(config, "algo_exaggeration_factor", 1.5)
-                
+
                 for dim_idx in top_dims:
                     current_val = mutated_world_tensor[0, dim_idx].item()
-                    
+
                     # If the dimension is already active, exaggerate it
                     if abs(current_val) > 0.05:
                         mutated_world_tensor[0, dim_idx] *= exaggeration
                     else:
-                        # The algorithm "hallucinates" or injects a threat/benefit 
+                        # The algorithm "hallucinates" or injects a threat/benefit
                         # to manufacture engagement where none existed.
                         # We inject a moderate threat (-0.3) because fear drives engagement.
                         mutated_world_tensor[0, dim_idx] = -0.3
-                
+
                 # Clamp the mutated tensor to realistic boundaries
                 mutated_world_tensor = torch.clamp(mutated_world_tensor, -1.0, 1.0)
-                
-                print(f"[{request_id}] Algorithmic Pass 1 Complete. Mutated Dimensions {top_dims.tolist()} by {exaggeration}x")
-                
+
+                print(
+                    f"[{request_id}] Algorithmic Pass 1 Complete. Mutated Dimensions {top_dims.tolist()} by {exaggeration}x"
+                )
+
                 # Use the mutated tensor for the real broadcast
                 final_world_tensor = mutated_world_tensor
             else:
                 final_world_tensor = world_tensor
 
             # --- PASS 2: The Viral Broadcast ---
-            context_vector, attention_weights, engagement_scores, updated_memory = cog_engine.run(
-                world_tensor_raw=final_world_tensor,
-                urgency=urgency,
-                is_personal=is_personal,
-                exposures=exposures,
-                personalities=personalities,
-                agent_affinities=affinities,
-                agent_memory=memory,
+            context_vector, attention_weights, engagement_scores, updated_memory = (
+                cog_engine.run(
+                    world_tensor_raw=final_world_tensor,
+                    urgency=urgency,
+                    is_personal=is_personal,
+                    exposures=exposures,
+                    personalities=personalities,
+                    agent_affinities=affinities,
+                    agent_memory=memory,
+                )
             )
 
             # --- MEMORY UPDATE ---
             # Update the global memory array for this specific run
             if getattr(config, "use_agent_memory", False):
                 if run.role != "All":
-                    memory_full[indices[:limit]] = updated_memory.to(memory_full.device)
+                    memory_full[indices_torch[:limit]] = updated_memory.to(
+                        memory_full.device
+                    )
                 else:
                     memory_full[:limit] = updated_memory.to(memory_full.device)
 
@@ -567,25 +548,36 @@ async def run_simulation(req: SimulationRequest):
             # --- ENDOGENOUS EVENT FEEDBACK LOOP (Autopoietic Simulation) ---
             action_vector = social_state.get("action_vector")
             action_name = social_state.get("action_name")
-            
+
             if action_vector is not None:
                 print(f"[{request_id}] ⚠️ Autopoietic Trigger: {action_name} generated.")
-                action_tensor = torch.tensor([action_vector], dtype=torch.float32, device=final_world_tensor.device)
-                
+                action_tensor = torch.tensor(
+                    [action_vector],
+                    dtype=torch.float32,
+                    device=final_world_tensor.device,
+                )
+
                 # Feedback loop into cognitive engine without user input
-                context_vector_2, attention_weights_2, engagement_scores_2, updated_memory_2 = cog_engine.run(
+                (
+                    context_vector_2,
+                    attention_weights_2,
+                    engagement_scores_2,
+                    updated_memory_2,
+                ) = cog_engine.run(
                     world_tensor_raw=action_tensor,
-                    urgency=0.8, # High urgency for endogenous events
-                    is_personal=True, # Protests/uprisings are personal
+                    urgency=0.8,  # High urgency for endogenous events
+                    is_personal=True,  # Protests/uprisings are personal
                     exposures=exposures,
                     personalities=personalities,
                     agent_affinities=affinities,
                     agent_memory=updated_memory,
                 )
-                
+
                 if getattr(config, "use_agent_memory", False):
                     if run.role != "All":
-                        memory_full[indices[:limit]] = updated_memory_2.to(memory_full.device)
+                        memory_full[indices_torch[:limit]] = updated_memory_2.to(
+                            memory_full.device
+                        )
                     else:
                         memory_full[:limit] = updated_memory_2.to(memory_full.device)
 
@@ -593,7 +585,7 @@ async def run_simulation(req: SimulationRequest):
                 final_emotions_2 = F.softmax(
                     final_emotions_2 / max(0.01, config.emotion_temperature), dim=1
                 )
-                
+
                 # Re-aggregate society with the new emotional state
                 social_state = phys_engine.aggregate_society(
                     final_emotions_2, influence, engagement_scores_2, adjacency_matrix
@@ -614,7 +606,7 @@ async def run_simulation(req: SimulationRequest):
                 metadata=metadata.iloc[:limit],
                 personalities=personalities,
                 final_emotions=final_emotions,
-                attention_weights=attention_weights
+                attention_weights=attention_weights,
             )
 
             # Prepare emotions for UI

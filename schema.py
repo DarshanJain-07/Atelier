@@ -208,7 +208,9 @@ class SimConfig:
     distortion_min_alpha: float = 0.01
 
     use_engagement_gate: bool = True
-    engagement_threshold: float = 0.15  # Lowered from 0.25 to prevent dead zone for average agents
+    engagement_threshold: float = (
+        0.15  # Lowered from 0.25 to prevent dead zone for average agents
+    )
     engagement_gain: float = 10.0  # Sharpness of transition
 
     use_time_pressure: bool = True  # Enable "Cognitive Tunneling" (Urgency)
@@ -234,7 +236,9 @@ class SimConfig:
     temp_conscientiousness_weight: float = 0.8
     temp_neuroticism_weight: float = 0.6
 
-    threshold_base: float = 0.05  # Lowered from 0.1 to allow smaller emotional responses through
+    threshold_base: float = (
+        0.05  # Lowered from 0.1 to allow smaller emotional responses through
+    )
     threshold_extraversion_weight: float = 0.15
 
     stress_neurotic_amplification: float = 1.5
@@ -243,18 +247,26 @@ class SimConfig:
 
     # --- Agent Memory Parameters ---
     use_agent_memory: bool = True
-    memory_decay_rate: float = 0.7  # How much memory is retained each event (0.0 to 1.0)
-    memory_desensitization_gain: float = 0.5  # How much past identical events suppress current reaction
-    memory_trigger_stacking_gain: float = 1.2  # How much past stress amplifies new similar threats
+    memory_decay_rate: float = (
+        0.7  # How much memory is retained each event (0.0 to 1.0)
+    )
+    memory_desensitization_gain: float = (
+        0.5  # How much past identical events suppress current reaction
+    )
+    memory_trigger_stacking_gain: float = (
+        1.2  # How much past stress amplifies new similar threats
+    )
 
     # --- Algorithmic Amplification (2-Pass Filter Bubble) ---
     use_algorithmic_amplification: bool = False
     algo_sample_size: float = 0.1  # Fraction of population used for initial A/B test
-    algo_exaggeration_factor: float = 1.5  # How much to amplify the dimensions that cause highest engagement
+    algo_exaggeration_factor: float = (
+        1.5  # How much to amplify the dimensions that cause highest engagement
+    )
 
     use_power_law_influence: bool = False  # Enable Weighted Aggregation (Pareto)
     use_maslow_gating: bool = True  # Enable Survival Override (Fear Gating)
-    
+
     # Use robust lookup
     wealth_dim_idx: int = DIMENSION_INDICES["Wealth"]
 
@@ -281,14 +293,20 @@ class SimConfig:
     use_ideological_drift: bool = True
     ideological_drift_rate: float = 0.05
     ideological_drift_noise: float = 0.02
-    elite_influence_drift_chance: float = 0.20  # Chance society drifts toward elite ideology instead of global mean
+    elite_influence_drift_chance: float = (
+        0.20  # Chance society drifts toward elite ideology instead of global mean
+    )
     use_ideological_repulsion: bool = True
-    repulsion_threshold: float = 0.5  # If similarity to societal mean is less than this, agents repel
+    repulsion_threshold: float = (
+        0.5  # If similarity to societal mean is less than this, agents repel
+    )
     repulsion_rate: float = 0.02
     record_history: bool = False
 
     # --- Initialization Parameters ---
-    initial_trait_std_dev: float = 0.33  # Standard deviation for generating initial trait bell curves
+    initial_trait_std_dev: float = (
+        0.33  # Standard deviation for generating initial trait bell curves
+    )
 
     # --- Physics Engine Parameters ---
     outrage_gain: float = 5.0

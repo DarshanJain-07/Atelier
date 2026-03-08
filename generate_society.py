@@ -6,8 +6,8 @@ import pandas as pd
 import torch
 
 from schema import (
-    DIMENSIONS,
     DIMENSION_INDICES,
+    DIMENSIONS,
     SimConfig,
 )
 from society_evolution import SocietyEvolution
@@ -38,7 +38,9 @@ def apply_random_mutations(exposures, personalities, temperature, seed):
     for _ in range(num_changes):
         col_indices = torch.randint(0, num_dims, (len(mutant_indices),), generator=rng)
         # Use normal distribution for mutations to preserve bell curve (avoid uniformity/bimodality)
-        random_values = torch.clamp(torch.randn(len(mutant_indices), generator=rng) * 0.4, -1.0, 1.0)
+        random_values = torch.clamp(
+            torch.randn(len(mutant_indices), generator=rng) * 0.4, -1.0, 1.0
+        )
         exposures[mutant_indices, col_indices] = random_values
 
     for _ in range(num_changes):
@@ -123,29 +125,38 @@ def generate_hybrid_wealth(
 # ================================
 # Main Generator (Bias-Free)
 # ================================
-def create_topology(config: SimConfig, exposures: torch.Tensor, personalities: torch.Tensor, influence_scores: np.ndarray):
+def create_topology(
+    config: SimConfig,
+    exposures: torch.Tensor,
+    personalities: torch.Tensor,
+    influence_scores: np.ndarray,
+):
     """
     Creates a sparse K-Nearest Neighbor adjacency matrix based on influence.
     High influence = larger out-degree (k).
     Edges are weighted by homophily (cosine similarity of traits).
     """
     N = config.num_agents
-    
+
     # 1. Determine out-degree (k) per agent based on influence
     inf_mean = np.mean(influence_scores)
-    k_array = np.clip((influence_scores / inf_mean) * config.base_connections, 1, config.max_connections).astype(int)
-    
+    k_array = np.clip(
+        (influence_scores / inf_mean) * config.base_connections,
+        1,
+        config.max_connections,
+    ).astype(int)
+
     # 2. Build feature matrix for KNN
     features = torch.cat([exposures, personalities], dim=1)
-    
+
     # L2 normalize features
     features_norm = features / (torch.norm(features, dim=1, keepdim=True) + 1e-8)
-    
+
     # Process in batches to save memory
     batch_size = 1000
     indices_list = []
     values_list = []
-    
+
     # Ensure inputs are on the same device
     device = exposures.device
     features_norm = features_norm.to(device)
@@ -154,56 +165,60 @@ def create_topology(config: SimConfig, exposures: torch.Tensor, personalities: t
         end = min(i + batch_size, N)
         batch_size_actual = end - i
         batch_features = features_norm[i:end]
-        
+
         # similarity: (batch_size_actual, N)
         sim = torch.mm(batch_features, features_norm.T)
-        
+
         # Add homophily bias. Exponentiate to punish low similarity heavily.
         sim = torch.pow((sim + 1.0) / 2.0, getattr(config, "homophily_strength", 2.0))
-        
+
         # Self-loops must be removed
         # Set self-similarity to -1.0 so they aren't picked by topk
         batch_indices = torch.arange(batch_size_actual, device=device)
         global_indices = batch_indices + i
         sim[batch_indices, global_indices] = -1.0
-        
+
         # Determine k for this batch
-        batch_k = k_array[i:end] # numpy array
+        batch_k = k_array[i:end]  # numpy array
         max_k = int(np.max(batch_k))
-        
+
         # Get top max_k neighbors
         # (batch_size_actual, max_k)
         top_vals, top_indices = torch.topk(sim, max_k, dim=1)
-        
+
         # Create mask for variable k
         range_tensor = torch.arange(max_k, device=device).unsqueeze(0)
         k_tensor = torch.tensor(batch_k, device=device).unsqueeze(1)
         mask = range_tensor < k_tensor
-        
+
         # Filter valid edges
-        valid_src = torch.arange(i, end, device=device).unsqueeze(1).expand(-1, max_k)[mask]
+        valid_src = (
+            torch.arange(i, end, device=device).unsqueeze(1).expand(-1, max_k)[mask]
+        )
         valid_dst = top_indices[mask]
         valid_val = top_vals[mask]
-        
+
         indices_list.append(torch.stack([valid_src, valid_dst]))
         values_list.append(valid_val)
-                
+
     if not indices_list:
         return None
 
     indices_tensor = torch.cat(indices_list, dim=1)
     values_tensor = torch.cat(values_list)
-    
+
     sparse_adj = torch.sparse_coo_tensor(indices_tensor, values_tensor, size=(N, N))
-    
+
     # Row normalize so each agent's local center is a proper mean
     dense_sums = torch.sparse.sum(sparse_adj, dim=1).to_dense()
     dense_sums = torch.clamp(dense_sums, min=1e-8)
-    
+
     row_indices = indices_tensor[0]
     normalized_values = values_tensor / dense_sums[row_indices]
-    
-    normalized_sparse_adj = torch.sparse_coo_tensor(indices_tensor, normalized_values, size=(N, N)).coalesce()
+
+    normalized_sparse_adj = torch.sparse_coo_tensor(
+        indices_tensor, normalized_values, size=(N, N)
+    ).coalesce()
     return normalized_sparse_adj
 
 
@@ -237,33 +252,36 @@ def generate_society(config: SimConfig):
 
     # ---- Influence (no role-based anchoring) ----
     influence_scores = np.random.lognormal(
-        mean=1.0,
-        sigma=0.5 + config.mutation_temperature,
-        size=config.num_agents
+        mean=1.0, sigma=0.5 + config.mutation_temperature, size=config.num_agents
     )
-    
+
     if getattr(config, "use_power_law_influence", False):
         alpha = 1.16  # standard 80/20 rule pareto
         pareto_multiplier = (np.random.pareto(alpha, config.num_agents) + 1) * 2.0
         influence_scores *= pareto_multiplier
 
     # To create a realistic correlation between structural influence and susceptibility,
-    # we slightly modify personalities of top influencers to be less susceptible 
+    # we slightly modify personalities of top influencers to be less susceptible
     # (lower agreeableness, lower openness to external change)
     # and lower influencers to be more standard.
-    
+
     # rank influence to get percentiles
     influence_ranks = np.argsort(np.argsort(influence_scores)) / (config.num_agents - 1)
-    
+
     # Agreeableness is index 3, Openness is index 0
     # Top influencers (rank near 1.0) get a reduction in agreeableness and openness
-    stubbornness_modifier = torch.tensor(influence_ranks, dtype=torch.float32).unsqueeze(1) * 0.3
-    
+    stubbornness_modifier = (
+        torch.tensor(influence_ranks, dtype=torch.float32).unsqueeze(1) * 0.3
+    )
+
     # Reduce agreeableness (index 3) and openness (index 0)
     # Give them a minimum floor so they can still be occasionally swayed (e.g. by board members/peers)
-    personalities[:, 0] = torch.clamp(personalities[:, 0] - stubbornness_modifier.squeeze() * 0.4, 0.3, 1.0)
-    personalities[:, 3] = torch.clamp(personalities[:, 3] - stubbornness_modifier.squeeze() * 0.4, 0.3, 1.0)
-
+    personalities[:, 0] = torch.clamp(
+        personalities[:, 0] - stubbornness_modifier.squeeze() * 0.4, 0.3, 1.0
+    )
+    personalities[:, 3] = torch.clamp(
+        personalities[:, 3] - stubbornness_modifier.squeeze() * 0.4, 0.3, 1.0
+    )
 
     # ---- Wealth (no role multipliers) ----
     wealth_base = np.ones(config.num_agents)
@@ -290,7 +308,9 @@ def generate_society(config: SimConfig):
     # Clamp non-wealth traits to strict bounds (most are already in bounds due to std 0.33)
     non_wealth_mask = torch.ones(num_dims, dtype=torch.bool)
     non_wealth_mask[wealth_idx] = False
-    exposures[:, non_wealth_mask] = torch.clamp(exposures[:, non_wealth_mask], -1.0, 1.0)
+    exposures[:, non_wealth_mask] = torch.clamp(
+        exposures[:, non_wealth_mask], -1.0, 1.0
+    )
     personalities = torch.clamp(personalities, 0.0, 1.0)
 
     # --- Affinity Normalization (Cognitive Bandwidth) ---
@@ -327,7 +347,9 @@ def generate_society(config: SimConfig):
     adjacency_matrix = None
     if getattr(config, "use_network_topology", False):
         print("Generating Network Topology (Sparse KNN Adjacency Matrix)...")
-        adjacency_matrix = create_topology(config, exposures, personalities, influence_scores)
+        adjacency_matrix = create_topology(
+            config, exposures, personalities, influence_scores
+        )
         torch.save(adjacency_matrix, f"{config.output_dir}/adjacency.pt")
 
     print(f"Society Generated in '{config.output_dir}' (Bias-Free)")
@@ -337,10 +359,13 @@ def generate_society(config: SimConfig):
 def main():
     conf = SimConfig(num_agents=10000, seed=69)
     conf.wealth_dim_idx = DIMENSION_INDICES["Wealth"]
-    df_meta, exposures, personalities, affinities, adjacency_matrix = generate_society(conf)
+    df_meta, exposures, personalities, affinities, adjacency_matrix = generate_society(
+        conf
+    )
     if conf.enable_evolution:
         evolver = SocietyEvolution(conf, df_meta, exposures, personalities)
         df_meta, exposures, personalities = evolver.evolve()
+
 
 if __name__ == "__main__":
     main()

@@ -36,31 +36,31 @@ class SocietyEvolution:
     def apply_inheritance(self):
         """
         Simulate intergenerational inheritance with some decay and noise.
-        
+
         Refactored Logic:
         - 'inheritance_fraction' acts as the amount PASSED DOWN (e.g., 0.7).
-        - The remaining (0.3) is NOT destroyed. It is taxed/lost and then 
+        - The remaining (0.3) is NOT destroyed. It is taxed/lost and then
           REDISTRIBUTED back to the population (simulating public services/infrastructure).
         - This prevents the economy from shrinking to zero over time.
         """
         inherit_frac = self.config.inheritance_fraction  # e.g., 0.7
         noise_std = self.config.inheritance_noise_std  # e.g., 0.05
-        
+
         parent_wealth = self.exposures[:, self.wealth_idx]
-        
+
         # 1. Tax / Loss Phase
         inherited_wealth = parent_wealth * inherit_frac
-        
+
         # Calculate total 'tax' collected
         total_tax = (parent_wealth - inherited_wealth).sum()
-        
+
         # 2. Redistribution Phase (Uniform Basic Income / Public Goods)
         # Everyone gets an equal share of the taxed wealth
         redistribution_per_capita = total_tax / self.num_agents
-        
+
         # 3. Apply changes with noise
         noise = torch.randn(self.num_agents) * noise_std * parent_wealth.mean()
-        
+
         new_wealth = inherited_wealth + redistribution_per_capita + noise
         new_wealth = torch.clamp(new_wealth, min=0.0)  # No negative wealth
 
@@ -126,21 +126,21 @@ class SocietyEvolution:
 
     def apply_ideological_drift(self):
         """
-        Simulate generational ideological drift. Agents' traits drift slightly towards 
+        Simulate generational ideological drift. Agents' traits drift slightly towards
         the societal mean, with some random generational noise, mimicking cultural shifts.
         Occasionally (e.g. 5% chance), society drifts toward the Elite's mean instead of the global mean (Hegemony).
         Also includes "Repulsion" where alienated agents actively move away from the mainstream.
         """
-        if not getattr(self.config, 'use_ideological_drift', False):
+        if not getattr(self.config, "use_ideological_drift", False):
             return
 
-        drift_rate = getattr(self.config, 'ideological_drift_rate', 0.05)
-        noise_std = getattr(self.config, 'ideological_drift_noise', 0.02)
-        elite_chance = getattr(self.config, 'elite_influence_drift_chance', 0.05)
-        
-        use_repulsion = getattr(self.config, 'use_ideological_repulsion', False)
-        repulsion_threshold = getattr(self.config, 'repulsion_threshold', 0.0)
-        repulsion_rate = getattr(self.config, 'repulsion_rate', 0.02)
+        drift_rate = getattr(self.config, "ideological_drift_rate", 0.05)
+        noise_std = getattr(self.config, "ideological_drift_noise", 0.02)
+        elite_chance = getattr(self.config, "elite_influence_drift_chance", 0.05)
+
+        use_repulsion = getattr(self.config, "use_ideological_repulsion", False)
+        repulsion_threshold = getattr(self.config, "repulsion_threshold", 0.0)
+        repulsion_rate = getattr(self.config, "repulsion_rate", 0.02)
 
         # We only drift non-wealth traits
         non_wealth_mask = torch.ones(self.exposures.shape[1], dtype=torch.bool)
@@ -161,32 +161,41 @@ class SocietyEvolution:
 
         # Calculate difference from target
         diff_from_target = target_mean - self.exposures
-        
+
         # Calculate 'distance' or 'alienation' of each agent from the target mean
         # Using cosine similarity to measure if they are conceptually aligned
         if use_repulsion:
             # Calculate cosine similarity manually for tensors
             # (N, D) and (D,)
-            target_mean_norm = target_mean[non_wealth_mask] / (torch.norm(target_mean[non_wealth_mask]) + 1e-8)
-            agent_norms = self.exposures[:, non_wealth_mask] / (torch.norm(self.exposures[:, non_wealth_mask], dim=1, keepdim=True) + 1e-8)
+            target_mean_norm = target_mean[non_wealth_mask] / (
+                torch.norm(target_mean[non_wealth_mask]) + 1e-8
+            )
+            agent_norms = self.exposures[:, non_wealth_mask] / (
+                torch.norm(self.exposures[:, non_wealth_mask], dim=1, keepdim=True)
+                + 1e-8
+            )
             alignment = torch.matmul(agent_norms, target_mean_norm)
-            
+
             # Agents with alignment < threshold are "alienated" and experience repulsion instead of attraction
             is_alienated = (alignment < repulsion_threshold).unsqueeze(1)
-            
+
             # Attracted agents move toward target (+), Alienated move away (-)
             # Repulsion rate usually slightly smaller than drift to avoid explosions
-            drift_direction = torch.where(is_alienated, -diff_from_target * repulsion_rate, diff_from_target * drift_rate)
+            drift_direction = torch.where(
+                is_alienated,
+                -diff_from_target * repulsion_rate,
+                diff_from_target * drift_rate,
+            )
         else:
             drift_direction = diff_from_target * drift_rate
-            
+
         # Add random noise
         noise = torch.randn_like(self.exposures) * noise_std
 
         # 1. Apply raw drift + noise
         new_exposures = self.exposures[:, non_wealth_mask].clone()
         new_exposures += drift_direction[:, non_wealth_mask] + noise[:, non_wealth_mask]
-        
+
         # 2. Standardize to prevent variance collapse
         # We only do this if repulsion is OFF, because repulsion is SUPPOSED to increase variance (fracturing)
         if not use_repulsion:
@@ -194,12 +203,16 @@ class SocietyEvolution:
             new_mean = new_exposures.mean(dim=0, keepdim=True)
             new_std = new_exposures.std(dim=0, keepdim=True)
             new_std = torch.clamp(new_std, min=1e-6)
-            new_exposures = ((new_exposures - new_mean) / new_std) * current_std + new_mean
-        
+            new_exposures = (
+                (new_exposures - new_mean) / new_std
+            ) * current_std + new_mean
+
         self.exposures[:, non_wealth_mask] = new_exposures
-        
+
         # Clamp back to [-1, 1]
-        self.exposures[:, non_wealth_mask] = torch.clamp(self.exposures[:, non_wealth_mask], -1.0, 1.0)
+        self.exposures[:, non_wealth_mask] = torch.clamp(
+            self.exposures[:, non_wealth_mask], -1.0, 1.0
+        )
 
     def reassign_roles(self):
 
@@ -236,7 +249,13 @@ class SocietyEvolution:
         new_roles_indices = torch.multinomial(probs, 1).squeeze().numpy()
 
         # Map indices to generic class names since original roles are removed
-        role_map = {0: "Underclass", 1: "Working Class", 2: "Middle Class", 3: "Upper Middle", 4: "Elite"}
+        role_map = {
+            0: "Underclass",
+            1: "Working Class",
+            2: "Middle Class",
+            3: "Upper Middle",
+            4: "Elite",
+        }
         mapped_roles = [role_map.get(idx, "Unknown") for idx in new_roles_indices]
 
         self.metadata["Role"] = mapped_roles

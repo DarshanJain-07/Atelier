@@ -1,6 +1,7 @@
+from typing import Optional
+
 import torch
 import torch.nn.functional as F
-from typing import Optional
 
 from attention_context import AttentionContext
 from schema import SimConfig
@@ -116,7 +117,11 @@ class CognitiveEngine:
 
         # Smooth stress scaling
         stress_factor = torch.sigmoid(
-            torch.tensor(self.config.stress_gain * (urgency - threshold), dtype=torch.float32, device=attention_weights.device)
+            torch.tensor(
+                self.config.stress_gain * (urgency - threshold),
+                dtype=torch.float32,
+                device=attention_weights.device,
+            )
         )  # (N,1)
 
         biased = attention_weights.clone()
@@ -125,21 +130,28 @@ class CognitiveEngine:
         # Neuroticism → amplify dominant interpretation
         # --------------------------------------------------
         dominant_val, dominant_idx = torch.max(biased, dim=1, keepdim=True)
-        amplification = 1.0 + stress_factor * neuroticism * self.config.stress_neurotic_amplification
+        amplification = (
+            1.0
+            + stress_factor * neuroticism * self.config.stress_neurotic_amplification
+        )
 
         biased.scatter_(1, dominant_idx, dominant_val * amplification)
 
         # --------------------------------------------------
         # Low Openness → reduce diversity
         # --------------------------------------------------
-        diversity_scale = 1.0 - stress_factor * (1 - openness) * self.config.stress_openness_reduction
+        diversity_scale = (
+            1.0 - stress_factor * (1 - openness) * self.config.stress_openness_reduction
+        )
         biased = biased * diversity_scale
 
         # --------------------------------------------------
         # Extraversion → increase emotional intensity
         # (global scaling of attention sharpness)
         # --------------------------------------------------
-        intensity_boost = 1.0 + stress_factor * extraversion * self.config.stress_extraversion_boost
+        intensity_boost = (
+            1.0 + stress_factor * extraversion * self.config.stress_extraversion_boost
+        )
         biased = biased * intensity_boost
 
         # --------------------------------------------------
@@ -192,28 +204,36 @@ class CognitiveEngine:
         # ---------------------------------
         if agent_memory is not None and getattr(self.config, "use_agent_memory", False):
             mem = agent_memory.to(device)
-            
+
             # Desensitization (Fatigue): If current event aligns with recent memory, reduce impact
             # We use an exponential scaling so repeated hits rapidly approach 1.0 (total fatigue)
             alignment = mem * distorted_world
             fatigue_mask = torch.clamp(alignment, min=0.0)
-            fatigue_penalty = 1.0 - torch.exp(-fatigue_mask * getattr(self.config, "memory_desensitization_gain", 2.0))
-            
+            fatigue_penalty = 1.0 - torch.exp(
+                -fatigue_mask * getattr(self.config, "memory_desensitization_gain", 2.0)
+            )
+
             # Trigger Stacking: Total past stress makes them hyper-reactive to NEW threats
             threat_mask = (distorted_world < 0).float()
             # Calculate total past stress across ALL dimensions
             total_stress = torch.sum(torch.abs(mem), dim=1, keepdim=True)
-            
+
             # Only stack triggers on dimensions that aren't currently fatiguing them
             fresh_threat_mask = threat_mask * (fatigue_mask < 0.1).float()
-            
+
             # Logarithmic scaling so it doesn't break the math, but still gives a massive boost
-            trigger_stack_boost = torch.log1p(total_stress) * fresh_threat_mask * getattr(self.config, "memory_trigger_stacking_gain", 3.0)
-            
-            # Apply memory modifications: 
-            # 1. Fatigue multiplies the raw signal down toward 0. 
+            trigger_stack_boost = (
+                torch.log1p(total_stress)
+                * fresh_threat_mask
+                * getattr(self.config, "memory_trigger_stacking_gain", 3.0)
+            )
+
+            # Apply memory modifications:
+            # 1. Fatigue multiplies the raw signal down toward 0.
             # 2. Trigger stacking adds an amplification if it's a fresh threat.
-            perceived_world = distorted_world * (1.0 - torch.clamp(fatigue_penalty, max=0.95)) + (distorted_world * trigger_stack_boost)
+            perceived_world = distorted_world * (
+                1.0 - torch.clamp(fatigue_penalty, max=0.95)
+            ) + (distorted_world * trigger_stack_boost)
         else:
             perceived_world = distorted_world
 

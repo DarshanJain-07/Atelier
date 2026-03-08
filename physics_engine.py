@@ -25,10 +25,16 @@ class SocialPhysicsEngine:
     # ============================================================
 
     @torch.inference_mode()
-    def aggregate_society(self, emotion_tensor, influence_scores, engagement_scores=None, adjacency_matrix=None):
+    def aggregate_society(
+        self,
+        emotion_tensor,
+        influence_scores,
+        engagement_scores=None,
+        adjacency_matrix=None,
+    ):
         """
         Calculates the socio-emotional metrics for a single event.
-        
+
         Args:
             emotion_tensor: (N, 8) tensor of emotional states.
             influence_scores: (N,) structural influence weights.
@@ -46,13 +52,15 @@ class SocialPhysicsEngine:
         elif isinstance(influence_scores, torch.Tensor):
             structural_weights = influence_scores.float()
         elif hasattr(influence_scores, "to_numpy"):
-            structural_weights = torch.tensor(influence_scores.to_numpy(), dtype=torch.float32)
+            structural_weights = torch.tensor(
+                influence_scores.to_numpy(), dtype=torch.float32
+            )
         else:
             structural_weights = torch.ones(N, dtype=torch.float32)
 
         # Influence saturation (prevents oligarch domination)
         structural_weights = torch.log1p(structural_weights)
-        
+
         # ----------------------------
         # Active Engagement (Skin in the Game)
         # ----------------------------
@@ -61,7 +69,7 @@ class SocialPhysicsEngine:
             energy = engagement_scores
             # Normalize energy so we don't completely crush baseline influence
             energy = energy / (energy.mean() + 1e-9)
-            
+
             # Final objective weight is Structural Influence * Active Engagement
             weights = structural_weights * energy
         else:
@@ -74,14 +82,16 @@ class SocialPhysicsEngine:
         # 1️⃣ Objective Center of Gravity (Global)
         # ============================================================
         center_of_gravity = (emotion_tensor * weights.unsqueeze(1)).sum(dim=0)
-        
+
         # ============================================================
         # 1.5️⃣ Topological Context (Local Echo Chambers)
         # ============================================================
         if adjacency_matrix is not None:
             # Each agent's emotional baseline is now the weighted average of their connections
             # adjacency_matrix is row-normalized, so mm acts as a weighted mean
-            local_centers = torch.smm(adjacency_matrix.to(emotion_tensor.device), emotion_tensor)
+            local_centers = torch.smm(
+                adjacency_matrix.to(emotion_tensor.device), emotion_tensor
+            )
         else:
             # If no topology, the local context is just the global context for everyone
             local_centers = center_of_gravity.unsqueeze(0).expand(N, -1)
@@ -96,13 +106,15 @@ class SocialPhysicsEngine:
         distances = torch.norm(emotion_tensor - local_centers, dim=1)
 
         outrage_gain = self.config.outrage_gain
-        
+
         # Sigmoid Saturation Model: simulates algorithm caps and user fatigue.
         # Prevents extreme outliers from generating infinite viral weight.
         max_multiplier = self.config.max_viral_multiplier
         midpoint = self.config.saturation_midpoint
-        
-        outrage_boost = 1.0 + max_multiplier * torch.sigmoid(outrage_gain * (distances - midpoint))
+
+        outrage_boost = 1.0 + max_multiplier * torch.sigmoid(
+            outrage_gain * (distances - midpoint)
+        )
 
         viral_weights = weights * outrage_boost
         viral_weights = viral_weights / viral_weights.sum()
@@ -151,7 +163,7 @@ class SocialPhysicsEngine:
         # Positive: Joy (+1), Trust (+0.5), Anticipation (+0.5), Surprise (0)
         # Negative: Sadness (-1), Disgust (-0.5), Anger (-0.8), Fear (-0.8)
         # Assuming EMOTION_LABELS order: ["Joy", "Trust", "Fear", "Surprise", "Sadness", "Disgust", "Anger", "Anticipation"]
-        
+
         # Calculate single valence score for the objective center (-1.0 to 1.0)
         valence_score = torch.dot(center_of_gravity, VALENCE_WEIGHTS).item()
 
@@ -177,33 +189,33 @@ class SocialPhysicsEngine:
         # ============================================================
         # 8️⃣ Endogenous Event Generation
         # ============================================================
-        
+
         action_vector = None
         action_name = None
-        
+
         elite_div_threshold = getattr(self.config, "elite_divergence_threshold", 0.4)
         pol_threshold = getattr(self.config, "polarization_threshold", 0.5)
 
         if elite_divergence > elite_div_threshold and polarization > pol_threshold:
             # Populist Uprising
             action_vector = [0.0] * 12
-            action_vector[1] = -0.5 # Negative Safety
-            action_vector[2] = -0.8 # Negative Stability
-            action_vector[4] = -0.9 # Negative Fairness
+            action_vector[1] = -0.5  # Negative Safety
+            action_vector[2] = -0.8  # Negative Stability
+            action_vector[4] = -0.9  # Negative Fairness
             action_vector[7] = 0.5  # Positive Freedom
             action_name = "Populist Uprising"
         elif elite_divergence > elite_div_threshold:
             # Policy Shift (Elite push through changes)
             action_vector = [0.0] * 12
             action_vector[0] = 0.4  # Wealth impact
-            action_vector[4] = -0.3 # Negative Fairness
+            action_vector[4] = -0.3  # Negative Fairness
             action_vector[6] = 0.6  # Positive Innovation
             action_name = "Elite Policy Shift"
         elif polarization > pol_threshold:
             # Protest
             action_vector = [0.0] * 12
-            action_vector[2] = -0.6 # Negative Stability
-            action_vector[4] = -0.5 # Negative Fairness
+            action_vector[2] = -0.6  # Negative Stability
+            action_vector[4] = -0.5  # Negative Fairness
             action_vector[5] = 0.7  # Positive In-Group
             action_name = "Civil Protest"
 
@@ -216,16 +228,13 @@ class SocialPhysicsEngine:
             "objective_center": center_of_gravity.tolist(),
             "viral_center": viral_center.tolist(),
             "elite_center": elite_center.tolist(),
-
             # Summaries
             "dominant_emotion": dominant_label,
             "confidence": round(max_val.item(), 3),
             "sentiment_valence": round(valence_score, 3),
-
             # Virality metrics
             "mean_outrage_multiplier": round(outrage_boost.mean().item(), 3),
             "max_outrage_multiplier": round(outrage_boost.max().item(), 3),
-
             # Stability metrics
             "polarization": polarization,
             "entropy": entropy,
@@ -233,7 +242,6 @@ class SocialPhysicsEngine:
             "elite_divergence": elite_divergence,
             "action_vector": action_vector,
             "action_name": action_name,
-
             "labels": EMOTION_LABELS,
         }
 
@@ -248,7 +256,7 @@ if __name__ == "__main__":
     # Fake Data: 10 agents, 8 emotions
     fake_emotions = torch.rand(10, 8)
     fake_influence = np.array([1, 1, 1, 1, 1, 1, 1, 1, 1, 100])  # One whale
-    
+
     # Fake engagement scores (10 agents)
     fake_engagement = torch.rand(10)
 

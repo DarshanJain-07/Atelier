@@ -7,6 +7,7 @@ import torch
 
 from schema import (
     DIMENSIONS,
+    DIMENSION_INDICES,
     SimConfig,
 )
 from society_evolution import SocietyEvolution
@@ -140,38 +141,58 @@ def create_topology(config: SimConfig, exposures: torch.Tensor, personalities: t
     # L2 normalize features
     features_norm = features / (torch.norm(features, dim=1, keepdim=True) + 1e-8)
     
+    # Process in batches to save memory
+    batch_size = 1000
     indices_list = []
     values_list = []
     
-    # Process in batches to save memory
-    batch_size = 1000
+    # Ensure inputs are on the same device
+    device = exposures.device
+    features_norm = features_norm.to(device)
+
     for i in range(0, N, batch_size):
         end = min(i + batch_size, N)
+        batch_size_actual = end - i
         batch_features = features_norm[i:end]
         
-        # similarity: (batch_size, N)
+        # similarity: (batch_size_actual, N)
         sim = torch.mm(batch_features, features_norm.T)
         
         # Add homophily bias. Exponentiate to punish low similarity heavily.
         sim = torch.pow((sim + 1.0) / 2.0, getattr(config, "homophily_strength", 2.0))
         
         # Self-loops must be removed
-        for j in range(end - i):
-            sim[j, i+j] = -1.0
+        # Set self-similarity to -1.0 so they aren't picked by topk
+        batch_indices = torch.arange(batch_size_actual, device=device)
+        global_indices = batch_indices + i
+        sim[batch_indices, global_indices] = -1.0
         
-        # For each agent in batch, get top k
-        for idx_in_batch in range(end - i):
-            global_idx = i + idx_in_batch
-            k = k_array[global_idx]
-            
-            top_vals, top_indices = torch.topk(sim[idx_in_batch], k)
-            
-            for j in range(k):
-                indices_list.append([global_idx, top_indices[j].item()])
-                values_list.append(top_vals[j].item())
+        # Determine k for this batch
+        batch_k = k_array[i:end] # numpy array
+        max_k = int(np.max(batch_k))
+        
+        # Get top max_k neighbors
+        # (batch_size_actual, max_k)
+        top_vals, top_indices = torch.topk(sim, max_k, dim=1)
+        
+        # Create mask for variable k
+        range_tensor = torch.arange(max_k, device=device).unsqueeze(0)
+        k_tensor = torch.tensor(batch_k, device=device).unsqueeze(1)
+        mask = range_tensor < k_tensor
+        
+        # Filter valid edges
+        valid_src = torch.arange(i, end, device=device).unsqueeze(1).expand(-1, max_k)[mask]
+        valid_dst = top_indices[mask]
+        valid_val = top_vals[mask]
+        
+        indices_list.append(torch.stack([valid_src, valid_dst]))
+        values_list.append(valid_val)
                 
-    indices_tensor = torch.tensor(indices_list, dtype=torch.long).T
-    values_tensor = torch.tensor(values_list, dtype=torch.float32)
+    if not indices_list:
+        return None
+
+    indices_tensor = torch.cat(indices_list, dim=1)
+    values_tensor = torch.cat(values_list)
     
     sparse_adj = torch.sparse_coo_tensor(indices_tensor, values_tensor, size=(N, N))
     
@@ -197,7 +218,7 @@ def generate_society(config: SimConfig):
     print(f"Generating {config.num_agents} Agents via Bias-Free Continuous Field...")
 
     num_dims = len(DIMENSIONS)
-    wealth_idx = DIMENSIONS.index("Wealth")
+    wealth_idx = DIMENSION_INDICES["Wealth"]
     num_personalities = 5
     total_dims = num_dims * 2 + num_personalities
 
@@ -315,7 +336,7 @@ def generate_society(config: SimConfig):
 
 def main():
     conf = SimConfig(num_agents=10000, seed=69)
-    conf.wealth_dim_idx = DIMENSIONS.index("Wealth")
+    conf.wealth_dim_idx = DIMENSION_INDICES["Wealth"]
     df_meta, exposures, personalities, affinities, adjacency_matrix = generate_society(conf)
     if conf.enable_evolution:
         evolver = SocietyEvolution(conf, df_meta, exposures, personalities)

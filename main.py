@@ -22,7 +22,7 @@ from physics_engine import SocialPhysicsEngine
 from explainability import ExplainabilityEngine
 
 # Import our Core Logic
-from schema import DIMENSIONS, EMOTION_LABELS, PSYCH_PROJECTION, SimConfig
+from schema import DIMENSION_INDICES, DIMENSIONS, EMOTION_LABELS, PSYCH_PROJECTION, SimConfig
 from society_evolution import SocietyEvolution
 from validation import Validator
 
@@ -132,7 +132,7 @@ def prepare_society_sync(run: RunProfile, run_output_dir: str):
         shock_frequency=run.shock_frequency,
         shock_magnitude=run.shock_magnitude,
     )
-    config.wealth_dim_idx = DIMENSIONS.index("Wealth")
+    config.wealth_dim_idx = DIMENSION_INDICES["Wealth"]
 
     cache_key = f"{run.seed}_{run.agent_count}_{run.temperature}_{run.use_power_law}"
 
@@ -180,6 +180,143 @@ def prepare_society_sync(run: RunProfile, run_output_dir: str):
     return config, metadata_full, exposures_full, personalities_full, affinities_full, memory_full, adjacency_matrix
 
 
+def subset_adjacency(adj, keep_indices):
+    """
+    Slices a sparse adjacency matrix to keep only rows/cols specified in 'keep_indices'.
+    Remaps indices to 0..len(keep_indices).
+    Renormalizes rows to sum to 1.
+    """
+    if adj is None:
+        return None
+    
+    device = adj.device
+    
+    # 1. Create a mask of nodes to keep
+    N = adj.shape[0]
+    
+    # Check if keep_indices is a tensor or list
+    if not isinstance(keep_indices, torch.Tensor):
+        keep_indices = torch.tensor(keep_indices, device=device, dtype=torch.long)
+    else:
+        keep_indices = keep_indices.to(device)
+        
+    M = keep_indices.numel()
+    if M == 0:
+        return None
+        
+    # Mapping from old_index -> new_index (0..M)
+    # Initialize with -1
+    mapping = torch.full((N,), -1, dtype=torch.long, device=device)
+    mapping[keep_indices] = torch.arange(M, device=device)
+    
+    # 2. Filter edges
+    adj = adj.coalesce()
+    indices = adj.indices()
+    values = adj.values()
+    
+    row, col = indices[0], indices[1]
+    
+    # Keep edge only if BOTH src and dst are in the subset
+    # We use the mapping to check: if mapping[idx] != -1, it's kept
+    new_row = mapping[row]
+    new_col = mapping[col]
+    
+    # Filter where both are valid (>= 0)
+    mask = (new_row >= 0) & (new_col >= 0)
+    
+    if not mask.any():
+        return None
+        
+    final_row = new_row[mask]
+    final_col = new_col[mask]
+    final_values = values[mask]
+    
+    # 3. Create new sparse tensor
+    new_indices = torch.stack([final_row, final_col])
+    
+    # 4. Renormalize rows
+    # Construct temp to get row sums
+    temp_adj = torch.sparse_coo_tensor(new_indices, final_values, size=(M, M))
+    row_sums = torch.sparse.sum(temp_adj, dim=1).to_dense()
+    
+    # Avoid division by zero
+    row_sums[row_sums == 0] = 1.0
+    
+    # Normalize
+    final_values = final_values / row_sums[final_row]
+    
+    return torch.sparse_coo_tensor(new_indices, final_values, size=(M, M)).coalesce()
+
+
+def subset_adjacency(adj, keep_indices):
+    """
+    Slices a sparse adjacency matrix to keep only rows/cols specified in 'keep_indices'.
+    Remaps indices to 0..len(keep_indices).
+    Renormalizes rows to sum to 1.
+    """
+    if adj is None:
+        return None
+    
+    device = adj.device
+    
+    # 1. Create a mask of nodes to keep
+    N = adj.shape[0]
+    
+    # Check if keep_indices is a tensor or list
+    if not isinstance(keep_indices, torch.Tensor):
+        keep_indices = torch.tensor(keep_indices, device=device, dtype=torch.long)
+    else:
+        keep_indices = keep_indices.to(device)
+        
+    M = keep_indices.numel()
+    if M == 0:
+        return None
+        
+    # Mapping from old_index -> new_index (0..M)
+    # Initialize with -1
+    mapping = torch.full((N,), -1, dtype=torch.long, device=device)
+    mapping[keep_indices] = torch.arange(M, device=device)
+    
+    # 2. Filter edges
+    adj = adj.coalesce()
+    indices = adj.indices()
+    values = adj.values()
+    
+    row, col = indices[0], indices[1]
+    
+    # Keep edge only if BOTH src and dst are in the subset
+    # We use the mapping to check: if mapping[idx] != -1, it's kept
+    new_row = mapping[row]
+    new_col = mapping[col]
+    
+    # Filter where both are valid (>= 0)
+    mask = (new_row >= 0) & (new_col >= 0)
+    
+    if not mask.any():
+        return None
+        
+    final_row = new_row[mask]
+    final_col = new_col[mask]
+    final_values = values[mask]
+    
+    # 3. Create new sparse tensor
+    new_indices = torch.stack([final_row, final_col])
+    
+    # 4. Renormalize rows
+    # Construct temp to get row sums
+    temp_adj = torch.sparse_coo_tensor(new_indices, final_values, size=(M, M))
+    row_sums = torch.sparse.sum(temp_adj, dim=1).to_dense()
+    
+    # Avoid division by zero
+    row_sums[row_sums == 0] = 1.0
+    
+    # Normalize
+    # We need to map row indices back to values to divide correctly
+    final_values = final_values / row_sums[final_row]
+    
+    return torch.sparse_coo_tensor(new_indices, final_values, size=(M, M)).coalesce()
+
+
 def cleanup_memory():
     """Forces garbage collection and clears PyTorch cache."""
     import gc
@@ -192,8 +329,6 @@ def cleanup_memory():
 
 @app.post("/simulate")
 async def run_simulation(req: SimulationRequest):
-    global SOCIETY_CACHE
-
     # 0. Global Memory Management - Start with a clean slate
     print("\n--- Initializing New Simulation Request ---")
 
@@ -286,17 +421,25 @@ async def run_simulation(req: SimulationRequest):
             # --- ROLE FILTERING ---
             if run.role != "All":
                 mask = metadata_full["Role"] == run.role
-                metadata = metadata_full[mask].reset_index(drop=True)
-                indices = np.where(mask.to_numpy())[0]
-                exposures = exposures_full[indices]
-                personalities = personalities_full[indices]
-                affinities = affinities_full[indices]
-                memory = memory_full[indices]
+                indices_np = np.where(mask.to_numpy())[0]
+                indices_torch = torch.tensor(indices_np, dtype=torch.long)
                 
-                # Topological subsetting is complex for sparse matrices without breaking normalizations.
-                # For role-filtered sub-populations, we disable network topology to preserve accuracy.
-                adjacency_matrix = None
+                metadata = metadata_full.iloc[indices_np].reset_index(drop=True)
+                exposures = exposures_full[indices_np]
+                personalities = personalities_full[indices_np]
+                affinities = affinities_full[indices_np]
+                memory = memory_full[indices_np]
                 
+                # Slicing sparse adjacency matrix to preserve physics within the subgroup
+                if adjacency_matrix_full is not None:
+                    adjacency_matrix = subset_adjacency(adjacency_matrix_full, indices_torch)
+                    if adjacency_matrix is not None:
+                         print(f"[{request_id}] Resliced Adjacency Matrix for Role: {run.role} (Nodes: {len(indices_np)})")
+                    else:
+                         print(f"[{request_id}] Adjacency Slice Empty/Failed for Role: {run.role}")
+                else:
+                    adjacency_matrix = None
+                    
                 print(
                     f"[{request_id}] Filtered Run {i} to Role: {run.role} ({len(metadata)} agents)"
                 )
@@ -312,16 +455,18 @@ async def run_simulation(req: SimulationRequest):
             if limit == 0:
                 all_results.append({"error": f"No agents found for role: {run.role}"})
                 continue
-
+            
+            current_count = len(metadata)
             metadata = metadata.iloc[:limit]
             exposures = exposures[:limit]
             personalities = personalities[:limit]
             affinities = affinities[:limit]
             memory = memory[:limit]
             
-            if adjacency_matrix is not None and limit < len(metadata_full):
-                 # Same logic: if we truncated the population, topology breaks.
-                 adjacency_matrix = None
+            if adjacency_matrix is not None and limit < current_count:
+                 # Further subsetting if limit < filtered_population
+                 limit_indices = torch.arange(limit, dtype=torch.long)
+                 adjacency_matrix = subset_adjacency(adjacency_matrix, limit_indices)
 
             try:
                 influence = metadata["Influence"].to_numpy(dtype=np.float32)

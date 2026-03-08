@@ -1,5 +1,15 @@
 import torch
 import torch.nn.functional as F
+from schema import PERSONALITY_QUERY_MATRIX, CROSS_DIM_INTERACTIONS
+
+# Global cache for device-specific constants to avoid repeated CPU->GPU transfers
+_DEVICE_CACHE = {}
+
+def get_cached_constant(name: str, tensor: torch.Tensor, device: torch.device) -> torch.Tensor:
+    key = (name, device)
+    if key not in _DEVICE_CACHE:
+        _DEVICE_CACHE[key] = tensor.to(device)
+    return _DEVICE_CACHE[key]
 
 
 class AttentionContext:
@@ -64,8 +74,8 @@ class AttentionContext:
         # Shape (N, 5)
         activations = torch.cat([O_act, C_act, E_act, A_act, N_act], dim=1)
 
-        from schema import PERSONALITY_QUERY_MATRIX
-        personality_mod = torch.matmul(activations, PERSONALITY_QUERY_MATRIX.to(Q_base.device))
+        matrix = get_cached_constant("PERSONALITY_QUERY_MATRIX", PERSONALITY_QUERY_MATRIX, Q_base.device)
+        personality_mod = torch.matmul(activations, matrix)
 
         self.Q = torch.tanh(Q_base + personality_mod)
         return self
@@ -124,10 +134,10 @@ class AttentionContext:
             raise ValueError("cross_dimension_layer called before Q is initialized")
 
         Q = self.Q
-        from schema import CROSS_DIM_INTERACTIONS
 
         influence = Q * self.config.cross_dim_interaction_strength
-        Q_cross = torch.matmul(influence, CROSS_DIM_INTERACTIONS.to(Q.device))
+        matrix = get_cached_constant("CROSS_DIM_INTERACTIONS", CROSS_DIM_INTERACTIONS, Q.device)
+        Q_cross = torch.matmul(influence, matrix)
 
         self.Q = torch.tanh(Q + Q_cross)
         return self

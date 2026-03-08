@@ -21,6 +21,9 @@ DIMENSIONS: List[str] = [
     "Long_Term",
 ]
 
+# Map Dimension Names to Indices for Robustness
+DIMENSION_INDICES = {dim: i for i, dim in enumerate(DIMENSIONS)}
+
 EMOTION_LABELS: List[str] = [
     "Joy",
     "Trust",
@@ -251,7 +254,9 @@ class SimConfig:
 
     use_power_law_influence: bool = False  # Enable Weighted Aggregation (Pareto)
     use_maslow_gating: bool = True  # Enable Survival Override (Fear Gating)
-    wealth_dim_idx = DIMENSIONS.index("Wealth")
+    
+    # Use robust lookup
+    wealth_dim_idx: int = DIMENSION_INDICES["Wealth"]
 
     # --- Network Topology Parameters ---
     use_network_topology: bool = True

@@ -15,14 +15,28 @@ HF_MODEL_NAME = "cardiffnlp/twitter-roberta-base-sentiment"
 
 class Validator:
     def __init__(self):
+        self.tokenizer = None
+        self.model = None
+        self.device = None
+    
+    def _load_model(self):
+        if self.model is not None:
+            return
+
         print("Loading Baseline AI (RoBERTa)...")
-        self.tokenizer = AutoTokenizer.from_pretrained(HF_MODEL_NAME)
-        self.model = AutoModelForSequenceClassification.from_pretrained(HF_MODEL_NAME)
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.model.to(self.device)
-        print("Baseline AI Loaded.")
+        try:
+            self.tokenizer = AutoTokenizer.from_pretrained(HF_MODEL_NAME)
+            self.model = AutoModelForSequenceClassification.from_pretrained(HF_MODEL_NAME)
+            self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            self.model.to(self.device)
+            print("Baseline AI Loaded.")
+        except Exception as e:
+            print(f"Failed to load Baseline AI: {e}")
+            raise e
 
     def get_baseline_prob(self, text: str):
+        self._load_model()
+        
         inputs = self.tokenizer(
             text, return_tensors="pt", truncation=True, max_length=512
         ).to(self.device)

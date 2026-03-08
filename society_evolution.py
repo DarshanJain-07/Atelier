@@ -36,17 +36,32 @@ class SocietyEvolution:
     def apply_inheritance(self):
         """
         Simulate intergenerational inheritance with some decay and noise.
-        A fraction of wealth is passed on, rest lost or consumed.
+        
+        Refactored Logic:
+        - 'inheritance_fraction' acts as the amount PASSED DOWN (e.g., 0.7).
+        - The remaining (0.3) is NOT destroyed. It is taxed/lost and then 
+          REDISTRIBUTED back to the population (simulating public services/infrastructure).
+        - This prevents the economy from shrinking to zero over time.
         """
         inherit_frac = self.config.inheritance_fraction  # e.g., 0.7
         noise_std = self.config.inheritance_noise_std  # e.g., 0.05
-
+        
         parent_wealth = self.exposures[:, self.wealth_idx]
-
+        
+        # 1. Tax / Loss Phase
         inherited_wealth = parent_wealth * inherit_frac
+        
+        # Calculate total 'tax' collected
+        total_tax = (parent_wealth - inherited_wealth).sum()
+        
+        # 2. Redistribution Phase (Uniform Basic Income / Public Goods)
+        # Everyone gets an equal share of the taxed wealth
+        redistribution_per_capita = total_tax / self.num_agents
+        
+        # 3. Apply changes with noise
         noise = torch.randn(self.num_agents) * noise_std * parent_wealth.mean()
-
-        new_wealth = inherited_wealth + noise
+        
+        new_wealth = inherited_wealth + redistribution_per_capita + noise
         new_wealth = torch.clamp(new_wealth, min=0.0)  # No negative wealth
 
         self.exposures[:, self.wealth_idx] = new_wealth

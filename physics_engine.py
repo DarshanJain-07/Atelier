@@ -24,6 +24,7 @@ class SocialPhysicsEngine:
     # Core Aggregation
     # ============================================================
 
+    @torch.inference_mode()
     def aggregate_society(self, emotion_tensor, influence_scores, engagement_scores=None, adjacency_matrix=None):
         """
         Calculates the socio-emotional metrics for a single event.

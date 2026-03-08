@@ -157,6 +157,7 @@ class CognitiveEngine:
 
         return biased
 
+    @torch.inference_mode()
     def run(
         self,
         world_tensor_raw: torch.Tensor,

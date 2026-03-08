@@ -59,7 +59,7 @@ class RunProfile(BaseModel):
     seed: int = 42
     temperature: float = Field(default=0.7, ge=0.0, le=1.0)
     region: str = "All"
-    role: str = "All"
+    social_class: str = "All"
     agent_count: int = Field(default=1000, gt=0)
     use_distortion: bool = True
     use_pressure: bool = True
@@ -67,6 +67,19 @@ class RunProfile(BaseModel):
     use_power_law: bool = False
     emotion_temperature: float = Field(default=0.2, ge=0.0, le=1.0)
     panic_threshold: float = Field(default=-1.2, le=0.0)
+
+    # New Features
+    use_algorithmic_amplification: bool = False
+    algo_sample_size: float = 0.1
+    algo_exaggeration_factor: float = 1.5
+    
+    use_agent_memory: bool = True
+    memory_decay_rate: float = 0.7
+    memory_desensitization_gain: float = 0.5
+    memory_trigger_stacking_gain: float = 1.2
+    
+    use_network_topology: bool = True
+    enable_evolution: bool = True
 
     # Researcher (Cognitive)
     cross_dim_interaction_strength: float = 0.3
@@ -136,6 +149,15 @@ def prepare_society_sync(run: RunProfile, run_output_dir: str):
         inheritance_fraction=run.inheritance_fraction,
         shock_frequency=run.shock_frequency,
         shock_magnitude=run.shock_magnitude,
+        use_algorithmic_amplification=run.use_algorithmic_amplification,
+        algo_sample_size=run.algo_sample_size,
+        algo_exaggeration_factor=run.algo_exaggeration_factor,
+        use_agent_memory=run.use_agent_memory,
+        memory_decay_rate=run.memory_decay_rate,
+        memory_desensitization_gain=run.memory_desensitization_gain,
+        memory_trigger_stacking_gain=run.memory_trigger_stacking_gain,
+        use_network_topology=run.use_network_topology,
+        enable_evolution=run.enable_evolution,
     )
     config.wealth_dim_idx = DIMENSION_INDICES["Wealth"]
 
@@ -385,9 +407,9 @@ async def run_simulation(req: SimulationRequest):
                 adjacency_matrix_full,
             ) = society_result
 
-            # --- ROLE FILTERING ---
-            if run.role != "All":
-                mask = metadata_full["Role"] == run.role
+            # --- CLASS FILTERING ---
+            if run.social_class != "All":
+                mask = metadata_full["Class"] == run.social_class
                 indices_np = np.where(mask.to_numpy())[0]
                 indices_torch = torch.tensor(indices_np, dtype=torch.long)
 
@@ -404,17 +426,17 @@ async def run_simulation(req: SimulationRequest):
                     )
                     if adjacency_matrix is not None:
                         print(
-                            f"[{request_id}] Resliced Adjacency Matrix for Role: {run.role} (Nodes: {len(indices_np)})"
+                            f"[{request_id}] Resliced Adjacency Matrix for Class: {run.social_class} (Nodes: {len(indices_np)})"
                         )
                     else:
                         print(
-                            f"[{request_id}] Adjacency Slice Empty/Failed for Role: {run.role}"
+                            f"[{request_id}] Adjacency Slice Empty/Failed for Class: {run.social_class}"
                         )
                 else:
                     adjacency_matrix = None
 
                 print(
-                    f"[{request_id}] Filtered Run {i} to Role: {run.role} ({len(metadata)} agents)"
+                    f"[{request_id}] Filtered Run {i} to Class: {run.social_class} ({len(metadata)} agents)"
                 )
             else:
                 metadata = metadata_full.copy()
@@ -426,7 +448,7 @@ async def run_simulation(req: SimulationRequest):
 
             limit = min(run.agent_count, len(metadata))
             if limit == 0:
-                all_results.append({"error": f"No agents found for role: {run.role}"})
+                all_results.append({"error": f"No agents found for class: {run.social_class}"})
                 continue
 
             current_count = len(metadata)
@@ -521,7 +543,7 @@ async def run_simulation(req: SimulationRequest):
             # --- MEMORY UPDATE ---
             # Update the global memory array for this specific run
             if getattr(config, "use_agent_memory", False):
-                if run.role != "All":
+                if run.social_class != "All":
                     memory_full[indices_torch[:limit]] = updated_memory.to(
                         memory_full.device
                     )
@@ -574,7 +596,7 @@ async def run_simulation(req: SimulationRequest):
                 )
 
                 if getattr(config, "use_agent_memory", False):
-                    if run.role != "All":
+                    if run.social_class != "All":
                         memory_full[indices_torch[:limit]] = updated_memory_2.to(
                             memory_full.device
                         )
@@ -599,6 +621,9 @@ async def run_simulation(req: SimulationRequest):
                 social_state["objective_center"], baseline_result
             )
 
+            # Clustering metrics
+            cluster_metrics = validator.calculate_cluster_metrics(final_emotions)
+
             # 8. Explainability
             explain_engine = ExplainabilityEngine()
             explainability_data = explain_engine.generate_explanation(
@@ -620,7 +645,7 @@ async def run_simulation(req: SimulationRequest):
                 agent_data.append(
                     {
                         "id": int(meta_row["Agent_ID"]),
-                        "role": meta_row.get("Role", "Agent"),
+                        "social_class": meta_row.get("Class", "Agent"),
                         "region": meta_row.get("Region", "Global"),
                         "big5": personalities[j].tolist(),
                     }
@@ -637,11 +662,13 @@ async def run_simulation(req: SimulationRequest):
                     ],  # Keep key for UI compatibility
                     "wasserstein_distance": validation_result["wasserstein_distance"],
                     "kl_divergence": validation_result["kl_divergence"],
+                    "cluster_metrics": cluster_metrics,
                     "validation_details": validation_result,
                     "explainability": explainability_data,
                     "agent_states": current_agent_emotions,
                     "agent_influence": influence.tolist(),
                     "agent_metadata": agent_data,
+                    "endogenous_event": social_state.get("endogenous_event"),
                 }
             )
 

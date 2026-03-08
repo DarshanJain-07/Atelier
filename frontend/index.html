@@ -11,6 +11,7 @@
         />
     </head>
     <body>
+        <div id="toast-container" class="toast-container"></div>
         <!-- TOP TELEMETRY BAR -->
         <header class="telemetry-bar">
             <!-- LEFT: BRAND -->
@@ -50,18 +51,18 @@
                     <div class="separator"></div>
                     <div
                         class="metric" tabindex="0"
-                        data-tooltip="Measures deviation from standard AI sentiment baselines. Higher values suggest the simulation has detected complex, human-centric nuances that standard models miss."
+                        data-tooltip="Wasserstein Distance from standard AI sentiment baseline. Higher values suggest deviation from normal."
                     >
-                        <span class="label">ROBERTA DIV</span>
+                        <span class="label">W-DIST</span>
                         <span class="value" id="val-divergence">--</span>
                     </div>
                     <div class="separator"></div>
                     <div
                         class="metric" tabindex="0"
-                        data-tooltip="Measures deviation from GoEmotions 28-class baseline."
+                        data-tooltip="KL Divergence from standard AI baseline. Measures information difference."
                     >
-                        <span class="label">GO DIV</span>
-                        <span class="value" id="val-go-divergence">--</span>
+                        <span class="label">KL-DIV</span>
+                        <span class="value" id="val-kl-divergence">--</span>
                     </div>
                     <div class="separator"></div>
                     <div class="metric" tabindex="0">
@@ -133,10 +134,10 @@
                 </div>
                 <div class="sidebar-content" id="sidebar-basic">
                     <div class="config-section">
-                        <label class="section-title" tabindex="0" data-tooltip="Set the roles of agents to observe.">SCOPE</label>
+                        <label class="section-title" tabindex="0" data-tooltip="Set the class of agents to observe.">SCOPE</label>
                         <div class="select-wrapper">
-                            <select id="filter-role">
-                                <option value="All" selected>All Roles</option>
+                            <select id="filter-class">
+                                <option value="All" selected>All Classes</option>
                                 <option value="Underclass">Underclass</option>
                                 <option value="Working Class">
                                     Working Class
@@ -180,12 +181,44 @@
                                 Maslow Gate
                             </button>
                             <button
-                                class="toggle-btn active"
+                                class="toggle-btn"
                                 id="tog-power-law"
                                 onclick="this.classList.toggle('active')"
                                 data-tooltip="Enable power law influence (Weighted Aggregation / Pareto Distribution)"
                             >
                                 Power Law
+                            </button>
+                            <button
+                                class="toggle-btn active"
+                                id="tog-memory"
+                                onclick="this.classList.toggle('active')"
+                                data-tooltip="Enable agent memory (Fatigue and Trigger Stacking)"
+                            >
+                                Agent Memory
+                            </button>
+                            <button
+                                class="toggle-btn"
+                                id="tog-algo-amp"
+                                onclick="this.classList.toggle('active')"
+                                data-tooltip="Enable Algorithmic Amplification (2-pass filter bubble)"
+                            >
+                                Algo Amp
+                            </button>
+                            <button
+                                class="toggle-btn active"
+                                id="tog-network"
+                                onclick="this.classList.toggle('active')"
+                                data-tooltip="Enable Network Topology (Echo Chambers & Influencers)"
+                            >
+                                Network Topo
+                            </button>
+                            <button
+                                class="toggle-btn active"
+                                id="tog-evolution"
+                                onclick="this.classList.toggle('active')"
+                                data-tooltip="Enable long-term societal evolution"
+                            >
+                                Evolution
                             </button>
                         </div>
                     </div>
@@ -426,6 +459,68 @@
                         </div>
                     </div>
                     <div class="config-section">
+                        <label class="section-title" tabindex="0" data-tooltip="Agent memory parameters for fatigue and trauma.">AGENT MEMORY</label>
+                        <div class="sidebar-grid">
+                            <div class="sidebar-field">
+                                <label data-tooltip="How much memory is retained (0 to 1).">Decay Rate</label
+                                ><input
+                                    type="number"
+                                    id="res-mem-decay"
+                                    step="0.1"
+                                    value="0.7"
+                                    class="sidebar-input"
+                                />
+                            </div>
+                            <div class="sidebar-field">
+                                <label data-tooltip="How much past identical events suppress reaction.">Desensitize</label
+                                ><input
+                                    type="number"
+                                    id="res-mem-desens"
+                                    step="0.1"
+                                    value="0.5"
+                                    class="sidebar-input"
+                                />
+                            </div>
+                        </div>
+                        <div class="sidebar-grid">
+                            <div class="sidebar-field">
+                                <label data-tooltip="How much past stress amplifies new threats.">Trigger Stack</label
+                                ><input
+                                    type="number"
+                                    id="res-mem-trigger"
+                                    step="0.1"
+                                    value="1.2"
+                                    class="sidebar-input"
+                                />
+                            </div>
+                        </div>
+                    </div>
+                    <div class="config-section">
+                        <label class="section-title" tabindex="0" data-tooltip="Algorithmic filtering and amplification parameters.">ALGORITHMIC FILTER BUBBLE</label>
+                        <div class="sidebar-grid">
+                            <div class="sidebar-field">
+                                <label data-tooltip="Fraction of population used for initial A/B test.">Sample Size</label
+                                ><input
+                                    type="number"
+                                    id="res-algo-sample"
+                                    step="0.05"
+                                    value="0.1"
+                                    class="sidebar-input"
+                                />
+                            </div>
+                            <div class="sidebar-field">
+                                <label data-tooltip="How much to amplify the dimensions that cause highest engagement.">Exaggeration</label
+                                ><input
+                                    type="number"
+                                    id="res-algo-exagg"
+                                    step="0.1"
+                                    value="1.5"
+                                    class="sidebar-input"
+                                />
+                            </div>
+                        </div>
+                    </div>
+                    <div class="config-section">
                         <label class="section-title" tabindex="0" data-tooltip="Settings for noise and information loss."
                             >DISTORTION & ENTROPY</label
                         >
@@ -619,7 +714,7 @@
         <div id="tooltip" class="agent-card">
             <div class="card-header">
                 <span class="agent-id">ID: <span id="tt-id">--</span></span>
-                <span class="agent-role" id="tt-role">--</span>
+                <span class="agent-class" id="tt-class">--</span>
             </div>
             <div class="card-body">
                 <div class="data-row">
@@ -654,8 +749,8 @@
                 <!-- INDIVIDUAL VIEW -->
                 <div id="view-agent">
                     <div class="dossier-info info-grid-1col">                        <div class="info-group">
-                            <label>ROLE</label>
-                            <div id="ds-role" class="info-value">--</div>
+                            <label>CLASS</label>
+                            <div id="ds-class" class="info-value">--</div>
                         </div>
                     </div>
 
@@ -844,11 +939,27 @@
 
                     <div class="dist-container">
                         <div class="dist-group">
+                            <label class="section-label margin-y-12">GLOBAL CLUSTER METRICS</label>
+                            <div class="dossier-info info-grid-1col" style="gap: 8px;">
+                                <div class="info-group" style="display: flex; justify-content: space-between; align-items: center;">
+                                    <label style="margin-bottom: 0;" data-tooltip="Measures cluster cohesion. Higher is better (range: -1 to 1).">Silhouette Score</label>
+                                    <div id="c-val-silhouette" class="info-value" style="font-family: var(--font-mono);">--</div>
+                                </div>
+                                <div class="info-group" style="display: flex; justify-content: space-between; align-items: center;">
+                                    <label style="margin-bottom: 0;" data-tooltip="Measures cluster separation. Lower is better (min: 0).">Davies-Bouldin Index</label>
+                                    <div id="c-val-davies-bouldin" class="info-value" style="font-family: var(--font-mono);">--</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="dist-container">
+                        <div class="dist-group">
                             <label
                                 class="section-label margin-y-12"
-                                >ROLE DISTRIBUTION</label
+                                >CLASS DISTRIBUTION</label
                             >
-                            <div id="ds-cluster-roles">
+                            <div id="ds-cluster-classes">
                                 <!-- Dynamic -->
                             </div>
                         </div>

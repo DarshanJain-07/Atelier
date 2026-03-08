@@ -287,8 +287,8 @@ class SimConfig:
     shock_frequency: float = 0.1
     shock_magnitude: float = 0.2
     mobility_rate: float = 0.05
-    use_dynamic_roles: bool = True
-    role_temperature: float = 0.5
+    use_dynamic_classes: bool = True
+    class_temperature: float = 0.5
     elite_wealth_threshold: float = 0.95
     use_ideological_drift: bool = True
     ideological_drift_rate: float = 0.05

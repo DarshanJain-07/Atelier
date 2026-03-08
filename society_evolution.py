@@ -148,9 +148,9 @@ class SocietyEvolution:
             non_wealth_mask[self.wealth_idx] = False
 
         # Decide what the "cultural attractor" is for this generation
-        if np.random.rand() < elite_chance and "Role" in self.metadata:
+        if np.random.rand() < elite_chance and "Class" in self.metadata:
             # Cultural Hegemony: Society drifts toward the Elite class
-            elite_mask = (self.metadata["Role"] == "Elite").values
+            elite_mask = (self.metadata["Class"] == "Elite").values
             if elite_mask.sum() > 0:
                 target_mean = self.exposures[torch.from_numpy(elite_mask)].mean(dim=0)
             else:
@@ -214,7 +214,7 @@ class SocietyEvolution:
             self.exposures[:, non_wealth_mask], -1.0, 1.0
         )
 
-    def reassign_roles(self):
+    def reassign_classes(self):
 
         wealth = self.exposures[:, self.wealth_idx]
 
@@ -232,33 +232,33 @@ class SocietyEvolution:
             + 0.1 * self.personalities.mean(dim=1)
         )
 
-        # Define 5 structural roles
-        role_centers = torch.tensor([0.1, 0.3, 0.5, 0.75, 0.95])
+        # Define 5 structural classes
+        class_centers = torch.tensor([0.1, 0.3, 0.5, 0.75, 0.95])
 
-        # Compute fitness = closeness to each role center
-        fitness = -((power_score.unsqueeze(1) - role_centers) ** 2)
+        # Compute fitness = closeness to each class center
+        fitness = -((power_score.unsqueeze(1) - class_centers) ** 2)
 
         # Softmax
-        probs = torch.softmax(fitness / self.config.role_temperature, dim=1)
+        probs = torch.softmax(fitness / self.config.class_temperature, dim=1)
 
         elite_mask = wealth_norm < self.config.elite_wealth_threshold
         probs[elite_mask, 4] = 0
         probs = probs / probs.sum(dim=1, keepdim=True)
 
-        # Sample new role
-        new_roles_indices = torch.multinomial(probs, 1).squeeze().numpy()
+        # Sample new class
+        new_classes_indices = torch.multinomial(probs, 1).squeeze().numpy()
 
-        # Map indices to generic class names since original roles are removed
-        role_map = {
+        # Map indices to generic class names
+        class_map = {
             0: "Underclass",
             1: "Working Class",
             2: "Middle Class",
             3: "Upper Middle",
             4: "Elite",
         }
-        mapped_roles = [role_map.get(idx, "Unknown") for idx in new_roles_indices]
+        mapped_classes = [class_map.get(idx, "Unknown") for idx in new_classes_indices]
 
-        self.metadata["Role"] = mapped_roles
+        self.metadata["Class"] = mapped_classes
 
     def evolve(self):
         """
@@ -273,8 +273,8 @@ class SocietyEvolution:
             self.apply_mobility()
             self.apply_ideological_drift()
 
-            if self.config.use_dynamic_roles:
-                self.reassign_roles()
+            if self.config.use_dynamic_classes:
+                self.reassign_classes()
 
             # Clamp wealth to avoid negative values or extreme outliers
             self.exposures[:, self.wealth_idx] = torch.clamp(

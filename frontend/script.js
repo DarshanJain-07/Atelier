@@ -34,6 +34,7 @@ const EMOTION_ANGLES = {
 let agents = [];
 let agentMetadata = [];
 let clusterAggregates = {};
+let clusterMetrics = { silhouette_score: 0, davies_bouldin_index: 0 };
 let simulationHistory = [];
 let currentSessionIndex = -1;
 let currentRunInSessionIndex = -1;
@@ -42,7 +43,7 @@ let width, height, centerX, centerY;
 let clusterSpread = 1.0;
 
 // --- BATCH STATE ---
-let batchRuns = [
+  let batchRuns = [
   {
     id: Date.now(),
     seed: 42,
@@ -50,12 +51,16 @@ let batchRuns = [
     emotion_temperature: 0.2,
     panic_threshold: -1.2,
     region: "All",
-    role: "All",
+    social_class: "All",
     agent_count: 5000,
     use_distortion: true,
     use_pressure: true,
     use_maslow: true,
     use_power_law: false,
+    use_agent_memory: true,
+    use_algorithmic_amplification: false,
+    use_network_topology: true,
+    enable_evolution: true,
     cross_dim_interaction_strength: 0.3,
     threat_sensitivity_gain: 1.5,
     k_processing_tanh_gain: 1.5,
@@ -65,15 +70,20 @@ let batchRuns = [
     stress_neurotic_amplification: 1.5,
     stress_openness_reduction: 0.5,
     stress_extraversion_boost: 0.7,
-    outrage_gain: 2.5,
+    outrage_gain: 5.0,
     max_viral_multiplier: 10.0,
-    saturation_midpoint: 1.5,
+    saturation_midpoint: 0.5,
     distortion_max_noise: 0.4,
     distortion_neurotic_gain: 0.6,
     evolution_generations: 10,
     inheritance_fraction: 0.7,
     shock_frequency: 0.1,
     shock_magnitude: 0.2,
+    algo_sample_size: 0.1,
+    algo_exaggeration_factor: 1.5,
+    memory_decay_rate: 0.7,
+    memory_desensitization_gain: 0.5,
+    memory_trigger_stacking_gain: 1.2,
   },
 ];
 let currentBatchResults = [];
@@ -108,14 +118,14 @@ function renderBatchUI() {
             </div>
             <div class="sidebar-grid">
                 <div class="sidebar-field sidebar-field-span-2">
-                    <label data-tooltip="Filter agents by socioeconomic role.">Role</label>
-                    <select class="sidebar-input select-ui-font" onchange="updateRun(${run.id}, 'role', this.value)">
-                        <option value="All" ${run.role === "All" ? "selected" : ""}>All</option>
-                        <option value="Underclass" ${run.role === "Underclass" ? "selected" : ""}>Underclass</option>
-                        <option value="Working Class" ${run.role === "Working Class" ? "selected" : ""}>Working Class</option>
-                        <option value="Middle Class" ${run.role === "Middle Class" ? "selected" : ""}>Middle Class</option>
-                        <option value="Upper Middle" ${run.role === "Upper Middle" ? "selected" : ""}>Upper Middle</option>
-                        <option value="Elite" ${run.role === "Elite" ? "selected" : ""}>Elite</option>
+                    <label data-tooltip="Filter agents by socioeconomic class.">Class</label>
+                    <select class="sidebar-input select-ui-font" onchange="updateRun(${run.id}, 'social_class', this.value)">
+                        <option value="All" ${run.social_class === "All" ? "selected" : ""}>All</option>
+                        <option value="Underclass" ${run.social_class === "Underclass" ? "selected" : ""}>Underclass</option>
+                        <option value="Working Class" ${run.social_class === "Working Class" ? "selected" : ""}>Working Class</option>
+                        <option value="Middle Class" ${run.social_class === "Middle Class" ? "selected" : ""}>Middle Class</option>
+                        <option value="Upper Middle" ${run.social_class === "Upper Middle" ? "selected" : ""}>Upper Middle</option>
+                        <option value="Elite" ${run.social_class === "Elite" ? "selected" : ""}>Elite</option>
                     </select>
                 </div>
             </div>
@@ -127,10 +137,14 @@ function renderBatchUI() {
                 </div>
             </div>
             <div class="batch-toggle-grid">
-                <button class="batch-tog ${run.use_distortion ? "active" : ""}" onclick="this.classList.toggle('active'); updateRun(${run.id}, 'use_distortion', this.classList.contains('active'))">DIST</button>
-                <button class="batch-tog ${run.use_pressure ? "active" : ""}" onclick="this.classList.toggle('active'); updateRun(${run.id}, 'use_pressure', this.classList.contains('active'))">TIME</button>
-                <button class="batch-tog ${run.use_maslow ? "active" : ""}" onclick="this.classList.toggle('active'); updateRun(${run.id}, 'use_maslow', this.classList.contains('active'))">MSLW</button>
-                <button class="batch-tog ${run.use_power_law ? "active" : ""}" onclick="this.classList.toggle('active'); updateRun(${run.id}, 'use_power_law', this.classList.contains('active'))">PWR</button>
+                <button class="batch-tog ${run.use_distortion ? "active" : ""}" onclick="this.classList.toggle('active'); updateRun(${run.id}, 'use_distortion', this.classList.contains('active'))" title="Distortion">DIST</button>
+                <button class="batch-tog ${run.use_pressure ? "active" : ""}" onclick="this.classList.toggle('active'); updateRun(${run.id}, 'use_pressure', this.classList.contains('active'))" title="Time Pressure">TIME</button>
+                <button class="batch-tog ${run.use_maslow ? "active" : ""}" onclick="this.classList.toggle('active'); updateRun(${run.id}, 'use_maslow', this.classList.contains('active'))" title="Maslow Gate">MSLW</button>
+                <button class="batch-tog ${run.use_power_law ? "active" : ""}" onclick="this.classList.toggle('active'); updateRun(${run.id}, 'use_power_law', this.classList.contains('active'))" title="Power Law">PWR</button>
+                <button class="batch-tog ${run.use_agent_memory ? "active" : ""}" onclick="this.classList.toggle('active'); updateRun(${run.id}, 'use_agent_memory', this.classList.contains('active'))" title="Agent Memory">MEM</button>
+                <button class="batch-tog ${run.use_algorithmic_amplification ? "active" : ""}" onclick="this.classList.toggle('active'); updateRun(${run.id}, 'use_algorithmic_amplification', this.classList.contains('active'))" title="Algo Amplification">ALGO</button>
+                <button class="batch-tog ${run.use_network_topology ? "active" : ""}" onclick="this.classList.toggle('active'); updateRun(${run.id}, 'use_network_topology', this.classList.contains('active'))" title="Network Topology">NET</button>
+                <button class="batch-tog ${run.enable_evolution ? "active" : ""}" onclick="this.classList.toggle('active'); updateRun(${run.id}, 'enable_evolution', this.classList.contains('active'))" title="Evolution">EVO</button>
             </div>
         `;
     container.appendChild(item);
@@ -170,12 +184,21 @@ document.getElementById("btn-add-run").addEventListener("click", () => {
     emotion_temperature: last.emotion_temperature,
     panic_threshold: last.panic_threshold,
     region: last.region,
-    role: last.role,
+    social_class: last.social_class,
     agent_count: last.agent_count,
     use_distortion: last.use_distortion,
     use_pressure: last.use_pressure,
     use_maslow: last.use_maslow,
     use_power_law: last.use_power_law,
+    use_agent_memory: last.use_agent_memory,
+    use_algorithmic_amplification: last.use_algorithmic_amplification,
+    use_network_topology: last.use_network_topology,
+    enable_evolution: last.enable_evolution,
+    algo_sample_size: last.algo_sample_size,
+    algo_exaggeration_factor: last.algo_exaggeration_factor,
+    memory_decay_rate: last.memory_decay_rate,
+    memory_desensitization_gain: last.memory_desensitization_gain,
+    memory_trigger_stacking_gain: last.memory_trigger_stacking_gain,
     cross_dim_interaction_strength: last.cross_dim_interaction_strength,
     threat_sensitivity_gain: last.threat_sensitivity_gain,
     k_processing_tanh_gain: last.k_processing_tanh_gain,
@@ -289,18 +312,22 @@ function displayResult(data) {
     ? data.divergence
     : divVal.toFixed(3);
 
-  const goDivVal = data.go_validation_details
-    ? parseFloat(data.go_validation_details.wasserstein_distance)
-    : NaN;
-  const goDivEl = document.getElementById("val-go-divergence");
-  if (goDivEl) {
-    goDivEl.textContent = isNaN(goDivVal) ? "--" : goDivVal.toFixed(3);
+  const klDivVal = data.kl_divergence ? parseFloat(data.kl_divergence) : NaN;
+  const klDivEl = document.getElementById("val-kl-divergence");
+  if (klDivEl) {
+    klDivEl.textContent = isNaN(klDivVal) ? "--" : klDivVal.toFixed(3);
   }
 
   // 4. Update Agents
   const states = data.agent_states;
   const influences = data.agent_influence || [];
   agentMetadata = data.agent_metadata || [];
+  
+  if (data.cluster_metrics) {
+    clusterMetrics = data.cluster_metrics;
+  } else {
+    clusterMetrics = { silhouette_score: 0, davies_bouldin_index: 0 };
+  }
 
   selectedAgentIndex = null;
   dossier.classList.add("hidden");
@@ -363,14 +390,32 @@ function displayResult(data) {
   } else {
     explainBtn.classList.add("hidden");
   }
+
+  // 6. Show Endogenous Event Toast if present
+  if (data.endogenous_event) {
+    showToast(`⚠️ Autopoietic Trigger: ${data.endogenous_event}`);
+  }
+}
+
+function showToast(message) {
+  const container = document.getElementById("toast-container");
+  if (!container) return;
+  const toast = document.createElement("div");
+  toast.className = "toast";
+  toast.textContent = message;
+  container.appendChild(toast);
+  setTimeout(() => {
+    toast.classList.add("fade-out");
+    setTimeout(() => toast.remove(), 400);
+  }, 5000);
 }
 
 // --- CLUSTER AGGREGATE CALCULATION ---
-let totalCounts = { regions: {}, roles: {} };
+let totalCounts = { regions: {}, classes: {} };
 
 function calculateClusterAggregates() {
   clusterAggregates = {};
-  totalCounts = { regions: {}, roles: {} };
+  totalCounts = { regions: {}, classes: {} };
   const emotions = [
     "Joy",
     "Trust",
@@ -388,7 +433,7 @@ function calculateClusterAggregates() {
       count: 0,
       big5: [0, 0, 0, 0, 0],
       regions: {},
-      roles: {},
+      classes: {},
     };
   });
 
@@ -403,7 +448,7 @@ function calculateClusterAggregates() {
     // Global Totals
     totalCounts.regions[meta.region] =
       (totalCounts.regions[meta.region] || 0) + 1;
-    totalCounts.roles[meta.role] = (totalCounts.roles[meta.role] || 0) + 1;
+    totalCounts.classes[meta.social_class] = (totalCounts.classes[meta.social_class] || 0) + 1;
 
     // Cluster Specific
     agg.count++;
@@ -412,7 +457,7 @@ function calculateClusterAggregates() {
     }
 
     agg.regions[meta.region] = (agg.regions[meta.region] || 0) + 1;
-    agg.roles[meta.role] = (agg.roles[meta.role] || 0) + 1;
+    agg.classes[meta.social_class] = (agg.classes[meta.social_class] || 0) + 1;
   }
 
   // Calculate means
@@ -661,7 +706,7 @@ async function runSimulation() {
       document.getElementById("param-panic-thresh").value || -1.2,
     ),
     region: "All",
-    role: document.getElementById("filter-role").value,
+    social_class: document.getElementById("filter-class").value,
     agent_count: parseInt(document.getElementById("param-count").value),
     use_distortion: document
       .getElementById("tog-distortion")
@@ -675,6 +720,33 @@ async function runSimulation() {
     use_power_law: document
       .getElementById("tog-power-law")
       .classList.contains("active"),
+    use_agent_memory: document
+      .getElementById("tog-memory")
+      .classList.contains("active"),
+    use_algorithmic_amplification: document
+      .getElementById("tog-algo-amp")
+      .classList.contains("active"),
+    use_network_topology: document
+      .getElementById("tog-network")
+      .classList.contains("active"),
+    enable_evolution: document
+      .getElementById("tog-evolution")
+      .classList.contains("active"),
+    algo_sample_size: parseFloat(
+      document.getElementById("res-algo-sample")?.value || 0.1,
+    ),
+    algo_exaggeration_factor: parseFloat(
+      document.getElementById("res-algo-exagg")?.value || 1.5,
+    ),
+    memory_decay_rate: parseFloat(
+      document.getElementById("res-mem-decay")?.value || 0.7,
+    ),
+    memory_desensitization_gain: parseFloat(
+      document.getElementById("res-mem-desens")?.value || 0.5,
+    ),
+    memory_trigger_stacking_gain: parseFloat(
+      document.getElementById("res-mem-trigger")?.value || 1.2,
+    ),
     cross_dim_interaction_strength: parseFloat(
       document.getElementById("res-cross-dim")?.value || 0.3,
     ),
@@ -741,12 +813,21 @@ async function runSimulation() {
         emotion_temperature: run.emotion_temperature,
         panic_threshold: run.panic_threshold,
         region: run.region,
-        role: run.role,
+        social_class: run.social_class,
         agent_count: run.agent_count,
         use_distortion: run.use_distortion,
         use_pressure: run.use_pressure,
         use_maslow: run.use_maslow,
         use_power_law: run.use_power_law,
+        use_agent_memory: run.use_agent_memory,
+        use_algorithmic_amplification: run.use_algorithmic_amplification,
+        use_network_topology: run.use_network_topology,
+        enable_evolution: run.enable_evolution,
+        algo_sample_size: run.algo_sample_size,
+        algo_exaggeration_factor: run.algo_exaggeration_factor,
+        memory_decay_rate: run.memory_decay_rate,
+        memory_desensitization_gain: run.memory_desensitization_gain,
+        memory_trigger_stacking_gain: run.memory_trigger_stacking_gain,
         cross_dim_interaction_strength: run.cross_dim_interaction_strength,
         threat_sensitivity_gain: run.threat_sensitivity_gain,
         k_processing_tanh_gain: run.k_processing_tanh_gain,
@@ -900,8 +981,8 @@ function renderHistory() {
                             <div class="run-info">
                                 <div class="run-label">${run.dominant_emotion.toUpperCase()} (Seed: ${cfg.seed}, T: ${cfg.temperature})</div>
                                 <div class="run-stats">
-                                    POL: ${run.polarization} | POP: ${(cfg.agent_count / 1000).toFixed(1)}k | ${cfg.role}
-                                    <br>PARAMS: ${params}
+                                    POL: ${run.polarization} | POP: ${(cfg.agent_count / 1000).toFixed(1)}k | ${cfg.social_class}
+                                </div>
                                 </div>
                             </div>
                             <div class="node-action" onclick="event.stopPropagation(); downloadData(${sIdx}, ${rIdx})">
@@ -1013,7 +1094,7 @@ function showDossier(index) {
   document.getElementById("ds-id").textContent = meta.id
     .toString()
     .padStart(4, "0");
-  document.getElementById("ds-role").textContent = meta.role;
+  document.getElementById("ds-class").textContent = meta.social_class;
 
   const traits = [
     "openness",
@@ -1057,6 +1138,12 @@ function showDossier(index) {
         `;
       }
     }
+    
+    // Update global cluster metrics
+    const silEl = document.getElementById("c-val-silhouette");
+    const dbEl = document.getElementById("c-val-davies-bouldin");
+    if (silEl) silEl.textContent = clusterMetrics.silhouette_score.toFixed(3);
+    if (dbEl) dbEl.textContent = clusterMetrics.davies_bouldin_index.toFixed(3);
   }
   dossier.classList.remove("hidden");
 }
@@ -1108,7 +1195,7 @@ canvas.addEventListener("mousemove", (e) => {
     const agent = agents[found];
     if (meta) {
       document.getElementById("tt-id").textContent = meta.id.toString().padStart(4, "0");
-      document.getElementById("tt-role").textContent = meta.role;
+      document.getElementById("tt-class").textContent = meta.social_class;
       document.getElementById("tt-influence").textContent = agent.influence.toFixed(2);
       document.getElementById("tt-state").textContent = agent.emotion.toUpperCase();
       document.getElementById("tt-state").style.color = PALETTE[agent.emotion] || "#fff";

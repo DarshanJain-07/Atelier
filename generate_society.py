@@ -332,7 +332,7 @@ def generate_society(config: SimConfig):
     df_metadata = pd.DataFrame(
         {
             "Agent_ID": range(config.num_agents),
-            "Role": ["Agent"] * config.num_agents,
+            "Class": ["Agent"] * config.num_agents,
             "Region": ["Global"] * config.num_agents,
             "Influence": np.round(influence_scores, 3),
             "Cognitive_Bandwidth": np.round(cognitive_bandwidth.squeeze().numpy(), 3),

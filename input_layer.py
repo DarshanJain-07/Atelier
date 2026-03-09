@@ -103,6 +103,7 @@ def get_world_state(user_input: str) -> Tuple[torch.Tensor, float, bool]:
     *   Do NOT perform simple sentiment analysis.
     *   Look past PR spin, corporate framing, or political rhetoric. If a text says "We are replacing staff with AI for efficiency and scalability," do not score this as purely positive because of the words "efficiency." You must predict the real-world outcome: massive job losses (Negative Wealth/Stability for the workforce), potential increase in corporate profit (Positive Wealth for elites), and increased Out_Group tension.
     *   Assess the underlying objective reality and the likely cascading social effects of the decision/event.
+    *   POWER DYNAMICS & CONDESCENSION: Pay close attention to language indicating dominance, imperialism, or loss of autonomy. For example, if an entity or nation claims to "allow", "permit", or "grant waivers" to another sovereign group, recognize the implicit threat to sovereignty and patronizing tone. This must generate negative scores for Freedom (loss of autonomy) and Fairness (unequal power dynamics), and potentially trigger In_Group/Out_Group tensions, even if the text is framed positively (e.g., "temporarily allowing purchases").
 
     ### 2. CALIBRATION NOTES & THE MAGNITUDE RUBRIC
     You must be highly calibrated. Do NOT exaggerate minor events.

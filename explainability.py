@@ -84,7 +84,7 @@ class ExplainabilityEngine:
             polarization > self.high_polarization_threshold
             and bimodality > self.high_bimodality_threshold
         ):
-            base = "The society is **deeply divided**."
+            base = "The society is **deeply divided**, showing strong evidence of isolated **echo chambers**."
         elif entropy > self.high_entropy_threshold:
             base = "The society is **fragmented**."
         elif polarization < (self.high_polarization_threshold / 2):
@@ -278,6 +278,29 @@ class ExplainabilityEngine:
 
         return archetypes
 
+    def _generate_endogenous_event_explanation(self, social_state: Dict[str, Any]) -> str:
+        """Explains if the societal tension triggered an autopoietic macro-event."""
+        action_name = social_state.get("action_name")
+        if not action_name:
+            return "Society remained stable enough that no macro-level endogenous events were triggered."
+        
+        polarization = social_state.get("polarization", 0.0)
+        elite_divergence = social_state.get("elite_divergence", 0.0)
+        
+        reasons = []
+        if elite_divergence > self.high_elite_divergence_threshold:
+            reasons.append("extreme elite divergence")
+        if polarization > self.high_polarization_threshold:
+            reasons.append("high structural polarization")
+            
+        reason_str = " and ".join(reasons) if reasons else "high societal tension"
+        
+        return (
+            f"⚠️ **Autopoietic Trigger**: The simulation generated an endogenous event "
+            f"(**{action_name}**). Due to {reason_str}, the system reached a breaking point, "
+            f"automatically feeding this new macro-action back into the society."
+        )
+
     def generate_explanation(
         self,
         social_state: Dict[str, Any],
@@ -298,4 +321,5 @@ class ExplainabilityEngine:
             "demographics": self._generate_demographic_summary(
                 metadata, personalities, final_emotions
             ),
+            "endogenous_events": self._generate_endogenous_event_explanation(social_state),
         }

@@ -388,9 +388,10 @@ function displayResult(data) {
     document.getElementById("ex-viral").innerHTML = formatBold(data.explainability.viral_dynamics || "--");
     document.getElementById("ex-tug-of-war").innerHTML = formatBold(data.explainability.tug_of_war || "--");
     document.getElementById("ex-structure").innerHTML = formatBold(data.explainability.societal_structure || "--");
-    
-    const demoList = document.getElementById("ex-demographics");
-    demoList.innerHTML = "";
+    document.getElementById("ex-endogenous-events").innerHTML = formatBold(data.explainability.endogenous_events || "--");
+
+    const demoContainer = document.getElementById("ex-demographics");
+    demoContainer.innerHTML = "";
     if (data.explainability.demographics && data.explainability.demographics.length > 0) {
       data.explainability.demographics.forEach(demo => {
         const item = document.createElement("div");

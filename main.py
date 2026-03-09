@@ -1,8 +1,10 @@
 import asyncio
 import os
 import shutil
+import time
 import uuid
-from typing import Any, Dict, List, Tuple, cast
+from collections import OrderedDict
+from typing import Any, List, Tuple, cast
 
 import numpy as np
 import pandas as pd
@@ -10,7 +12,7 @@ import torch
 import torch.nn.functional as F
 import uvicorn
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -51,8 +53,9 @@ app.add_middleware(
 
 print("✅ Server Ready.")
 
-# Persistent cache for societies (seed + count + temp -> data)
-SOCIETY_CACHE: Dict[str, Any] = {}
+# Persistent LRU cache for societies (seed + count + temp -> data)
+MAX_CACHE_SIZE = 7
+SOCIETY_CACHE: OrderedDict[str, Any] = OrderedDict()
 
 
 class RunProfile(BaseModel):
@@ -72,12 +75,12 @@ class RunProfile(BaseModel):
     use_algorithmic_amplification: bool = False
     algo_sample_size: float = 0.1
     algo_exaggeration_factor: float = 1.5
-    
+
     use_agent_memory: bool = True
     memory_decay_rate: float = 0.7
     memory_desensitization_gain: float = 0.5
     memory_trigger_stacking_gain: float = 1.2
-    
+
     use_network_topology: bool = True
     enable_evolution: bool = True
 
@@ -165,6 +168,7 @@ def prepare_society_sync(run: RunProfile, run_output_dir: str):
 
     if cache_key in SOCIETY_CACHE:
         print(f"Cache Hit for {cache_key}")
+        SOCIETY_CACHE.move_to_end(cache_key)
         (
             metadata_full,
             exposures_full,
@@ -213,6 +217,10 @@ def prepare_society_sync(run: RunProfile, run_output_dir: str):
         memory_full,
         adjacency_matrix,
     )
+
+    if len(SOCIETY_CACHE) > MAX_CACHE_SIZE:
+        evicted_key, _ = SOCIETY_CACHE.popitem(last=False)
+        print(f"🧹 LRU Evicted {evicted_key} from RAM cache.")
     return (
         config,
         metadata_full,
@@ -302,30 +310,26 @@ def cleanup_memory():
     print("Memory Cleaned.")
 
 
-@app.post("/simulate")
-async def run_simulation(req: SimulationRequest):
-    # 0. Global Memory Management - Start with a clean slate
-    print("\n--- Initializing New Simulation Request ---")
-
-    needed_keys = {
-        f"{run.seed}_{run.agent_count}_{run.temperature}_{run.use_power_law}"
-        for run in req.runs
-    }
-    keys_to_evict = [k for k in SOCIETY_CACHE if k not in needed_keys]
-
-    for k in keys_to_evict:
-        del SOCIETY_CACHE[k]
-
-    if keys_to_evict:
-        print(f"🧹 Evicted {len(keys_to_evict)} unused societies from RAM cache.")
-
+def cleanup_old_files():
     shutil.rmtree("society_data", ignore_errors=True)
+    current_time = time.time()
     for folder in os.listdir("."):
         if os.path.isdir(folder) and folder.startswith("temp_sim_"):
             try:
-                shutil.rmtree(folder)
+                # Only delete if older than 5 minutes to avoid race conditions with concurrent requests
+                if current_time - os.path.getctime(folder) > 300:
+                    shutil.rmtree(folder)
             except Exception:
                 pass
+
+
+@app.post("/simulate")
+async def run_simulation(req: SimulationRequest, background_tasks: BackgroundTasks):
+    # 0. Global Memory Management - Start with a clean slate
+    print("\n--- Initializing New Simulation Request ---")
+
+    # Offload sweeping cleanup to background to prevent blocking
+    background_tasks.add_task(cleanup_old_files)
 
     cleanup_memory()
 
@@ -381,8 +385,10 @@ async def run_simulation(req: SimulationRequest):
         for i, (run, society_result) in enumerate(zip(req.runs, results[2:])):
             if isinstance(society_result, Exception):
                 print(f"[{request_id}] Run {i} Error: {society_result}")
-                all_results.append({"error": str(society_result)})
-                continue
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Simulation Run {i} failed: {str(society_result)}",
+                )
 
             society_result = cast(
                 Tuple[
@@ -408,6 +414,7 @@ async def run_simulation(req: SimulationRequest):
             ) = society_result
 
             # --- CLASS FILTERING ---
+            indices_torch = []
             if run.social_class != "All":
                 mask = metadata_full["Class"] == run.social_class
                 indices_np = np.where(mask.to_numpy())[0]
@@ -448,7 +455,9 @@ async def run_simulation(req: SimulationRequest):
 
             limit = min(run.agent_count, len(metadata))
             if limit == 0:
-                all_results.append({"error": f"No agents found for class: {run.social_class}"})
+                all_results.append(
+                    {"error": f"No agents found for class: {run.social_class}"}
+                )
                 continue
 
             current_count = len(metadata)
@@ -542,7 +551,7 @@ async def run_simulation(req: SimulationRequest):
 
             # --- MEMORY UPDATE ---
             # Update the global memory array for this specific run
-            if getattr(config, "use_agent_memory", False):
+            if getattr(config, "use_agent_memory", False) and updated_memory is not None:
                 if run.social_class != "All":
                     memory_full[indices_torch[:limit]] = updated_memory.to(
                         memory_full.device
@@ -595,7 +604,7 @@ async def run_simulation(req: SimulationRequest):
                     agent_memory=updated_memory,
                 )
 
-                if getattr(config, "use_agent_memory", False):
+                if getattr(config, "use_agent_memory", False) and updated_memory_2 is not None:
                     if run.social_class != "All":
                         memory_full[indices_torch[:limit]] = updated_memory_2.to(
                             memory_full.device
@@ -677,7 +686,7 @@ async def run_simulation(req: SimulationRequest):
         raise HTTPException(status_code=502, detail=f"Simulation Error: {str(e)}")
     finally:
         if temp_dir and os.path.exists(temp_dir):
-            shutil.rmtree(temp_dir)
+            background_tasks.add_task(shutil.rmtree, temp_dir, ignore_errors=True)
 
     return {"status": "success", "results": all_results}
 

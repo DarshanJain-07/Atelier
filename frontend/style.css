@@ -430,7 +430,9 @@ select:hover {
 .section-title[data-tooltip]:hover::after,
 .section-title[data-tooltip]:focus-visible::after,
 label[data-tooltip]:hover::after,
-label[data-tooltip]:focus-visible::after {
+label[data-tooltip]:focus-visible::after,
+.reset-section-btn[data-tooltip]:hover::after,
+.reset-section-btn[data-tooltip]:focus-visible::after {
     top: calc(100% + 10px);
     --y-slide: -4px;
 }
@@ -464,6 +466,17 @@ label[data-tooltip]:focus-visible::after {
 .toggle-grid .toggle-btn:nth-child(4)[data-tooltip] {
     --tt-left: auto;
     --tt-right: 0;
+    --tt-x: 0;
+}
+.reset-section-btn[data-tooltip] {
+    --tt-left: auto;
+    --tt-right: 0;
+    --tt-x: 0;
+}
+
+/* Dossier Tooltip Boundary Fixes */
+.dossier-card .info-group label[data-tooltip] {
+    --tt-left: 0;
     --tt-x: 0;
 }
 
@@ -1644,20 +1657,70 @@ input[type="range"]::-moz-range-track {
 }
 
 .toast {
-    background: rgba(230, 57, 70, 0.9);
     color: #fff;
     padding: 12px 24px;
     border-radius: 8px;
     font-weight: 600;
     font-size: 0.85rem;
     letter-spacing: 0.05em;
-    box-shadow: 0 4px 15px rgba(230, 57, 70, 0.4);
     animation: toastFadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     display: flex;
     align-items: center;
     gap: 10px;
     backdrop-filter: blur(4px);
+}
+
+.toast-error {
+    background: rgba(230, 57, 70, 0.9);
+    box-shadow: 0 4px 15px rgba(230, 57, 70, 0.4);
     border: 1px solid #ff4d4d;
+}
+
+.toast-success {
+    background: rgba(16, 185, 129, 0.9);
+    box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
+    border: 1px solid #34d399;
+}
+
+.toast-warning {
+    background: rgba(245, 158, 11, 0.9);
+    box-shadow: 0 4px 15px rgba(245, 158, 11, 0.4);
+    border: 1px solid #fbbf24;
+}
+
+.toast-info {
+    background: rgba(59, 130, 246, 0.9);
+    box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
+    border: 1px solid #60a5fa;
+}
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.section-header .section-title {
+    margin-bottom: 0;
+}
+
+.reset-section-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: color 0.2s ease, background-color 0.2s ease;
+}
+
+.reset-section-btn:hover {
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.1);
 }
 
 @keyframes toastFadeIn {

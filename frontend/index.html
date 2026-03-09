@@ -134,7 +134,15 @@
                 </div>
                 <div class="sidebar-content" id="sidebar-basic">
                     <div class="config-section">
-                        <label class="section-title" tabindex="0" data-tooltip="Set the class of agents to observe.">SCOPE</label>
+                        <div class="section-header">
+                            <label class="section-title" tabindex="0" data-tooltip="Set the class of agents to observe.">SCOPE</label>
+                            <button class="reset-section-btn" onclick="resetSection(this)" data-tooltip="Reset section" aria-label="Reset Defaults">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                                    <path d="M3 3v5h5"/>
+                                </svg>
+                            </button>
+                        </div>
                         <div class="select-wrapper">
                             <select id="filter-class">
                                 <option value="All" selected>All Classes</option>
@@ -154,7 +162,15 @@
                     </div>
 
                     <div class="config-section">
-                        <label class="section-title" tabindex="0" data-tooltip="Toggle core simulation mechanisms.">PARAMETERS</label>
+                        <div class="section-header">
+                            <label class="section-title" tabindex="0" data-tooltip="Toggle core simulation mechanisms.">PARAMETERS</label>
+                            <button class="reset-section-btn" onclick="resetSection(this)" data-tooltip="Reset section" aria-label="Reset Defaults">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                                    <path d="M3 3v5h5"/>
+                                </svg>
+                            </button>
+                        </div>
                         <div class="toggle-grid">
                             <button
                                 class="toggle-btn active"
@@ -181,7 +197,7 @@
                                 Maslow Gate
                             </button>
                             <button
-                                class="toggle-btn"
+                                class="toggle-btn active"
                                 id="tog-power-law"
                                 onclick="this.classList.toggle('active')"
                                 data-tooltip="Enable power law influence (Weighted Aggregation / Pareto Distribution)"
@@ -197,7 +213,7 @@
                                 Agent Memory
                             </button>
                             <button
-                                class="toggle-btn"
+                                class="toggle-btn active"
                                 id="tog-algo-amp"
                                 onclick="this.classList.toggle('active')"
                                 data-tooltip="Enable Algorithmic Amplification (2-pass filter bubble)"
@@ -224,7 +240,15 @@
                     </div>
 
                     <div class="config-section">
-                        <label class="section-title" tabindex="0" for="param-count" data-tooltip="Total number of agents simulated in the population.">POPULATION</label>
+                        <div class="section-header">
+                            <label class="section-title" tabindex="0" for="param-count" data-tooltip="Total number of agents simulated in the population.">POPULATION</label>
+                            <button class="reset-section-btn" onclick="resetSection(this)" data-tooltip="Reset section" aria-label="Reset Defaults">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                                    <path d="M3 3v5h5"/>
+                                </svg>
+                            </button>
+                        </div>
                         <div class="range-wrapper">
                             <input
                                 type="range"
@@ -239,12 +263,20 @@
                     </div>
 
                     <div class="config-section">
-                        <label
+                        <div class="section-header">
+                            <label
                             class="section-title" tabindex="0"
                             for="param-temp"
                             data-tooltip="Controls the mutation rate. Higher values increase randomness in agent personalities and beliefs, creating more outliers."
                             >TEMPERATURE</label
                         >
+                            <button class="reset-section-btn" onclick="resetSection(this)" data-tooltip="Reset section" aria-label="Reset Defaults">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                                    <path d="M3 3v5h5"/>
+                                </svg>
+                            </button>
+                        </div>
                         <div class="range-wrapper">
                             <input
                                 type="range"
@@ -274,11 +306,19 @@
 
                 <div class="sidebar-content hidden" id="sidebar-researcher">
                     <div class="config-section">
-                        <label
+                        <div class="section-header">
+                            <label
                             class="section-title" tabindex="0"
                             data-tooltip="Controls the sharpness of emotions. Lower values mean more pronounced dominant emotions."
                             >EMOTION TEMP</label
                         >
+                            <button class="reset-section-btn" onclick="resetSection(this)" data-tooltip="Reset section" aria-label="Reset Defaults">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                                    <path d="M3 3v5h5"/>
+                                </svg>
+                            </button>
+                        </div>
                         <div class="range-wrapper">
                             <input
                                 type="range"
@@ -295,11 +335,19 @@
                     </div>
 
                     <div class="config-section">
-                        <label
+                        <div class="section-header">
+                            <label
                             class="section-title" tabindex="0"
                             data-tooltip="Panic threshold. If safety falls below this, FEAR is triggered."
                             >PANIC THRESHOLD</label
                         >
+                            <button class="reset-section-btn" onclick="resetSection(this)" data-tooltip="Reset section" aria-label="Reset Defaults">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                                    <path d="M3 3v5h5"/>
+                                </svg>
+                            </button>
+                        </div>
                         <div class="range-wrapper">
                             <input
                                 type="range"
@@ -316,7 +364,15 @@
                     </div>
 
                     <div class="config-section">
-                        <label class="section-title" tabindex="0" data-tooltip="Parameters governing how agents perceive and process information.">COGNITIVE ENGINE</label>
+                        <div class="section-header">
+                            <label class="section-title" tabindex="0" data-tooltip="Parameters governing how agents perceive and process information.">COGNITIVE ENGINE</label>
+                            <button class="reset-section-btn" onclick="resetSection(this)" data-tooltip="Reset section" aria-label="Reset Defaults">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                                    <path d="M3 3v5h5"/>
+                                </svg>
+                            </button>
+                        </div>
                         <div class="sidebar-grid">
                             <div class="sidebar-field">
                                 <label data-tooltip="Interaction strength between different world dimensions.">Cross Dim</label
@@ -385,7 +441,15 @@
                         </div>
                     </div>
                     <div class="config-section">
-                        <label class="section-title" tabindex="0" data-tooltip="How psychological traits react under high urgency/stress.">STRESS MULTIPLIERS</label>
+                        <div class="section-header">
+                            <label class="section-title" tabindex="0" data-tooltip="How psychological traits react under high urgency/stress.">STRESS MULTIPLIERS</label>
+                            <button class="reset-section-btn" onclick="resetSection(this)" data-tooltip="Reset section" aria-label="Reset Defaults">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                                    <path d="M3 3v5h5"/>
+                                </svg>
+                            </button>
+                        </div>
                         <div class="sidebar-grid">
                             <div class="sidebar-field">
                                 <label data-tooltip="Amplification of neuroticism under stress.">Neur Amp</label
@@ -422,7 +486,15 @@
                         </div>
                     </div>
                     <div class="config-section">
-                        <label class="section-title" tabindex="0" data-tooltip="Parameters controlling the spread of emotion through the network.">PHYSICS ENGINE</label>
+                        <div class="section-header">
+                            <label class="section-title" tabindex="0" data-tooltip="Parameters controlling the spread of emotion through the network.">PHYSICS ENGINE</label>
+                            <button class="reset-section-btn" onclick="resetSection(this)" data-tooltip="Reset section" aria-label="Reset Defaults">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                                    <path d="M3 3v5h5"/>
+                                </svg>
+                            </button>
+                        </div>
                         <div class="sidebar-grid">
                             <div class="sidebar-field">
                                 <label data-tooltip="Multiplier for outrage propagation.">Outrage Gain</label
@@ -459,7 +531,15 @@
                         </div>
                     </div>
                     <div class="config-section">
-                        <label class="section-title" tabindex="0" data-tooltip="Agent memory parameters for fatigue and trauma.">AGENT MEMORY</label>
+                        <div class="section-header">
+                            <label class="section-title" tabindex="0" data-tooltip="Agent memory parameters for fatigue and trauma.">AGENT MEMORY</label>
+                            <button class="reset-section-btn" onclick="resetSection(this)" data-tooltip="Reset section" aria-label="Reset Defaults">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                                    <path d="M3 3v5h5"/>
+                                </svg>
+                            </button>
+                        </div>
                         <div class="sidebar-grid">
                             <div class="sidebar-field">
                                 <label data-tooltip="How much memory is retained (0 to 1).">Decay Rate</label
@@ -496,7 +576,15 @@
                         </div>
                     </div>
                     <div class="config-section">
-                        <label class="section-title" tabindex="0" data-tooltip="Algorithmic filtering and amplification parameters.">ALGORITHMIC FILTER BUBBLE</label>
+                        <div class="section-header">
+                            <label class="section-title" tabindex="0" data-tooltip="Algorithmic filtering and amplification parameters.">ALGORITHMIC FILTER BUBBLE</label>
+                            <button class="reset-section-btn" onclick="resetSection(this)" data-tooltip="Reset section" aria-label="Reset Defaults">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                                    <path d="M3 3v5h5"/>
+                                </svg>
+                            </button>
+                        </div>
                         <div class="sidebar-grid">
                             <div class="sidebar-field">
                                 <label data-tooltip="Fraction of population used for initial A/B test.">Sample Size</label
@@ -521,9 +609,17 @@
                         </div>
                     </div>
                     <div class="config-section">
-                        <label class="section-title" tabindex="0" data-tooltip="Settings for noise and information loss."
+                        <div class="section-header">
+                            <label class="section-title" tabindex="0" data-tooltip="Settings for noise and information loss."
                             >DISTORTION & ENTROPY</label
                         >
+                            <button class="reset-section-btn" onclick="resetSection(this)" data-tooltip="Reset section" aria-label="Reset Defaults">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                                    <path d="M3 3v5h5"/>
+                                </svg>
+                            </button>
+                        </div>
                         <div class="sidebar-grid">
                             <div class="sidebar-field">
                                 <label data-tooltip="Maximum noise added during signal distortion.">Max Noise</label
@@ -548,7 +644,15 @@
                         </div>
                     </div>
                     <div class="config-section">
-                        <label class="section-title" tabindex="0" data-tooltip="Settings for the long-term societal evolution loop.">EVOLUTION</label>
+                        <div class="section-header">
+                            <label class="section-title" tabindex="0" data-tooltip="Settings for the long-term societal evolution loop.">EVOLUTION</label>
+                            <button class="reset-section-btn" onclick="resetSection(this)" data-tooltip="Reset section" aria-label="Reset Defaults">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                                    <path d="M3 3v5h5"/>
+                                </svg>
+                            </button>
+                        </div>
                         <div class="sidebar-grid">
                             <div class="sidebar-field">
                                 <label data-tooltip="Number of evolution cycles to run.">Generations</label
@@ -939,15 +1043,23 @@
 
                     <div class="dist-container">
                         <div class="dist-group">
-                            <label class="section-label margin-y-12">GLOBAL CLUSTER METRICS</label>
+                            <label class="section-label margin-y-12">CLUSTER METRICS</label>
                             <div class="dossier-info info-grid-1col" style="gap: 8px;">
                                 <div class="info-group" style="display: flex; justify-content: space-between; align-items: center;">
-                                    <label style="margin-bottom: 0;" data-tooltip="Measures cluster cohesion. Higher is better (range: -1 to 1).">Silhouette Score</label>
+                                    <label style="margin-bottom: 0;" data-tooltip="Global Silhouette Score">Global Silhouette</label>
                                     <div id="c-val-silhouette" class="info-value" style="font-family: var(--font-mono);">--</div>
                                 </div>
                                 <div class="info-group" style="display: flex; justify-content: space-between; align-items: center;">
-                                    <label style="margin-bottom: 0;" data-tooltip="Measures cluster separation. Lower is better (min: 0).">Davies-Bouldin Index</label>
+                                    <label style="margin-bottom: 0;" data-tooltip="Global Davies-Bouldin Index">Global DB Index</label>
                                     <div id="c-val-davies-bouldin" class="info-value" style="font-family: var(--font-mono);">--</div>
+                                </div>
+                                <div class="info-group" style="display: flex; justify-content: space-between; align-items: center;">
+                                    <label style="margin-bottom: 0;" data-tooltip="Specific to this cluster. Measures cohesion.">Cluster Silhouette</label>
+                                    <div id="c-val-cluster-silhouette" class="info-value" style="font-family: var(--font-mono);">--</div>
+                                </div>
+                                <div class="info-group" style="display: flex; justify-content: space-between; align-items: center;">
+                                    <label style="margin-bottom: 0;" data-tooltip="Specific to this cluster. Measures separation.">Cluster DB Index</label>
+                                    <div id="c-val-cluster-davies-bouldin" class="info-value" style="font-family: var(--font-mono);">--</div>
                                 </div>
                             </div>
                         </div>

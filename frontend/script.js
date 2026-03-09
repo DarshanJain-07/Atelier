@@ -56,9 +56,9 @@ let clusterSpread = 1.0;
     use_distortion: true,
     use_pressure: true,
     use_maslow: true,
-    use_power_law: false,
+    use_power_law: true,
     use_agent_memory: true,
-    use_algorithmic_amplification: false,
+    use_algorithmic_amplification: true,
     use_network_topology: true,
     enable_evolution: true,
     cross_dim_interaction_strength: 0.3,
@@ -109,17 +109,17 @@ function renderBatchUI() {
             <div class="sidebar-grid">
                 <div class="sidebar-field">
                     <label data-tooltip="Random seed for deterministic outcomes.">Seed</label>
-                    <input type="number" class="sidebar-input" value="${run.seed}" onchange="updateRun(${run.id}, 'seed', this.value)">
+                    <input type="number" class="sidebar-input" value="${run.seed}" onchange="debouncedUpdateRun(${run.id}, 'seed', this.value)">
                 </div>
                 <div class="sidebar-field">
                     <label data-tooltip="Controls the mutation rate. Higher values increase randomness.">Temp</label>
-                    <input type="number" class="sidebar-input" step="0.1" min="0" max="1" value="${run.temperature}" onchange="updateRun(${run.id}, 'temperature', this.value)">
+                    <input type="number" class="sidebar-input" step="0.1" min="0" max="1" value="${run.temperature}" onchange="debouncedUpdateRun(${run.id}, 'temperature', this.value)">
                 </div>
             </div>
             <div class="sidebar-grid">
                 <div class="sidebar-field sidebar-field-span-2">
                     <label data-tooltip="Filter agents by socioeconomic class.">Class</label>
-                    <select class="sidebar-input select-ui-font" onchange="updateRun(${run.id}, 'social_class', this.value)">
+                    <select class="sidebar-input select-ui-font" onchange="debouncedUpdateRun(${run.id}, 'social_class', this.value)">
                         <option value="All" ${run.social_class === "All" ? "selected" : ""}>All</option>
                         <option value="Underclass" ${run.social_class === "Underclass" ? "selected" : ""}>Underclass</option>
                         <option value="Working Class" ${run.social_class === "Working Class" ? "selected" : ""}>Working Class</option>
@@ -133,18 +133,18 @@ function renderBatchUI() {
                 <div class="sidebar-field sidebar-field-span-2">
                     <label data-tooltip="Total number of agents to simulate.">Population: <span id="batch-pop-val-${run.id}">${(run.agent_count / 1000).toFixed(1)}k</span></label>
                     <input type="range" min="1000" max="15000" step="1000" value="${run.agent_count}"
-                        oninput="document.getElementById('batch-pop-val-${run.id}').textContent = (this.value/1000).toFixed(1) + 'k'; updateRun(${run.id}, 'agent_count', this.value)">
+                        oninput="document.getElementById('batch-pop-val-${run.id}').textContent = (this.value/1000).toFixed(1) + 'k'; debouncedUpdateRun(${run.id}, 'agent_count', this.value)">
                 </div>
             </div>
             <div class="batch-toggle-grid">
-                <button class="batch-tog ${run.use_distortion ? "active" : ""}" onclick="this.classList.toggle('active'); updateRun(${run.id}, 'use_distortion', this.classList.contains('active'))" title="Distortion">DIST</button>
-                <button class="batch-tog ${run.use_pressure ? "active" : ""}" onclick="this.classList.toggle('active'); updateRun(${run.id}, 'use_pressure', this.classList.contains('active'))" title="Time Pressure">TIME</button>
-                <button class="batch-tog ${run.use_maslow ? "active" : ""}" onclick="this.classList.toggle('active'); updateRun(${run.id}, 'use_maslow', this.classList.contains('active'))" title="Maslow Gate">MSLW</button>
-                <button class="batch-tog ${run.use_power_law ? "active" : ""}" onclick="this.classList.toggle('active'); updateRun(${run.id}, 'use_power_law', this.classList.contains('active'))" title="Power Law">PWR</button>
-                <button class="batch-tog ${run.use_agent_memory ? "active" : ""}" onclick="this.classList.toggle('active'); updateRun(${run.id}, 'use_agent_memory', this.classList.contains('active'))" title="Agent Memory">MEM</button>
-                <button class="batch-tog ${run.use_algorithmic_amplification ? "active" : ""}" onclick="this.classList.toggle('active'); updateRun(${run.id}, 'use_algorithmic_amplification', this.classList.contains('active'))" title="Algo Amplification">ALGO</button>
-                <button class="batch-tog ${run.use_network_topology ? "active" : ""}" onclick="this.classList.toggle('active'); updateRun(${run.id}, 'use_network_topology', this.classList.contains('active'))" title="Network Topology">NET</button>
-                <button class="batch-tog ${run.enable_evolution ? "active" : ""}" onclick="this.classList.toggle('active'); updateRun(${run.id}, 'enable_evolution', this.classList.contains('active'))" title="Evolution">EVO</button>
+                <button class="batch-tog ${run.use_distortion ? "active" : ""}" onclick="this.classList.toggle('active'); debouncedUpdateRun(${run.id}, 'use_distortion', this.classList.contains('active'))" title="Distortion">DIST</button>
+                <button class="batch-tog ${run.use_pressure ? "active" : ""}" onclick="this.classList.toggle('active'); debouncedUpdateRun(${run.id}, 'use_pressure', this.classList.contains('active'))" title="Time Pressure">TIME</button>
+                <button class="batch-tog ${run.use_maslow ? "active" : ""}" onclick="this.classList.toggle('active'); debouncedUpdateRun(${run.id}, 'use_maslow', this.classList.contains('active'))" title="Maslow Gate">MSLW</button>
+                <button class="batch-tog ${run.use_power_law ? "active" : ""}" onclick="this.classList.toggle('active'); debouncedUpdateRun(${run.id}, 'use_power_law', this.classList.contains('active'))" title="Power Law">PWR</button>
+                <button class="batch-tog ${run.use_agent_memory ? "active" : ""}" onclick="this.classList.toggle('active'); debouncedUpdateRun(${run.id}, 'use_agent_memory', this.classList.contains('active'))" title="Agent Memory">MEM</button>
+                <button class="batch-tog ${run.use_algorithmic_amplification ? "active" : ""}" onclick="this.classList.toggle('active'); debouncedUpdateRun(${run.id}, 'use_algorithmic_amplification', this.classList.contains('active'))" title="Algo Amplification">ALGO</button>
+                <button class="batch-tog ${run.use_network_topology ? "active" : ""}" onclick="this.classList.toggle('active'); debouncedUpdateRun(${run.id}, 'use_network_topology', this.classList.contains('active'))" title="Network Topology">NET</button>
+                <button class="batch-tog ${run.enable_evolution ? "active" : ""}" onclick="this.classList.toggle('active'); debouncedUpdateRun(${run.id}, 'enable_evolution', this.classList.contains('active'))" title="Evolution">EVO</button>
             </div>
         `;
     container.appendChild(item);
@@ -155,6 +155,18 @@ window.removeRun = (id) => {
   batchRuns = batchRuns.filter((r) => r.id !== id);
   renderBatchUI();
 };
+
+function debounce(func, wait) {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+}
 
 window.updateRun = (id, field, value) => {
   const run = batchRuns.find((r) => r.id === id);
@@ -168,11 +180,13 @@ window.updateRun = (id, field, value) => {
         field === "emotion_temperature" ||
         field === "panic_threshold" ||
         field === "agent_count"
-          ? parseFloat(value)
+          ? Number(value)
           : value;
     }
   }
 };
+
+window.debouncedUpdateRun = debounce(window.updateRun, 50);
 
 document.getElementById("btn-add-run").addEventListener("click", () => {
   if (batchRuns.length >= 6) return;
@@ -393,15 +407,15 @@ function displayResult(data) {
 
   // 6. Show Endogenous Event Toast if present
   if (data.endogenous_event) {
-    showToast(`⚠️ Autopoietic Trigger: ${data.endogenous_event}`);
+    showToast(`⚠️ Autopoietic Trigger: ${data.endogenous_event}`, "warning");
   }
 }
 
-function showToast(message) {
+function showToast(message, type = "info") {
   const container = document.getElementById("toast-container");
   if (!container) return;
   const toast = document.createElement("div");
-  toast.className = "toast";
+  toast.className = `toast toast-${type}`;
   toast.textContent = message;
   container.appendChild(toast);
   setTimeout(() => {
@@ -690,6 +704,8 @@ async function runSimulation() {
   statusLabel.style.color = "#fbbf24";
   runBtn.disabled = true;
   runBtn.style.opacity = "0.5";
+  runBtn.style.cursor = "not-allowed";
+  runBtn.textContent = "PROCESSING...";
 
   // Clear UI
   filmstrip.classList.add("hidden");
@@ -884,10 +900,12 @@ async function runSimulation() {
     console.error("Simulation failed:", error);
     statusLabel.textContent = "ERROR";
     statusLabel.style.color = "#ef4444";
-    alert(`Simulation failed: ${error.message}`);
+    showToast(`Simulation failed: ${error.message}`, "error");
   } finally {
     runBtn.disabled = false;
     runBtn.style.opacity = "1.0";
+    runBtn.style.cursor = "pointer";
+    runBtn.textContent = "RUN MODEL";
   }
 }
 
@@ -1025,6 +1043,7 @@ function downloadData(sIdx, rIdx) {
   a.href = url;
   a.download = `run_session${sIdx}_run${rIdx}.json`;
   a.click();
+  showToast("Download successful.", "success");
 }
 
 function downloadAllData() {
@@ -1036,6 +1055,7 @@ function downloadAllData() {
   a.href = url;
   a.download = `session_history.json`;
   a.click();
+  showToast("Session history downloaded successfully.", "success");
 }
 
 function handleLoadHistory(event) {
@@ -1052,8 +1072,9 @@ function handleLoadHistory(event) {
         const rIdx = simulationHistory[sIdx].runs ? 0 : -1;
         if (rIdx !== -1) restoreSimulation(sIdx, rIdx);
       }
+      showToast("History loaded successfully.", "success");
     } catch (err) {
-      alert("Invalid JSON");
+      showToast("Invalid JSON file.", "error");
     }
   };
   reader.readAsText(file);
@@ -1077,11 +1098,13 @@ async function checkBackendStatus() {
       );
       statusLabel.textContent = "SERVER ERROR";
       statusLabel.style.color = "#fbbf24";
+      showToast("Backend server error.", "error");
     }
   } catch (error) {
     console.error("Backend connection failed:", error);
     statusLabel.textContent = "OFFLINE";
     statusLabel.style.color = "#ef4444";
+    showToast("Backend is offline.", "error");
   }
 }
 
@@ -1119,17 +1142,17 @@ function showDossier(index) {
       document.getElementById(`c-val-${traits[i]}`).textContent = `${percent}%`;
     });
 
-    const rolesContainer = document.getElementById("ds-cluster-roles");
-    if (rolesContainer) {
-      rolesContainer.innerHTML = "";
-      const totalRoles = Object.values(agg.roles).reduce((a, b) => a + b, 0);
-      for (const [roleName, count] of Object.entries(agg.roles)) {
-        const percent = totalRoles > 0 ? Math.round((count / totalRoles) * 100) : 0;
-        rolesContainer.innerHTML += `
+    const classesContainer = document.getElementById("ds-cluster-classes");
+    if (classesContainer) {
+      classesContainer.innerHTML = "";
+      for (const [className, count] of Object.entries(agg.classes)) {
+        const globalCount = totalCounts.classes[className] || 1;
+        const percent = Math.round((count / globalCount) * 100);
+        classesContainer.innerHTML += `
           <div class="dist-item">
               <div class="dist-label-row">
-                  <span>${roleName}</span>
-                  <span>${percent}% (${count})</span>
+                  <span>${className}</span>
+                  <span>${percent}% (${count}/${globalCount})</span>
               </div>
               <div class="dist-bar-bg">
                   <div class="dist-bar" style="width: ${percent}%"></div>
@@ -1139,11 +1162,30 @@ function showDossier(index) {
       }
     }
     
-    // Update global cluster metrics
+    // Update global and cluster specific metrics
     const silEl = document.getElementById("c-val-silhouette");
     const dbEl = document.getElementById("c-val-davies-bouldin");
-    if (silEl) silEl.textContent = clusterMetrics.silhouette_score.toFixed(3);
-    if (dbEl) dbEl.textContent = clusterMetrics.davies_bouldin_index.toFixed(3);
+    const cSilEl = document.getElementById("c-val-cluster-silhouette");
+    const cDbEl = document.getElementById("c-val-cluster-davies-bouldin");
+
+    if (silEl) silEl.textContent = clusterMetrics.silhouette_score ? clusterMetrics.silhouette_score.toFixed(3) : "0.000";
+    if (dbEl) dbEl.textContent = clusterMetrics.davies_bouldin_index ? clusterMetrics.davies_bouldin_index.toFixed(3) : "0.000";
+
+    if (cSilEl) {
+      if (clusterMetrics.per_cluster_silhouette && typeof clusterMetrics.per_cluster_silhouette[emotion] !== 'undefined') {
+        cSilEl.textContent = clusterMetrics.per_cluster_silhouette[emotion].toFixed(3);
+      } else {
+        cSilEl.textContent = "N/A";
+      }
+    }
+    
+    if (cDbEl) {
+      if (clusterMetrics.per_cluster_davies_bouldin && typeof clusterMetrics.per_cluster_davies_bouldin[emotion] !== 'undefined') {
+        cDbEl.textContent = clusterMetrics.per_cluster_davies_bouldin[emotion].toFixed(3);
+      } else {
+        cDbEl.textContent = "N/A";
+      }
+    }
   }
   dossier.classList.remove("hidden");
 }
@@ -1265,6 +1307,52 @@ document.getElementById("tab-researcher")?.addEventListener("click", () => {
   document.getElementById("tab-basic").classList.remove("active");
   document.getElementById("sidebar-researcher").classList.remove("hidden");
   document.getElementById("sidebar-basic").classList.add("hidden");
+});
+
+function resetSection(btn) {
+    const section = btn.closest('.config-section');
+    if (!section) return;
+
+    // Reset range and number inputs
+    const inputs = section.querySelectorAll('input[type="range"], input[type="number"], input[type="text"]');
+    inputs.forEach(input => {
+        if (input.defaultValue !== undefined) {
+            input.value = input.defaultValue;
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+    });
+
+    // Reset selects
+    const selects = section.querySelectorAll('select');
+    selects.forEach(select => {
+        const defaultOption = Array.from(select.options).find(opt => opt.defaultSelected);
+        if (defaultOption) {
+            select.value = defaultOption.value;
+            select.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+    });
+
+    // Reset toggle buttons
+    const toggles = section.querySelectorAll('.toggle-btn');
+    toggles.forEach(toggle => {
+        if (toggle.hasAttribute('data-default-active')) {
+            const shouldBeActive = toggle.getAttribute('data-default-active') === 'true';
+            if (shouldBeActive) {
+                toggle.classList.add('active');
+            } else {
+                toggle.classList.remove('active');
+            }
+            // Trigger any onclick logic if it's not inline, but here they are mostly inline `onclick="this.classList.toggle('active')"`
+            // The simulation just reads classList.contains('active') later.
+        }
+    });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.toggle-btn').forEach(btn => {
+        btn.setAttribute('data-default-active', btn.classList.contains('active'));
+    });
 });
 
 resize();

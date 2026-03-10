@@ -390,6 +390,19 @@ function displayResult(data) {
     document.getElementById("ex-structure").innerHTML = formatBold(data.explainability.societal_structure || "--");
     document.getElementById("ex-endogenous-events").innerHTML = formatBold(data.explainability.endogenous_events || "--");
 
+    const biasContainer = document.getElementById("ex-biases");
+    biasContainer.innerHTML = "";
+    if (data.detected_biases && data.detected_biases.length > 0) {
+        data.detected_biases.forEach(bias => {
+            const tag = document.createElement("span");
+            tag.className = "bias-tag";
+            tag.textContent = bias;
+            biasContainer.appendChild(tag);
+        });
+    } else {
+        biasContainer.innerHTML = "<span>None detected</span>";
+    }
+
     const demoContainer = document.getElementById("ex-demographics");
     demoContainer.innerHTML = "";
     if (data.explainability.demographics && data.explainability.demographics.length > 0) {

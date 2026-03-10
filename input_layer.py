@@ -29,6 +29,7 @@ class DimensionParseError(Exception):
 
 class WorldState(BaseModel):
     Reasoning: str
+    Detected_Biases: list[str]
     Urgency: float
     Is_Personal: bool
 
@@ -48,13 +49,14 @@ class WorldState(BaseModel):
     model_config = {"extra": "forbid"}
 
 
-def get_world_state(user_input: str) -> Tuple[torch.Tensor, float, bool]:
+def get_world_state(user_input: str) -> Tuple[torch.Tensor, float, bool, list[str]]:
     """
     Analyzes the news event using the LLM.
     Returns:
         1. World Tensor (1, 12): The 12-dimensional impact vector.
         2. Urgency Score (float): 0.0 to 1.0 (Time Pressure).
         3. Personal Flag (bool): True if the event is about 'ME/MY/I'.
+        4. Detected Biases (list[str]): List of biases detected in the text.
     """
 
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent"
@@ -69,6 +71,11 @@ def get_world_state(user_input: str) -> Tuple[torch.Tensor, float, bool]:
             "Reasoning": {
                 "type": "string",
                 "description": "Chain of thought analysis.",
+            },
+            "Detected_Biases": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "List of explicit biases, spins, or power dynamics detected in the text (e.g., 'Corporate Spin', 'Imperial/Condescending', 'Political Framing').",
             },
             "Urgency": {
                 "type": "number",
@@ -92,18 +99,20 @@ def get_world_state(user_input: str) -> Tuple[torch.Tensor, float, bool]:
             "Short_Term": {"type": "number"},
             "Long_Term": {"type": "number"},
         },
-        "required": ["Reasoning", "Urgency", "Is_Personal"] + DIMENSIONS,
+        "required": ["Reasoning", "Detected_Biases", "Urgency", "Is_Personal"] + DIMENSIONS,
     }
 
     # 2. The System Prompt (The "Magnitude Rubric" and Few-Shot Calibration)
     system_instruction = """
     You are an objective 'World Model Engine' and 'Predictive Engine'. Your task is to analyze the input event and predict its ACTUAL material and social outcome on society or the individual across 12 dimensions.
 
-    ### 1. PIERCE THE SPIN & PREDICT ACTUAL OUTCOMES
+    ### 1. PIERCE THE SPIN, DETECT BIAS & PREDICT ACTUAL OUTCOMES
     *   Do NOT perform simple sentiment analysis.
+    *   Identify and list any biases or framing tactics in the "Detected_Biases" array. Use labels like "Corporate Spin", "Political Framing", "Imperial/Condescending", "Fearmongering", or "Downplaying".
     *   Look past PR spin, corporate framing, or political rhetoric. If a text says "We are replacing staff with AI for efficiency and scalability," do not score this as purely positive because of the words "efficiency." You must predict the real-world outcome: massive job losses (Negative Wealth/Stability for the workforce), potential increase in corporate profit (Positive Wealth for elites), and increased Out_Group tension.
     *   Assess the underlying objective reality and the likely cascading social effects of the decision/event.
     *   POWER DYNAMICS & CONDESCENSION: Pay close attention to language indicating dominance, imperialism, or loss of autonomy. For example, if an entity or nation claims to "allow", "permit", or "grant waivers" to another sovereign group, recognize the implicit threat to sovereignty and patronizing tone. This must generate negative scores for Freedom (loss of autonomy) and Fairness (unequal power dynamics), and potentially trigger In_Group/Out_Group tensions, even if the text is framed positively (e.g., "temporarily allowing purchases").
+
 
     ### 2. CALIBRATION NOTES & THE MAGNITUDE RUBRIC
     You must be highly calibrated. Do NOT exaggerate minor events.
@@ -198,11 +207,13 @@ def get_world_state(user_input: str) -> Tuple[torch.Tensor, float, bool]:
     world_tensor = torch.tensor([values], dtype=torch.float32)
     urgency = max(0.0, min(1.0, result.Urgency))
     is_personal = result.Is_Personal
+    detected_biases = result.Detected_Biases
 
     # Debug print
+    print(f"> Detected Biases: {detected_biases}")
     print(f"> {result.Reasoning}\n--------------------")
 
-    return world_tensor, urgency, is_personal
+    return world_tensor, urgency, is_personal, detected_biases
 
 
 if __name__ == "__main__":
@@ -210,7 +221,8 @@ if __name__ == "__main__":
     news = "Introduction of new rules regarding flight time duty regulations of plane members severely impacting of major airlines"
     if not GEMINI_API_KEY:
         raise ValueError("GEMINI_API_KEY not found in .env file")
-    tensor, urg, pers = get_world_state(news)
+    tensor, urg, pers, biases = get_world_state(news)
+    print(f"Biases: {biases}")
     print(f"Tensor: {tensor}")
     print(f"Urgency: {urg}")
     print(f"Personal: {pers}")

@@ -151,13 +151,34 @@ class SocietyEvolution:
         if np.random.rand() < elite_chance and "Class" in self.metadata:
             # Cultural Hegemony: Society drifts toward the Elite class
             elite_mask = (self.metadata["Class"] == "Elite").values
-            if elite_mask.sum() > 0:
-                target_mean = self.exposures[torch.from_numpy(elite_mask)].mean(dim=0)
+            if elite_mask.sum() > 1:
+                target_exposures = self.exposures[torch.from_numpy(elite_mask)]
+                target_mean = target_exposures.mean(dim=0)
+                target_var = target_exposures.var(dim=0, unbiased=False)
+            elif elite_mask.sum() == 1:
+                target_exposures = self.exposures[torch.from_numpy(elite_mask)]
+                target_mean = target_exposures.mean(dim=0)
+                target_var = torch.zeros_like(target_mean)
             else:
                 target_mean = self.exposures.mean(dim=0)
+                target_var = self.exposures.var(dim=0, unbiased=False)
         else:
             # Normal cultural consensus
             target_mean = self.exposures.mean(dim=0)
+            target_var = self.exposures.var(dim=0, unbiased=False)
+
+        # Prevent zero variance issues
+        target_var = torch.clamp(target_var, min=1e-6)
+
+        # Bayesian Belief Updating:
+        # If the target (evidence) is highly polarized (high variance), agents trust it less.
+        # If there is strong consensus (low variance), agents are pulled more strongly.
+        prior_var = getattr(self.config, "bayesian_prior_variance", 0.1)
+        
+        # Calculate dynamic Bayesian update rate (Kalman Gain style)
+        # Shape will be (D,) allowing per-dimension belief updating based on consensus.
+        bayesian_update_rate = prior_var / (prior_var + target_var)
+        dynamic_drift_rate = drift_rate * bayesian_update_rate
 
         # Calculate difference from target
         diff_from_target = target_mean - self.exposures
@@ -184,10 +205,10 @@ class SocietyEvolution:
             drift_direction = torch.where(
                 is_alienated,
                 -diff_from_target * repulsion_rate,
-                diff_from_target * drift_rate,
+                diff_from_target * dynamic_drift_rate,
             )
         else:
-            drift_direction = diff_from_target * drift_rate
+            drift_direction = diff_from_target * dynamic_drift_rate
 
         # Add random noise
         noise = torch.randn_like(self.exposures) * noise_std

@@ -78,6 +78,7 @@ class CognitiveEngine:
             ctx.rde_layer()
             .personality_query_layer()
             .personal_event_layer()
+            .selective_exposure_layer()
             .key_processing_layer()
             .cross_dimension_layer()
             .relevance_layer()

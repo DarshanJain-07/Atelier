@@ -11,16 +11,16 @@ Generating Network Topology (Sparse KNN Adjacency Matrix)...
 Society Generated in 'society_data' (Bias-Free)
 
 [ Running 50 Iterations of the Same Wealth Threat (-0.8) ]
-Iteration 1 (Fresh): Average Engagement = 0.0635
-Iteration 50 (Fatigued): Average Engagement = 0.1006
+Iteration 1 (Fresh): Average Engagement = 0.0634
+Iteration 50 (Fatigued): Average Engagement = 0.0993
 
 [ Society is now heavily desensitized to Wealth Threats but carries massive internal stress ]
 
 [ The Spark: A Minor New Threat (Physical Safety -0.2) ]
-Average Engagement (Trigger Stacked): 0.0426
+Average Engagement (Trigger Stacked): 0.0410
 
 [ Baseline: Same Minor Safety Threat on FRESH Society (No Memory) ]
-Average Engagement (Baseline / Calm): 0.0077
+Average Engagement (Baseline / Calm): 0.0074
 
 --------------------------------------------------------
 Running: research_paper_tests/test_algorithmic_filter_bubble.py
@@ -42,15 +42,15 @@ The algorithm noticed high engagement in these dimensions:
 Mutated Tensor: Innovation: 0.20, Freedom: -0.20
 
 [ Results ]
-Average Engagement (Without Algorithm): 0.0054
-Average Engagement (With Algorithm):    0.0168
-Total Engagement Increase:              212.5%
+Average Engagement (Without Algorithm): 0.0052
+Average Engagement (With Algorithm):    0.0167
+Total Engagement Increase:              222.1%
 
 --------------------------------------------------------
 Running: research_paper_tests/test_bimodality_polarization.py
 --------------------------------------------------------
 /home/darshan/Desktop/djsce/BE_Project/society_evolution.py:155: UserWarning: The given NumPy array is not writable, and PyTorch does not support non-writable tensors. This means writing to this tensor will result in undefined behavior. You may want to copy the array to protect its data or make it writable before converting it to a tensor. This type of warning will be suppressed for the rest of this program. (Triggered internally at /pytorch/torch/csrc/utils/tensor_numpy.cpp:213.)
-  target_mean = self.exposures[torch.from_numpy(elite_mask)].mean(dim=0)
+  target_exposures = self.exposures[torch.from_numpy(elite_mask)]
 --- Running Bimodality Coefficient (Polarization) Analysis ---
 
 Generating Initial Society...
@@ -101,11 +101,11 @@ Applying economic shock at generation 198, multiplier 0.85
 Applying economic shock at generation 200, multiplier 0.85
 
 [ Final Distribution Analysis ]
-  Fairness     | Final BC: 0.941 | Change: +0.591 | Trend: INCREASING (Polarizing)
+  Fairness     | Final BC: 0.962 | Change: +0.612 | Trend: INCREASING (Polarizing)
     -> WARNING: The society is structurally polarized on Fairness.
-  Innovation   | Final BC: 0.943 | Change: +0.611 | Trend: INCREASING (Polarizing)
+  Innovation   | Final BC: 0.963 | Change: +0.631 | Trend: INCREASING (Polarizing)
     -> WARNING: The society is structurally polarized on Innovation.
-  In_Group     | Final BC: 0.943 | Change: +0.604 | Trend: INCREASING (Polarizing)
+  In_Group     | Final BC: 0.964 | Change: +0.625 | Trend: INCREASING (Polarizing)
     -> WARNING: The society is structurally polarized on In_Group.
   Wealth       | Final BC: 0.507 | Change: +0.084 | Trend: INCREASING (Polarizing)
 
@@ -131,7 +131,7 @@ Processed 4000/4000 seeds...
 [ Results ]
 Total Seeds: 4000
 Cascades > 1 hop: 40
-Max Cascade Size: 1585 agents
+Max Cascade Size: 1581 agents
 
 [ Plotting Log-Log Distribution ]
 Plot saved to: /home/darshan/Desktop/djsce/BE_Project/research_paper_tests/cascade_power_law.png
@@ -159,8 +159,8 @@ Applying economic shock at generation 29, multiplier 0.87
 
 [ Generation 30: Final Society ]
 Building 5-NN Social Graph for 10000 agents...
-Final Network Assortativity on Fairness: 0.464
-Change in Assortativity: +0.011 -> FORMING ECHO CHAMBERS
+Final Network Assortativity on Fairness: 0.472
+Change in Assortativity: +0.019 -> FORMING ECHO CHAMBERS
 
 --------------------------------------------------------
 Running: research_paper_tests/test_endogenous_events.py
@@ -190,15 +190,15 @@ Running: research_paper_tests/test_ideological_influence_gini.py
 
 --- Running Ideological Influence Analysis: Standard Lognormal Influence ---
 Influence Gini Coefficient: 0.603
-Top 1% Agents control: 12.5% of total societal influence
-Top 5% Agents control: 32.8% of total societal influence
+Top 1% Agents control: 12.2% of total societal influence
+Top 5% Agents control: 32.6% of total societal influence
 Top 20% Agents control: 64.0% of total societal influence
 
 --- Running Ideological Influence Analysis: Power-Law (Pareto) Influence ---
-Influence Gini Coefficient: 0.808
-Top 1% Agents control: 41.6% of total societal influence
-Top 5% Agents control: 63.3% of total societal influence
-Top 20% Agents control: 83.8% of total societal influence
+Influence Gini Coefficient: 0.842
+Top 1% Agents control: 54.5% of total societal influence
+Top 5% Agents control: 70.3% of total societal influence
+Top 20% Agents control: 86.5% of total societal influence
 
 --------------------------------------------------------
 Running: research_paper_tests/test_influence_susceptibility_ratio.py
@@ -223,24 +223,24 @@ Definition:
  - In-degree: Number of times an agent was highly engaged by the 200 shared thoughts.
  - Ratio: Out-degree / In-degree (Higher = More influential & less susceptible)
 
-Average Out-degree: 35.09 (± 32.72)
-  Min: 4.0, Max: 371.0
-  25th: 21.0, 50th: 28.0, 75th: 38.25, 95th: 80.24999999999991
+Average Out-degree: 34.71 (± 31.36)
+  Min: 4.0, Max: 348.0
+  25th: 21.0, 50th: 28.0, 75th: 38.0, 95th: 80.24999999999991
 
-Average In-degree:  4.37 (± 7.98)
+Average In-degree:  4.34 (± 7.97)
   Min: 0.0, Max: 33.0
   25th: 0.0, 50th: 0.0, 75th: 4.0, 95th: 23.049999999999983
 
-Average Ratio:      24.723 (± 34.748)
-  Min: 0.647, Max: 371.000
-  25th: 5.650, 50th: 17.500, 75th: 32.250, 95th: 69.150
+Average Ratio:      24.572 (± 33.364)
+  Min: 0.647, Max: 348.000
+  25th: 5.650, 50th: 18.250, 75th: 32.250, 95th: 69.150
 
 [!] Saved distribution plots to: /home/darshan/Desktop/djsce/BE_Project/research_paper_tests/influence_susceptibility.png
 
 Top Influencer (by Out-degree):
-  Out-degree: 371.0
+  Out-degree: 348.0
   In-degree:  0.0
-  Ratio:      371.000
+  Ratio:      348.000
 
 Most Susceptible Agent (by In-degree):
   Out-degree: 22.0
@@ -248,22 +248,22 @@ Most Susceptible Agent (by In-degree):
   Ratio:      0.647
 
 Highest Influence/Susceptibility Ratio Agent:
-  Out-degree: 371.0
+  Out-degree: 348.0
   In-degree:  0.0
-  Ratio:      371.000
+  Ratio:      348.000
 
 [ Statistical Correlations ]
-Correlation (Out-degree vs In-degree): -0.080 (p=0.2587)
+Correlation (Out-degree vs In-degree): -0.079 (p=0.2659)
   -> NO STRONG LINK: Influence and susceptibility are largely independent traits in this society.
 
-Correlation (Structural Influence vs Organic Ratio): 0.815 (p=0.0000)
+Correlation (Structural Influence vs Organic Ratio): 0.797 (p=0.0000)
   -> ALIGNED: Agents assigned high structural influence naturally command a high Influence/Susceptibility ratio.
 
 --------------------------------------------------------
 Running: research_paper_tests/test_louvain_modularity.py
 --------------------------------------------------------
 /home/darshan/Desktop/djsce/BE_Project/society_evolution.py:155: UserWarning: The given NumPy array is not writable, and PyTorch does not support non-writable tensors. This means writing to this tensor will result in undefined behavior. You may want to copy the array to protect its data or make it writable before converting it to a tensor. This type of warning will be suppressed for the rest of this program. (Triggered internally at /pytorch/torch/csrc/utils/tensor_numpy.cpp:213.)
-  target_mean = self.exposures[torch.from_numpy(elite_mask)].mean(dim=0)
+  target_exposures = self.exposures[torch.from_numpy(elite_mask)]
 --- Running Network Modularity (Louvain) Analysis ---
 
 [ Generation 0: Initial Society ]
@@ -282,12 +282,12 @@ Applying economic shock at generation 34, multiplier 0.84
 
 [ Generation 50: Final Society ]
 Building Threshold Graph (t=0.9) for 2000 agents...
-Final Network Modularity (Q): 0.1727
-Final Number of Major Communities (>10 agents): 12
+Final Network Modularity (Q): 0.2774
+Final Number of Major Communities (>10 agents): 18
 
 [ Analysis ]
 Note: Modularity (Q) > 0.3 typically indicates strong, dense community structure (Echo Chambers).
-Change in Modularity: -0.8175
+Change in Modularity: -0.7128
 -> The society remains a relatively fluid, interconnected web.
 
 --------------------------------------------------------
@@ -315,7 +315,7 @@ Max Outrage Multiplier: 11.0x
 In your 'outrage_boost' formula: 1.0 + max_multiplier * torch.sigmoid(outrage_gain * (viral_energy - midpoint))
 Midpoint = 0.5
 Where: viral_energy = arousal (emotional magnitude) * normalized_engagement
-If an agent is not actively engaged, or their emotional reaction is very weak, their viral energy stays low
+If an agent is not actively engaged, or their emotional reaction is very weak, their viral energy stays low 
 and they do not contribute to the viral spread.
 
 --------------------------------------------------------
@@ -363,13 +363,13 @@ Society Generated in 'society_data' (Bias-Free)
 Definition: R0 is the average number of secondary agents highly engaged (score > 0.5) by a single agent's thought.
 If Average R0 > 1, the network is fundamentally susceptible to viral cascades.
 
-Average R0:             26.035 (± 18.072)
-Max R0 (Most Viral):    81
+Average R0:             26.005 (± 18.035)
+Max R0 (Most Viral):    80
 Super-spreaders (R0≥5): 178 out of 200 seeds (89.0%)
 Viral Cascade Potential: YES
 
 [ Bias Check: Extremity vs Virality ]
-Correlation between Thought Extremity and R0: 0.061 (p-value: 0.3910)
+Correlation between Thought Extremity and R0: 0.059 (p-value: 0.4035)
 -> NO SIGNIFICANT BIAS: Virality is not purely driven by how extreme the thought is.
 
 --------------------------------------------------------
@@ -381,16 +381,16 @@ Gen 0   | Gini: 0.691 | Top 5% hold 48.2% of wealth
 Applying economic shock at generation 2, multiplier 0.80
 Applying economic shock at generation 3, multiplier 0.82
 Applying economic shock at generation 4, multiplier 0.85
-Gen 10  | Gini: 0.256 | Top 5% hold 21.5% of wealth
+Gen 10  | Gini: 0.258 | Top 5% hold 21.8% of wealth
 Applying economic shock at generation 26, multiplier 0.82
 Applying economic shock at generation 30, multiplier 0.83
-Gen 50  | Gini: 0.224 | Top 5% hold 17.4% of wealth
+Gen 50  | Gini: 0.221 | Top 5% hold 17.3% of wealth
 Applying economic shock at generation 68, multiplier 0.85
 Applying economic shock at generation 76, multiplier 0.81
 Applying economic shock at generation 77, multiplier 0.82
 Applying economic shock at generation 91, multiplier 0.82
 Applying economic shock at generation 94, multiplier 0.84
-Gen 100 | Gini: 0.006 | Top 5% hold 83.8% of wealth
+Gen 100 | Gini: 0.009 | Top 5% hold 80.7% of wealth
 Applying economic shock at generation 102, multiplier 0.83
 Applying economic shock at generation 106, multiplier 0.81
 Applying economic shock at generation 112, multiplier 0.84
@@ -415,17 +415,17 @@ Applying economic shock at generation 256, multiplier 0.81
 Applying economic shock at generation 263, multiplier 0.89
 Applying economic shock at generation 274, multiplier 0.85
 Applying economic shock at generation 280, multiplier 0.81
-Gen 300 | Gini: 0.004 | Top 5% hold 88.2% of wealth
+Gen 300 | Gini: 0.004 | Top 5% hold 88.0% of wealth
 
 --- Running Experiment: Uniform Base Wealth Start ---
 Gen 0   | Gini: 0.000 | Top 5% hold 100.0% of wealth
 Applying economic shock at generation 2, multiplier 0.81
-Gen 10  | Gini: 0.194 | Top 5% hold 14.6% of wealth
+Gen 10  | Gini: 0.195 | Top 5% hold 14.6% of wealth
 Applying economic shock at generation 16, multiplier 0.85
 Applying economic shock at generation 27, multiplier 0.87
 Applying economic shock at generation 31, multiplier 0.87
 Applying economic shock at generation 39, multiplier 0.86
-Gen 50  | Gini: 0.222 | Top 5% hold 17.6% of wealth
+Gen 50  | Gini: 0.221 | Top 5% hold 17.6% of wealth
 Applying economic shock at generation 55, multiplier 0.85
 Applying economic shock at generation 61, multiplier 0.81
 Applying economic shock at generation 75, multiplier 0.86
@@ -433,7 +433,7 @@ Applying economic shock at generation 81, multiplier 0.89
 Applying economic shock at generation 90, multiplier 0.89
 Applying economic shock at generation 92, multiplier 0.86
 Applying economic shock at generation 100, multiplier 0.88
-Gen 100 | Gini: 0.031 | Top 5% hold 33.7% of wealth
+Gen 100 | Gini: 0.031 | Top 5% hold 32.7% of wealth
 Applying economic shock at generation 107, multiplier 0.90
 Applying economic shock at generation 108, multiplier 0.86
 Applying economic shock at generation 121, multiplier 0.83
@@ -456,7 +456,7 @@ Applying economic shock at generation 261, multiplier 0.87
 Applying economic shock at generation 264, multiplier 0.90
 Applying economic shock at generation 265, multiplier 0.89
 Applying economic shock at generation 281, multiplier 0.87
-Gen 300 | Gini: 0.004 | Top 5% hold 87.4% of wealth
+Gen 300 | Gini: 0.004 | Top 5% hold 88.4% of wealth
 
 ===========================================
 All tests completed. Results saved to test_results_output.txt

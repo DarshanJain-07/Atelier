@@ -122,6 +122,45 @@ class AttentionContext:
 
         return self
 
+    def selective_exposure_layer(self):
+        """
+        The 'Triple-Filter-Bubble' Cognitive Gate.
+        If the event fundamentally contradicts the agent's core values, and they have low Openness,
+        they will completely ignore it (Confirmation Bias).
+        """
+        if getattr(self.config, "use_selective_exposure", True) is False:
+            return self
+            
+        if self.Q is None:
+            raise ValueError("selective_exposure_layer called before Q is initialized")
+
+        # Normalize the incoming event (World Tensor) and the agent's worldview (Exposures)
+        # Note: self.world_tensor is (N, 12) because of signal distortion
+        event_norm = self.world_tensor / (torch.norm(self.world_tensor, dim=1, keepdim=True) + 1e-8)
+        
+        # We use a copy of the original exposures to represent their deep-seated worldview
+        # self.exposures is (N, 12)
+        agent_norms = self.exposures / (torch.norm(self.exposures, dim=1, keepdim=True) + 1e-8)
+        
+        # Cosine Similarity between agent worldview and the event per agent
+        # Element-wise multiplication followed by sum along dimension 1 -> Shape: (N, 1)
+        alignment = (agent_norms * event_norm).sum(dim=1, keepdim=True)
+        
+        # Agents with low Openness are more likely to filter out opposing views
+        openness = self.personalities[:, 0:1]
+        
+        # Calculate tolerance threshold (agents with high openness tolerate more negative alignment)
+        base_tolerance = getattr(self.config, "selective_exposure_base_tolerance", -0.3)
+        tolerance = base_tolerance - (openness * getattr(self.config, "selective_exposure_openness_factor", 0.4))
+        
+        # If alignment is below the agent's tolerance, they block the information (Filter Bubble activates)
+        is_blocked = (alignment < tolerance).float()
+        
+        # Force Q to near zero for blocked agents
+        self.Q = self.Q * (1.0 - is_blocked)
+        
+        return self
+
     def key_processing_layer(self):
         personalities = self.personalities
         neuroticism = personalities[:, 4:5]

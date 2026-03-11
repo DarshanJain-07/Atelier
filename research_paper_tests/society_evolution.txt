@@ -8,7 +8,7 @@ Here is a drafted section you can adapt for your research paper. It uses appropr
 
   1. Objective
   A critical concern in socio-economic simulation is whether the initialization parameters impose artificial structural biases on the model’s
-  emergent properties. In the Syntheti-Soc engine, initial agent wealth is synthesized using a multi-regime statistical distribution (exponential,
+  emergent properties. In the  engine, initial agent wealth is synthesized using a multi-regime statistical distribution (exponential,
   lognormal, and Pareto tails). To ensure this initialization does not act as an artificial constraint, an experiment was conducted to evaluate
   the long-term ergodicity of the model’s wealth distribution under the evolutionary physics engine.
 

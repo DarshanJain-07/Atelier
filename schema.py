@@ -192,7 +192,7 @@ CROSS_DIM_INTERACTIONS[6, 11] = 0.3  # Innovation -> Long_Term
 @dataclass
 class SimConfig:
     """
-    Central configuration for the Syntheti-Soc simulation.
+    Central configuration for the simulation.
     Controls infrastructure and research feature toggles.
     """
 

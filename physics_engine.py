@@ -79,7 +79,7 @@ class SocialPhysicsEngine:
         weights = weights / weights.sum()
 
         # ============================================================
-        # 1️⃣ Objective Center of Gravity (Global)
+        # Objective Center of Gravity (Global)
         # ============================================================
         center_of_gravity = (emotion_tensor * weights.unsqueeze(1)).sum(dim=0)
 
@@ -89,21 +89,59 @@ class SocialPhysicsEngine:
         if adjacency_matrix is not None:
             # Each agent's emotional baseline is now the weighted average of their connections
             # adjacency_matrix is row-normalized, so mm acts as a weighted mean
-            local_centers = torch.smm(
-                adjacency_matrix.to(emotion_tensor.device), emotion_tensor
+            # Convert to dense to avoid sparse operation limitations on some CPU builds
+            local_centers = torch.mm(
+                adjacency_matrix.to(emotion_tensor.device).to_dense(), emotion_tensor
             )
         else:
             # If no topology, the local context is just the global context for everyone
             local_centers = center_of_gravity.unsqueeze(0).expand(N, -1)
 
         # ============================================================
-        # 2️⃣ Nonlinear Outrage Contagion (Viral State)
+        # Nonlinear Outrage Contagion (Viral State)
         # ============================================================
 
-        # Outrage is now triggered by how far you are from your LOCAL echo chamber.
-        # If your echo chamber is calm but you are furious, you generate huge virality.
-        # If your whole echo chamber is furious with you, it's just normal consensus for your bubble (lower virality boost).
-        distances = torch.norm(emotion_tensor - local_centers, dim=1)
+        # First Principles Virality:
+        # 1. Emotional Arousal: Absolute intensity of the emotion.
+        # 2. Active Engagement: Is the agent actually paying attention to THIS event?
+        # 3. Echo Chamber Amplification: If an agent's highly aroused state is validated by their
+        #    immediate peers (local_centers), it creates a denser feedback loop, amplifying virality.
+
+        # Arousal is the raw magnitude of the emotion
+        arousal = torch.norm(emotion_tensor, dim=1)
+
+        # If we have cognitive engagement scores, use them as the catalyst
+        if engagement_scores is not None:
+            # Normalize engagement to act as a multiplier (0.0 to ~2.0)
+            normalized_engagement = engagement_scores / (
+                engagement_scores.mean() + 1e-9
+            )
+            viral_energy = arousal * normalized_engagement
+        else:
+            viral_energy = arousal
+
+        # Network Validation Boost
+        # How closely aligned is the agent's emotion with their echo chamber?
+        # Cosine similarity between agent emotion and local center emotion
+        # (normalized dot product)
+        norm_emotion = emotion_tensor / (arousal.unsqueeze(1) + 1e-9)
+
+        # Ensure local_centers is dense before calculating norm
+        if local_centers.is_sparse:
+            local_centers = local_centers.to_dense()
+
+        local_arousal = torch.norm(local_centers, dim=1)
+        norm_local = local_centers / (local_arousal.unsqueeze(1) + 1e-9)
+
+        # Alignment is between -1.0 (opposite) and 1.0 (perfectly aligned)
+        alignment = (norm_emotion * norm_local).sum(dim=1)
+
+        # Map alignment from [-1, 1] to [0.0, 2.0]
+        # Disagreement dampens the spark (0.0x), fierce agreement fuels it heavily (2.0x)
+        validation_multiplier = 1.0 + alignment
+
+        # Apply the validation boost to the viral energy
+        viral_energy = viral_energy * validation_multiplier
 
         outrage_gain = self.config.outrage_gain
 
@@ -112,8 +150,9 @@ class SocialPhysicsEngine:
         max_multiplier = self.config.max_viral_multiplier
         midpoint = self.config.saturation_midpoint
 
+        # Calculate the boost based on the combined viral energy
         outrage_boost = 1.0 + max_multiplier * torch.sigmoid(
-            outrage_gain * (distances - midpoint)
+            outrage_gain * (viral_energy - midpoint)
         )
 
         viral_weights = weights * outrage_boost
@@ -122,7 +161,7 @@ class SocialPhysicsEngine:
         viral_center = (emotion_tensor * viral_weights.unsqueeze(1)).sum(dim=0)
 
         # ============================================================
-        # 3️⃣ Elite Emotional Center
+        # Elite Emotional Center
         # ============================================================
 
         elite_percentile = self.config.elite_percentile
@@ -137,11 +176,12 @@ class SocialPhysicsEngine:
             elite_center = center_of_gravity.clone()
 
         # ============================================================
-        # 4️⃣ Polarization Metrics
+        # Polarization Metrics
         # ============================================================
 
-        # A. Dispersion-based polarization
-        polarization = (distances * weights).sum().item()
+        # A. Dispersion-based polarization (Global dispersion)
+        global_distances = torch.norm(emotion_tensor - center_of_gravity, dim=1)
+        polarization = (global_distances * weights).sum().item()
 
         # B. Emotional entropy (fragmentation)
         # Normalize center_of_gravity to act as a probability distribution for entropy calculation
@@ -157,7 +197,7 @@ class SocialPhysicsEngine:
         bimodality = projections.std().item()
 
         # ============================================================
-        # 5️⃣ 1D Sentiment/Valence (My Idea)
+        # 1D Sentiment/Valence (My Idea)
         # ============================================================
         # Plutchik Valence mapping:
         # Positive: Joy (+1), Trust (+0.5), Anticipation (+0.5), Surprise (0)
@@ -168,7 +208,7 @@ class SocialPhysicsEngine:
         valence_score = torch.dot(center_of_gravity, VALENCE_WEIGHTS).item()
 
         # ============================================================
-        # 6️⃣ Dominant Emotion (Viral State)
+        # Dominant Emotion (Viral State)
         # ============================================================
 
         max_val, dominant_idx = torch.max(viral_center, dim=0)
@@ -181,13 +221,13 @@ class SocialPhysicsEngine:
             dominant_label = EMOTION_LABELS[int(dominant_idx.item())]
 
         # ============================================================
-        # 7️⃣ Elite–Population Divergence
+        # Elite–Population Divergence
         # ============================================================
 
         elite_divergence = torch.norm(elite_center - center_of_gravity).item()
 
         # ============================================================
-        # 8️⃣ Endogenous Event Generation
+        # Endogenous Event Generation
         # ============================================================
 
         action_vector = None

@@ -33,12 +33,21 @@ def test_topology():
     print(f"Average edges per agent: {adjacency._nnz() / config_topo.num_agents:.1f}")
 
     # Let's create a highly polarized emotional state to test if topology changes the physics.
-    # Group A (first 1000) are Furious (Anger index = 4)
-    # Group B (last 1000) are Joyful (Joy index = 0)
+    # We must assign emotions based on their actual positions in the topology so that
+    # the echo chambers match the emotional split. 
+    # We will sort by their first coordinate (e.g., Wealth exposure)
+    sorted_indices = torch.argsort(exposures[:, 0])
+
     N = config_topo.num_agents
     emotion_tensor = torch.zeros(N, 8)
-    emotion_tensor[:1000, 4] = 1.0  # Anger
-    emotion_tensor[1000:, 0] = 1.0  # Joy
+    
+    # Bottom 50% (Group A) are Furious (Anger index = 4)
+    # Top 50% (Group B) are Joyful (Joy index = 0)
+    emotion_tensor[sorted_indices[:1000], 4] = 1.0  # Anger
+    emotion_tensor[sorted_indices[1000:], 0] = 1.0  # Joy
+    
+    # Give everyone high engagement so they generate virality
+    engagement = torch.ones(N)
 
     influence = df_meta["Influence"].values
 
@@ -47,29 +56,29 @@ def test_topology():
     print("\n[ Running Physics Engine WITHOUT Topology (Global Center) ]")
     # By passing None for adjacency, it defaults to the old Global Center method
     state_no_topo = phys_engine.aggregate_society(
-        emotion_tensor, influence, adjacency_matrix=None
+        emotion_tensor, influence, engagement_scores=engagement, adjacency_matrix=None
     )
     print(
         f"Mean Outrage Multiplier (Virality): {state_no_topo['mean_outrage_multiplier']}x"
     )
 
     print("\n[ Running Physics Engine WITH Topology (Local Echo Chambers) ]")
-    # By passing adjacency, outrage is measured against their LOCAL echo chamber.
+    # By passing adjacency, outrage is validated against their LOCAL echo chamber.
     # Since they are connected via homophily, Group A mostly connects to Group A.
-    # So their "local center" agrees with them, which should mathematically REDUCE their personal outrage
+    # So their "local center" agrees with them, which should mathematically BOOST their personal outrage
     # compared to the global model where half the world disagrees with them.
     state_topo = phys_engine.aggregate_society(
-        emotion_tensor, influence, adjacency_matrix=adjacency
+        emotion_tensor, influence, engagement_scores=engagement, adjacency_matrix=adjacency
     )
     print(
         f"Mean Outrage Multiplier (Virality): {state_topo['mean_outrage_multiplier']}x"
     )
 
     diff = (
-        state_no_topo["mean_outrage_multiplier"] - state_topo["mean_outrage_multiplier"]
+        state_topo["mean_outrage_multiplier"] - state_no_topo["mean_outrage_multiplier"]
     )
     print(
-        f"\nConclusion: Echo chambers reduced algorithmic virality by {diff:.2f}x because agents felt their 'local neighborhood' agreed with them, preventing the massive outrage spikes seen in the global broadcast model."
+        f"\nConclusion: Echo chambers AMPLIFIED algorithmic virality by {diff:.2f}x because agents felt their 'local neighborhood' validated their extreme emotion, creating denser feedback loops than the global broadcast model."
     )
 
 

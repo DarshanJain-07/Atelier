@@ -26,3 +26,19 @@ Prompt to generate more cases: i have designed a game, where you can predict an 
 11. We are debating whether to use generative AI to replace a portion of our customer support and creative teams, framing it as an efficiency and scalability initiative.
 
 12. We are planning to increase prices by 15% while simultaneously investing heavily in brand storytelling to reinforce premium perception.
+
+
+i have built a reaction sentiment prediction model
+
+i need some test prompts like:
+
+President Trump’s energy agenda has resulted in oil and gas production reaching the highest levels ever recorded.
+
+To enable oil to keep flowing into the global market, the Treasury Department is issuing a temporary 30-day waiver to allow Indian refiners to purchase Russian oil. This deliberately short-term measure will not provide significant financial benefit to the Russian government as it only authorizes transactions involving oil already stranded at sea.
+
+India is an essential partner of the United States, and we fully anticipate that New Delhi will ramp up purchases of U.S. oil. This stop-gap measure will alleviate pressure caused by Iran’s attempt to take global energy hostage.
+
+this is a real world twitter tweet
+
+
+Maintaining stable energy flows is critical for global economic stability, and cooperation between nations will remain essential.

@@ -43,49 +43,7 @@ let width, height, centerX, centerY;
 let clusterSpread = 1.0;
 
 // --- BATCH STATE ---
-  let batchRuns = [
-  {
-    id: Date.now(),
-    seed: 42,
-    temperature: 0.7,
-    emotion_temperature: 0.2,
-    panic_threshold: -1.2,
-    region: "All",
-    social_class: "All",
-    agent_count: 5000,
-    use_distortion: true,
-    use_pressure: true,
-    use_maslow: true,
-    use_power_law: true,
-    use_agent_memory: true,
-    use_algorithmic_amplification: true,
-    use_network_topology: true,
-    enable_evolution: true,
-    cross_dim_interaction_strength: 0.3,
-    threat_sensitivity_gain: 1.5,
-    k_processing_tanh_gain: 1.5,
-    relevance_importance_weight: 0.7,
-    relevance_base_weight: 0.3,
-    threat_amplifier_gain: 1.5,
-    stress_neurotic_amplification: 1.5,
-    stress_openness_reduction: 0.5,
-    stress_extraversion_boost: 0.7,
-    outrage_gain: 5.0,
-    max_viral_multiplier: 10.0,
-    saturation_midpoint: 0.5,
-    distortion_max_noise: 0.4,
-    distortion_neurotic_gain: 0.6,
-    evolution_generations: 10,
-    inheritance_fraction: 0.7,
-    shock_frequency: 0.1,
-    shock_magnitude: 0.2,
-    algo_sample_size: 0.1,
-    algo_exaggeration_factor: 1.5,
-    memory_decay_rate: 0.7,
-    memory_desensitization_gain: 0.5,
-    memory_trigger_stacking_gain: 1.2,
-  },
-];
+let batchRuns = [];
 let currentBatchResults = [];
 
 const historyPanel = document.getElementById("history-panel");
@@ -98,13 +56,22 @@ function renderBatchUI() {
   const container = document.getElementById("batch-container");
   container.innerHTML = "";
 
+  if (batchRuns.length === 0) {
+    const emptyMsg = document.createElement("div");
+    emptyMsg.className = "empty-history-msg";
+    emptyMsg.style.padding = "10px 0";
+    emptyMsg.textContent = "No extra experiments added.";
+    container.appendChild(emptyMsg);
+    return;
+  }
+
   batchRuns.forEach((run, index) => {
     const item = document.createElement("div");
     item.className = "batch-item";
     item.innerHTML = `
             <div class="batch-header">
                 <span class="batch-title">EXPERIMENT ${index + 1}</span>
-                ${batchRuns.length > 1 ? `<button class="batch-remove" onclick="removeRun(${run.id})">&times;</button>` : ""}
+                <button class="batch-remove" onclick="removeRun(${run.id})">&times;</button>
             </div>
             <div class="sidebar-grid">
                 <div class="sidebar-field">
@@ -190,47 +157,94 @@ window.debouncedUpdateRun = debounce(window.updateRun, 50);
 
 document.getElementById("btn-add-run").addEventListener("click", () => {
   if (batchRuns.length >= 6) return;
-  const last = batchRuns[batchRuns.length - 1];
+  
+  let defaults;
+  if (batchRuns.length > 0) {
+    defaults = batchRuns[batchRuns.length - 1];
+  } else {
+    // Use current UI values
+    defaults = {
+        temperature: parseFloat(document.getElementById("param-temp").value),
+        emotion_temperature: parseFloat(document.getElementById("param-emotion-temp").value || 0.2),
+        panic_threshold: parseFloat(document.getElementById("param-panic-thresh").value || -1.2),
+        region: "All",
+        social_class: document.getElementById("filter-class").value,
+        agent_count: parseInt(document.getElementById("param-count").value),
+        use_distortion: document.getElementById("tog-distortion").classList.contains("active"),
+        use_pressure: document.getElementById("tog-pressure").classList.contains("active"),
+        use_maslow: document.getElementById("tog-maslow").classList.contains("active"),
+        use_power_law: document.getElementById("tog-power-law").classList.contains("active"),
+        use_agent_memory: document.getElementById("tog-memory").classList.contains("active"),
+        use_algorithmic_amplification: document.getElementById("tog-algo-amp").classList.contains("active"),
+        use_network_topology: document.getElementById("tog-network").classList.contains("active"),
+        enable_evolution: document.getElementById("tog-evolution").classList.contains("active"),
+        // researcher defaults (can be expanded to read from UI if needed)
+        cross_dim_interaction_strength: parseFloat(document.getElementById("res-cross-dim")?.value || 0.3),
+        threat_sensitivity_gain: parseFloat(document.getElementById("res-threat-sens")?.value || 1.5),
+        k_processing_tanh_gain: parseFloat(document.getElementById("res-k-process")?.value || 1.5),
+        relevance_importance_weight: parseFloat(document.getElementById("res-rel-imp")?.value || 0.7),
+        relevance_base_weight: parseFloat(document.getElementById("res-rel-base")?.value || 0.3),
+        threat_amplifier_gain: parseFloat(document.getElementById("res-threat-amp")?.value || 1.5),
+        stress_neurotic_amplification: parseFloat(document.getElementById("res-stress-neur")?.value || 1.5),
+        stress_openness_reduction: parseFloat(document.getElementById("res-stress-open")?.value || 0.5),
+        stress_extraversion_boost: parseFloat(document.getElementById("res-stress-ext")?.value || 0.7),
+        outrage_gain: parseFloat(document.getElementById("res-outrage")?.value || 5.0),
+        max_viral_multiplier: parseFloat(document.getElementById("res-viral")?.value || 10.0),
+        saturation_midpoint: parseFloat(document.getElementById("res-sat")?.value || 0.5),
+        distortion_max_noise: parseFloat(document.getElementById("res-dist-max")?.value || 0.4),
+        distortion_neurotic_gain: parseFloat(document.getElementById("res-dist-neur")?.value || 0.6),
+        evolution_generations: parseInt(document.getElementById("res-evo-gen")?.value || 10),
+        inheritance_fraction: parseFloat(document.getElementById("res-evo-inh")?.value || 0.7),
+        shock_frequency: parseFloat(document.getElementById("res-evo-shock-freq")?.value || 0.1),
+        shock_magnitude: parseFloat(document.getElementById("res-evo-shock-mag")?.value || 0.2),
+        algo_sample_size: parseFloat(document.getElementById("res-algo-sample")?.value || 0.1),
+        algo_exaggeration_factor: parseFloat(document.getElementById("res-algo-exagg")?.value || 1.5),
+        memory_decay_rate: parseFloat(document.getElementById("res-mem-decay")?.value || 0.7),
+        memory_desensitization_gain: parseFloat(document.getElementById("res-mem-desens")?.value || 0.5),
+        memory_trigger_stacking_gain: parseFloat(document.getElementById("res-mem-trigger")?.value || 1.2),
+    };
+  }
+
   batchRuns.push({
     id: Date.now(),
-    seed: Math.floor(Math.random() * 10000),
-    temperature: last.temperature,
-    emotion_temperature: last.emotion_temperature,
-    panic_threshold: last.panic_threshold,
-    region: last.region,
-    social_class: last.social_class,
-    agent_count: last.agent_count,
-    use_distortion: last.use_distortion,
-    use_pressure: last.use_pressure,
-    use_maslow: last.use_maslow,
-    use_power_law: last.use_power_law,
-    use_agent_memory: last.use_agent_memory,
-    use_algorithmic_amplification: last.use_algorithmic_amplification,
-    use_network_topology: last.use_network_topology,
-    enable_evolution: last.enable_evolution,
-    algo_sample_size: last.algo_sample_size,
-    algo_exaggeration_factor: last.algo_exaggeration_factor,
-    memory_decay_rate: last.memory_decay_rate,
-    memory_desensitization_gain: last.memory_desensitization_gain,
-    memory_trigger_stacking_gain: last.memory_trigger_stacking_gain,
-    cross_dim_interaction_strength: last.cross_dim_interaction_strength,
-    threat_sensitivity_gain: last.threat_sensitivity_gain,
-    k_processing_tanh_gain: last.k_processing_tanh_gain,
-    relevance_importance_weight: last.relevance_importance_weight,
-    relevance_base_weight: last.relevance_base_weight,
-    threat_amplifier_gain: last.threat_amplifier_gain,
-    stress_neurotic_amplification: last.stress_neurotic_amplification,
-    stress_openness_reduction: last.stress_openness_reduction,
-    stress_extraversion_boost: last.stress_extraversion_boost,
-    outrage_gain: last.outrage_gain,
-    max_viral_multiplier: last.max_viral_multiplier,
-    saturation_midpoint: last.saturation_midpoint,
-    distortion_max_noise: last.distortion_max_noise,
-    distortion_neurotic_gain: last.distortion_neurotic_gain,
-    evolution_generations: last.evolution_generations,
-    inheritance_fraction: last.inheritance_fraction,
-    shock_frequency: last.shock_frequency,
-    shock_magnitude: last.shock_magnitude,
+    seed: defaults.seed || 42,
+    temperature: defaults.temperature,
+    emotion_temperature: defaults.emotion_temperature,
+    panic_threshold: defaults.panic_threshold,
+    region: defaults.region,
+    social_class: defaults.social_class,
+    agent_count: defaults.agent_count,
+    use_distortion: defaults.use_distortion,
+    use_pressure: defaults.use_pressure,
+    use_maslow: defaults.use_maslow,
+    use_power_law: defaults.use_power_law,
+    use_agent_memory: defaults.use_agent_memory,
+    use_algorithmic_amplification: defaults.use_algorithmic_amplification,
+    use_network_topology: defaults.use_network_topology,
+    enable_evolution: defaults.enable_evolution,
+    algo_sample_size: defaults.algo_sample_size,
+    algo_exaggeration_factor: defaults.algo_exaggeration_factor,
+    memory_decay_rate: defaults.memory_decay_rate,
+    memory_desensitization_gain: defaults.memory_desensitization_gain,
+    memory_trigger_stacking_gain: defaults.memory_trigger_stacking_gain,
+    cross_dim_interaction_strength: defaults.cross_dim_interaction_strength,
+    threat_sensitivity_gain: defaults.threat_sensitivity_gain,
+    k_processing_tanh_gain: defaults.k_processing_tanh_gain,
+    relevance_importance_weight: defaults.relevance_importance_weight,
+    relevance_base_weight: defaults.relevance_base_weight,
+    threat_amplifier_gain: defaults.threat_amplifier_gain,
+    stress_neurotic_amplification: defaults.stress_neurotic_amplification,
+    stress_openness_reduction: defaults.stress_openness_reduction,
+    stress_extraversion_boost: defaults.stress_extraversion_boost,
+    outrage_gain: defaults.outrage_gain,
+    max_viral_multiplier: defaults.max_viral_multiplier,
+    saturation_midpoint: defaults.saturation_midpoint,
+    distortion_max_noise: defaults.distortion_max_noise,
+    distortion_neurotic_gain: defaults.distortion_neurotic_gain,
+    evolution_generations: defaults.evolution_generations,
+    inheritance_fraction: defaults.inheritance_fraction,
+    shock_frequency: defaults.shock_frequency,
+    shock_magnitude: defaults.shock_magnitude,
   });
   renderBatchUI();
 });
@@ -384,6 +398,7 @@ function displayResult(data) {
     const formatBold = (str) => str.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
     
     document.getElementById("ex-cognitive").innerHTML = formatBold(data.explainability.cognitive_drivers || "--");
+    document.getElementById("ex-reasoning").innerHTML = formatBold(data.reasoning || "--");
     document.getElementById("ex-shift-story").innerHTML = formatBold(data.explainability.shift_story || "--");
     document.getElementById("ex-viral").innerHTML = formatBold(data.explainability.viral_dynamics || "--");
     document.getElementById("ex-tug-of-war").innerHTML = formatBold(data.explainability.tug_of_war || "--");
@@ -410,10 +425,10 @@ function displayResult(data) {
         const item = document.createElement("div");
         item.className = "demo-item";
         item.innerHTML = `<div class="demo-item-name">${demo.name}</div><div class="demo-item-desc">${formatBold(demo.description)}</div>`;
-        demoList.appendChild(item);
+        demoContainer.appendChild(item);
       });
     } else {
-      demoList.innerHTML = "<div>No specific demographics found.</div>";
+      demoContainer.innerHTML = "<div>No specific demographics found.</div>";
     }
   } else {
     explainBtn.classList.add("hidden");

@@ -49,7 +49,7 @@ class WorldState(BaseModel):
     model_config = {"extra": "forbid"}
 
 
-def get_world_state(user_input: str) -> Tuple[torch.Tensor, float, bool, list[str]]:
+def get_world_state(user_input: str) -> Tuple[torch.Tensor, float, bool, list[str], str]:
     """
     Analyzes the news event using the LLM.
     Returns:
@@ -57,6 +57,7 @@ def get_world_state(user_input: str) -> Tuple[torch.Tensor, float, bool, list[st
         2. Urgency Score (float): 0.0 to 1.0 (Time Pressure).
         3. Personal Flag (bool): True if the event is about 'ME/MY/I'.
         4. Detected Biases (list[str]): List of biases detected in the text.
+        5. Reasoning (str): The chain of thought analysis from the LLM.
     """
 
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent"
@@ -213,7 +214,7 @@ def get_world_state(user_input: str) -> Tuple[torch.Tensor, float, bool, list[st
     print(f"> Detected Biases: {detected_biases}")
     print(f"> {result.Reasoning}\n--------------------")
 
-    return world_tensor, urgency, is_personal, detected_biases
+    return world_tensor, urgency, is_personal, detected_biases, result.Reasoning
 
 
 if __name__ == "__main__":
@@ -221,8 +222,9 @@ if __name__ == "__main__":
     news = "Introduction of new rules regarding flight time duty regulations of plane members severely impacting of major airlines"
     if not GEMINI_API_KEY:
         raise ValueError("GEMINI_API_KEY not found in .env file")
-    tensor, urg, pers, biases = get_world_state(news)
+    tensor, urg, pers, biases, reason = get_world_state(news)
     print(f"Biases: {biases}")
+    print(f"Reasoning: {reason}")
     print(f"Tensor: {tensor}")
     print(f"Urgency: {urg}")
     print(f"Personal: {pers}")

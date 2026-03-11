@@ -372,8 +372,8 @@ async def run_simulation(req: SimulationRequest, background_tasks: BackgroundTas
         if isinstance(llm_result, Exception):
             raise llm_result
 
-        llm_result = cast(Tuple[torch.Tensor, float, bool, list[str]], llm_result)
-        world_tensor, urgency, is_personal, detected_biases = llm_result
+        llm_result = cast(Tuple[torch.Tensor, float, bool, list[str], str], llm_result)
+        world_tensor, urgency, is_personal, detected_biases, reasoning = llm_result
 
         # Parse Baseline results
         baseline_result = results[1]
@@ -679,6 +679,7 @@ async def run_simulation(req: SimulationRequest, background_tasks: BackgroundTas
                     "agent_metadata": agent_data,
                     "endogenous_event": social_state.get("endogenous_event"),
                     "detected_biases": detected_biases,
+                    "reasoning": reasoning,
                 }
             )
 

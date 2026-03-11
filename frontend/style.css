@@ -1613,7 +1613,7 @@ input[type="range"]::-moz-range-track {
 .explain-section p {
     font-size: 0.85rem;
     line-height: 1.5;
-    color: var(--text-main);
+    color: var(--text-primary);
     margin: 0;
 }
 
@@ -1633,7 +1633,7 @@ input[type="range"]::-moz-range-track {
 .demo-item-name {
     font-size: 0.75rem;
     font-weight: 600;
-    color: var(--text-main);
+    color: var(--text-primary);
     margin-bottom: 4px;
 }
 .demo-item-desc {

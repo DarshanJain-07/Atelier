@@ -132,13 +132,12 @@ def create_topology(
     influence_scores: np.ndarray,
 ):
     """
-    Creates a sparse K-Nearest Neighbor adjacency matrix based on influence.
-    High influence = larger out-degree (k).
-    Edges are weighted by homophily (cosine similarity of traits).
+    Creates a sparse stochastic adjacency matrix based on Preferential Attachment and Homophily.
+    Agents probabilistically connect to others based on Cosine Similarity * Target Influence.
     """
     N = config.num_agents
 
-    # 1. Determine out-degree (k) per agent based on influence
+    # 1. Determine out-degree (k) per agent based on their own influence (bandwidth)
     inf_mean = np.mean(influence_scores)
     k_array = np.clip(
         (influence_scores / inf_mean) * config.base_connections,
@@ -146,7 +145,7 @@ def create_topology(
         config.max_connections,
     ).astype(int)
 
-    # 2. Build feature matrix for KNN
+    # 2. Build feature matrix for Homophily
     features = torch.cat([exposures, personalities], dim=1)
 
     # L2 normalize features
@@ -160,6 +159,10 @@ def create_topology(
     # Ensure inputs are on the same device
     device = exposures.device
     features_norm = features_norm.to(device)
+    
+    # Target influence for Preferential Attachment
+    inf_tensor = torch.tensor(influence_scores, dtype=torch.float32, device=device)
+    inf_tensor = inf_tensor / inf_tensor.mean()
 
     for i in range(0, N, batch_size):
         end = min(i + batch_size, N)
@@ -171,20 +174,29 @@ def create_topology(
 
         # Add homophily bias. Exponentiate to punish low similarity heavily.
         sim = torch.pow((sim + 1.0) / 2.0, getattr(config, "homophily_strength", 2.0))
+        
+        # Preferential Attachment: Scale probability by target's influence
+        prob_matrix = sim * inf_tensor.unsqueeze(0)
 
         # Self-loops must be removed
-        # Set self-similarity to -1.0 so they aren't picked by topk
+        # Set probability to 0.0 so they aren't picked by multinomial
         batch_indices = torch.arange(batch_size_actual, device=device)
         global_indices = batch_indices + i
-        sim[batch_indices, global_indices] = -1.0
+        prob_matrix[batch_indices, global_indices] = 0.0
 
         # Determine k for this batch
         batch_k = k_array[i:end]  # numpy array
         max_k = int(np.max(batch_k))
+        
+        if max_k == 0:
+            continue
 
-        # Get top max_k neighbors
+        # Get probabilistic samples based on Preferential Attachment + Homophily
         # (batch_size_actual, max_k)
-        top_vals, top_indices = torch.topk(sim, max_k, dim=1)
+        # Avoid zero probability rows breaking multinomial by adding tiny epsilon
+        prob_matrix = prob_matrix + 1e-9
+        sampled_indices = torch.multinomial(prob_matrix, max_k, replacement=False)
+        sampled_vals = torch.gather(sim, 1, sampled_indices)
 
         # Create mask for variable k
         range_tensor = torch.arange(max_k, device=device).unsqueeze(0)
@@ -195,8 +207,8 @@ def create_topology(
         valid_src = (
             torch.arange(i, end, device=device).unsqueeze(1).expand(-1, max_k)[mask]
         )
-        valid_dst = top_indices[mask]
-        valid_val = top_vals[mask]
+        valid_dst = sampled_indices[mask]
+        valid_val = sampled_vals[mask]
 
         indices_list.append(torch.stack([valid_src, valid_dst]))
         values_list.append(valid_val)
@@ -305,11 +317,11 @@ def generate_society(config: SimConfig):
 
     exposures[:, wealth_idx] = torch.tensor(wealth_normalized).float()
 
-    # Clamp non-wealth traits to strict bounds (most are already in bounds due to std 0.33)
+    # Squish non-wealth traits smoothly to strict bounds to avoid artificial extremest clusters
     non_wealth_mask = torch.ones(num_dims, dtype=torch.bool)
     non_wealth_mask[wealth_idx] = False
-    exposures[:, non_wealth_mask] = torch.clamp(
-        exposures[:, non_wealth_mask], -1.0, 1.0
+    exposures[:, non_wealth_mask] = torch.tanh(
+        exposures[:, non_wealth_mask]
     )
     personalities = torch.clamp(personalities, 0.0, 1.0)
 

@@ -230,9 +230,9 @@ class SocietyEvolution:
 
         self.exposures[:, non_wealth_mask] = new_exposures
 
-        # Clamp back to [-1, 1]
-        self.exposures[:, non_wealth_mask] = torch.clamp(
-            self.exposures[:, non_wealth_mask], -1.0, 1.0
+        # Smoothly bound back to [-1, 1] using tanh to prevent bimodal edge cliffs
+        self.exposures[:, non_wealth_mask] = torch.tanh(
+            self.exposures[:, non_wealth_mask]
         )
 
     def reassign_classes(self):

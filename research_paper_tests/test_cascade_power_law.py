@@ -72,20 +72,30 @@ def test_cascade_power_law():
             agent_affinities=affinities,
         )
 
-        will_infect = (engagement_scores > threshold).numpy()
+        engagement_np = engagement_scores.numpy()
 
-        # BFS Cascade Propagation
+        # Stochastic BFS Cascade Propagation with Decay
         infected = {seed}
         frontier = {seed}
+        current_depth = 0
+        max_depth = 6  # Information half-life (max hops)
 
-        while frontier:
+        while frontier and current_depth < max_depth:
             new_frontier = set()
+            decay_factor = 0.85 ** current_depth  # Signal decays as it travels further
+            
             for u in frontier:
                 for v in G.successors(u):
-                    if v not in infected and will_infect[v]:
-                        new_frontier.add(v)
-            infected.update(new_frontier)
+                    if v not in infected:
+                        # Probability of infection based on engagement and decay
+                        prob_infection = min(1.0, engagement_np[v] * decay_factor)
+                        
+                        if np.random.rand() < prob_infection:
+                            new_frontier.add(v)
+                            infected.add(v)
+            
             frontier = new_frontier
+            current_depth += 1
 
         cascade_sizes.append(len(infected))
 

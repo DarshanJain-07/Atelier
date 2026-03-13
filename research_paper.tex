@@ -1,0 +1,475 @@
+\documentclass[12pt]{IEEEtran}
+\IEEEoverridecommandlockouts
+
+% ------ PACKAGES ------
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{algorithm2e}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{multirow}
+\usepackage{makecell}
+\usepackage{hyperref}
+\usepackage{microtype}
+
+\hbadness=10000
+\vbadness=10000
+\hfuzz=20pt
+\vfuzz=20pt
+\emergencystretch=2em
+
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+
+\begin{document}
+
+% ------ TITLE & AUTHORS ------
+\title{ATELIER: A Hybrid Neuro-Symbolic Multi-Agent Framework for Predicting Public Sentiment Dynamics, Emotional Contagion, and Backlash in Digital Ecosystems}
+
+\author{\IEEEauthorblockN{Darshan Jain, Atharva Nagarsekar, Atharva Patkar, \\
+Vinayak Mestry, Aryan More, and Deepali Patil}
+
+\IEEEauthorblockA{\textit{Department of Artificial Intelligence and Data Science} \\
+\textit{SVKM's Dwarkadas J. Sanghvi College of Engineering}\\
+Mumbai, India \\
+\{jaindarshan1005, nagarsekaratharva, atharva0604, vmestry351, aryansmore167, kolhedeepali20\}@gmail.com}
+}
+
+\maketitle
+
+% ------ ABSTRACT ------
+\begin{abstract}
+Modeling large-scale public opinion remains challenging. Conventional NLP systems often compress dynamics into homogeneous outputs, while Large Language Models (LLMs) are stochastic and difficult to calibrate for demographic forecasting. We present ATELIER, a hybrid neuro-symbolic agent-based framework separating environmental perception from collective reaction. A calibrated LLM converts unstructured information into structured 12-dimensional environmental tensors, driving a deterministic cognitive engine simulating thousands of agents parameterized by a continuous trait field and hybrid wealth distribution.
+
+The framework supports advanced cognitive modeling, including stateful agent memory (desensitization and cumulative stress), algorithmic amplification (recommendation curation), and bounded rationality. A nonlinear social physics engine models structural influence within a K-Nearest Neighbor (KNN) topology to simulate local homophilic networks and emotional contagion. Furthermore, ATELIER captures macroscopic autopoietic feedback loops where polarization triggers endogenous events, alongside evolutionary dynamics handling inheritance and ideological drift. Empirical evaluation leverages Wasserstein and Kullback-Leibler divergence against baselines, demonstrating the system's capacity for highly explainable ex-ante sentiment forecasting.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Agent-based modeling, Neuro-symbolic systems, Algorithmic Amplification, Social Physics, Autopoietic Systems, Network Topology, Ex-ante Forecasting.
+\end{IEEEkeywords}
+
+% ------ I. INTRODUCTION ------
+\section{Introduction}
+\label{sec:introduction}
+
+\subsection{Background and Context}
+Over the past two decades, social media has structurally evolved into a ubiquitous digital ecosystem where millions of users rapidly express emotions, form homophilic networks, and generate complex opinion dynamics. A single corporate message, geopolitical update, or policy shift can act as a catalyst, triggering widespread cascading emotional reactions \cite{dechoudhury2013}. Negative news, outrage, and controversy propagate at an exponentially faster rate than positive sentiment, severely reducing the critical window for organizational crisis management \cite{yadollahi2016review}. Despite the immense financial and reputational stakes, public interventions often rely on post-hoc analytics or intuition rather than predictive structural foresight.
+
+\subsection{Problem Formulation and Limitations of Existing Systems}
+While numerous digital analytics systems exist, the vast majority operate entirely \textit{post-hoc}. They classify sentiment only after human users have already reacted. A critical gap in the literature is the absence of an ``ex-ante'' system capable of forecasting reactions \textit{before} they organically manifest.
+
+Current systems present several methodological and architectural limitations:
+\begin{enumerate}
+    \item \textbf{The Homogeneity Assumption:} Current state-of-the-art sentiment algorithms output a single scalar value (e.g., $0.8$ Positive), frequently failing to account for the heterogeneous and stratified composition of society.
+    \item \textbf{Reactive Architecture:} Conventional models evaluate sentiment retrospectively rather than anticipating responses to forthcoming events.
+    \item \textbf{Absence of Memory and Context:} Traditional classifiers treat every event in isolation, ignoring psychological phenomena such as desensitization (fatigue) and cumulative stress (trigger stacking).
+    \item \textbf{Static Information Flow:} Standard Agent-Based Models (ABMs) assume all agents receive the same news with perfect accuracy and simultaneous distribution, failing to simulate algorithmic curation or the sensationalization of information.
+\end{enumerate}
+
+\subsection{Proposed Solution: The ATELIER Framework}
+To address these foundational gaps, we introduce \textbf{ATELIER}, a generative, predictive simulation framework capable of modeling complex emotional behavior and macroscopic societal evolution. We propose a \textbf{Hybrid Neuro-Symbolic Agent-Based Model}. A Large Language Model (LLM) acts as a calibrated semantic parsing engine, converting unstructured natural language into a 12-dimensional numerical Environmental Tensor, extracting urgency, personal relevance, and detecting inherent media biases.
+
+This tensor is processed by a deterministic, PyTorch-based cognitive physics engine. We generate a population of agents utilizing a \textit{Continuous Trait Field} rather than static archetypes, layering a hybrid wealth distribution (exponential, lognormal, and Pareto regimes) alongside dynamic class assignments.
+
+Crucially, ATELIER incorporates:
+\begin{itemize}
+    \item \textbf{Algorithmic Amplification:} A two-pass simulation modeling modern recommendation algorithms, wherein an initial A/B test mutates the event tensor to maximize engagement prior to broader dissemination.
+    \item \textbf{Network Topology and Homophily:} A sparse K-Nearest Neighbor adjacency matrix grounds agents in local topological contexts, where emotional contagion is modulated by deviations from local consensus.
+    \item \textbf{Autopoietic Feedback Loops:} Endogenous events (e.g., simulated protests) emerge organically from societal polarization and recursively feed back into the cognitive engine.
+    \item \textbf{Evolutionary Dynamics:} Simulation of multi-generational shifts, including wealth inheritance, capital reinvestment, and ideological drift.
+    \item \textbf{The Triple-Filter-Bubble Cognitive Gate:} An integration of algorithmic curation and individual confirmation bias. Agents calculate the cosine similarity between their deep-seated worldview and the incoming event tensor. If the event fundamentally contradicts their core values and they exhibit low Openness, a "Selective Exposure Layer" algorithmically blocks the information, enforcing a mathematically bounded confirmation bias.
+\end{itemize}
+
+\subsection{Research Scope and Objectives}
+The primary objective of this research is the rigorous design, implementation, and validation of the ATELIER framework. The scope encompasses:
+\begin{itemize}
+    \item \textbf{Population Generation:} Creating continuous, highly dimensional virtual societies that map real-world structural inequalities.
+    \item \textbf{Cognitive Simulation:} Executing a stateful, modular attention pipeline capturing bounded rationality, memory desensitization, and cumulative stress via highly parallelized tensor operations.
+    \item \textbf{Social Physics and Evolution:} Modeling localized networks, autopoietic endogenous events, and generational ideological drift.
+    \item \textbf{Ex-Ante Forecasting:} Predicting sentiment trajectories, expected emotional volatility, and tracking Wasserstein divergence against baseline models.
+\end{itemize}
+
+% ------ II. REVIEW OF LITERATURE ------
+\section{Review of Literature}
+\label{sec:literature}
+
+The domain of social simulation and public sentiment analysis lies at the intersection of computer science, sociology, and cognitive psychology.
+
+\subsection{Evolution of Sentiment Analysis and Ex-Ante Forecasting}
+Early sentiment analysis relied on static lexicons and traditional classifiers \cite{yadollahi2016review}. The advent of transformer architectures significantly improved contextual understanding \cite{kummervold2022}. However, these models remain post-hoc and largely output singular scalars, failing to represent demographic polarization. A major emerging trend is the shift toward \textit{ex-ante forecasting}, utilizing Bayesian state-space models and ``silicon samples'' to stress-test policies before deployment \cite{cho2025bayesian, nus2026silicon}. These approaches validate the necessity for proactive modeling, which ATELIER addresses directly through its predictive capabilities.
+
+\subsection{Generative Agents and Large-Scale Social Simulation}
+Opinion Dynamics models \cite{castellano2009statistical, li2017multi} utilize mathematical graphs to analyze consensus or division but often operate at high levels of abstraction, lacking the capability to process semantic, real-world data. A recent paradigm shift involves Large Language Models driving autonomous Generative Agents \cite{park2023generative}. Foundational frameworks such as the Social-network Simulation System (S$^3$) demonstrated the viability of LLMs for simulating emotional contagion \cite{gao2023s3}. Expanding on this, subsequent research, including AgentSociety \cite{park2023agentsociety}, SocioVerse \cite{wang2024sociocognitive}, and contemporary 2025 studies on echo chamber decoding via LLM-powered simulations \cite{chen2025decoding}, illustrate how preference-based algorithms trigger network polarization. While narratively rich, these LLM-based multi-agent systems suffer from prohibitive computational costs, stochastic hallucinations, and computational opacity. ATELIER explicitly addresses these limitations through its computationally efficient neuro-symbolic architecture, isolating the LLM as a read-only semantic parser and utilizing vectorized PyTorch matrices for deterministic, scalable cognitive modeling.
+
+\subsection{Algorithmic Amplification and Psychological Modeling}
+A growing body of work employs Agent-Based Modeling to study how social media algorithms create structural polarization, particularly through the lens of the ``Triple-Filter-Bubble'' framework (individual bias, social homophily, and technological filtering) \cite{zhao2024triple}. Studies show that engagement-maximizing algorithms act as amplifiers for sensationalist content, reducing content diversity \cite{cinelli2021echo}. Concurrently, specialized neuro-symbolic multi-agent systems integrate psychological constructs, such as SenticNet for knowledge integration and NSPA-AI for tracking longitudinal emotional states \cite{cambria2022senticnet, chen2024nspa}. ATELIER builds upon this foundation by simulating algorithmic mutation via its Two-Pass A/B Testing module and employing a continuous bias-free trait field to model complex psychological phenomena like trigger stacking and desensitization.
+
+% ------ III. THEORETICAL FOUNDATIONS ------
+\section{Theoretical Foundations}
+\label{sec:theoretical_foundations}
+
+\subsection{Personality, Emotion, and Memory}
+We define the baseline psychological architecture using a normalized trait vector $P_i \in \mathbb{R}^5$ representing the Big Five personality traits (Openness, Conscientiousness, Extraversion, Agreeableness, Neuroticism). To map environmental stimuli to outputs, we utilize Plutchik's Wheel of Emotions, tracking an 8-dimensional Emotion Vector $E_i \in \mathbb{R}^8$.
+
+We expand upon classical behavioral models by introducing \textbf{Stateful Agent Memory}. Agent reactions are modulated by historical exposures through:
+\begin{itemize}
+    \item \textbf{Desensitization (Fatigue):} Repeated exposure to similar stimuli exponentially decays the agent's reactive magnitude.
+    \item \textbf{Trigger Stacking:} Accumulated historical stress amplifies reactivity to novel stimuli.
+\end{itemize}
+
+\subsection{Bounded Rationality and Stress Bias}
+Under stress or high urgency, human cognition often defaults to heuristic processing. ATELIER models this through \textbf{Stress-Induced Cognitive Bias}. When event urgency surpasses a threshold, agents experience personality-dependent distortions: high neuroticism amplifies the dominant perceived threat, low openness reduces interpretive diversity, and high agreeableness fosters conformity toward the population mean.
+
+\subsection{Structural Inequality and Network Topology}
+Societal attributes frequently adhere to heavy-tailed distributions. ATELIER assigns wealth using a multi-regime model: an exponential distribution for the lower class, a lognormal distribution for the middle class, and a Pareto distribution for the upper percentiles. Agents are subsequently mapped into a K-Nearest Neighbor (KNN) topology governed by \textit{Homophily} (cosine similarity of traits), generating robust local networks.
+
+% ------ IV. SYSTEM DESIGN & ARCHITECTURE ------
+\section{System Design and Architecture}
+\label{sec:system_design}
+
+\begin{figure*}[t]
+\centerline{\includegraphics[width=\textwidth]
+{atelier_dataflow.png}}
+\caption{ATELIER Framework Data Flow Architecture.}
+\label{fig:dataflow}
+\end{figure*}
+
+ATELIER executes a high-frequency, feed-forward neuro-symbolic pipeline leveraging PyTorch's optimized tensor operations.
+
+\subsection{Agent Tensor Representation and Genesis}
+A simulated society $S$ consists of $N$ agents. Each agent $i$ is represented as a row in continuous tensor blocks. During the architectural design phase, we empirically benchmarked multiple society generation methodologies, specifically contrasting discrete archetype-based sampling against a continuous density-based Gaussian Mixture Model (GMM). Comprehensive stress-testing—evaluating structural inequality, Shannon entropy of trait distributions, and identity drift—demonstrated that both paradigms yield statistically analogous macroscopic topological structures. Consequently, ATELIER adopts the \textbf{Continuous Trait Field} (density-based) model rather than hard-coded archetypes. Base traits are sampled from a continuous landscape and subsequently mutated, allowing for fluid social transitions. Wealth and structural influence are dynamically mapped, and agents are grouped into continuous socio-economic classes via softmax fitness assignments.
+
+\textbf{Mitigation of Historical and Sampling Bias:} By algorithmically synthesizing the population mathematically rather than relying on discrete historical datasets, this continuous density approach effectively eliminates gathering, historical, and sampling biases. Unlike traditional social media analytics—which rely on scraped data inherently skewed toward highly active users—ATELIER mathematically generates the full demographic spectrum. This includes observational users who do not actively post, ensuring that the modeled society is structurally complete and minimizes selection bias.
+
+\subsection{The Semantic Parsing Engine}
+The input layer employs a frontier LLM strictly to parse objective information. An input event is translated into a 12-dimensional \textbf{World Tensor} $\mathcal{W} \in \mathbb{R}^{12}$, alongside scalar metadata for Urgency, Personal Relevance, and an array of explicitly Detected Biases (e.g., "Corporate Spin"). This $\mathcal{O}(1)$ LLM invocation bypasses the scalability bottlenecks typical of generative agent systems.
+
+\subsection{Algorithmic Amplification (Filter Bubble Simulation)}
+Modern digital ecosystems do not broadcast information uniformly; recommendation algorithms actively modulate visibility to maximize user engagement. ATELIER simulates this via a two-pass mechanism:
+\begin{enumerate}
+    \item \textbf{The A/B Test Pass:} A subset of the population receives the pristine World Tensor. The cognitive engine identifies which dimensions trigger the highest emotional \textit{Engagement}.
+    \item \textbf{Algorithmic Mutation:} The system isolates the dimensions driving maximal engagement and artificially exaggerates their magnitude.
+    \item \textbf{Viral Broadcast Pass:} The broader population receives the mutated tensor.
+\end{enumerate}
+
+\subsection{Cognitive Attention Pipeline}
+The agent's internal processing is modeled as a strictly ordered tensor pipeline. Unlike standard models where agents perceive absolute truths, ATELIER employs a novel \textbf{Big-Five Driven Stochastic Signal Distortion} layer. Here, the World Tensor passes through a dynamic noise filter where perceived events are modulated by a Beta distribution strictly scaled by the agent's Neuroticism trait. This establishes a continuous, psychologically grounded distortion before semantic processing begins.
+
+Following distortion, the signal interacts with the Memory Layer (fatigue and cumulative stress) and is modulated by the agent's Cognitive Bandwidth (affinity). Furthermore, the pipeline implements a \textbf{Triple-Filter-Bubble Cognitive Gate} via a Selective Exposure layer. By calculating the cosine similarity between an agent's worldview and the event tensor, it dynamically blocks contradictory information based on the agent's Openness trait, mathematically enforcing confirmation bias.
+
+Crucially, ATELIER introduces a \textbf{Psychological Q-K-V Attention Mechanism}. Re-engineering standard neural attention \cite{vaswani2017attention} for sociological constructs, it computes attention queries ($Q$) based on psychological gaps via a \textbf{Relative Deprivation (RDE)} layer (e.g., assessing "am I worse off than others?" using a "jealousy bias" derived from Neuroticism and Agreeableness deficits) rather than textual embeddings. A Personality Query Layer further modifies $Q$ through non-linear Big-Five trait projections, while a \textbf{Key Processing} layer focuses attention strictly on dimensions posing personal threats or relevance. This creates a \textbf{Neuro-Symbolic Transformer} where agents attend to events based on structural status anxiety and inherent jealousy. Finally, an \textbf{Affective Projection} layer multiplies the resulting Context Vector by a Psychological Axiom Matrix, projecting the 12-dimensional state into an 8-dimensional Plutchik emotional space, which is subsequently sharpened via Softmax to output the definitive Individual Emotion Vector.
+
+% ------ V. ALGORITHMIC IMPLEMENTATION ------
+\section{Algorithmic Implementation}
+\label{sec:implementation}
+
+The theoretical architecture is translated into massively parallelized PyTorch vector operations.
+
+\subsection{Nonlinear Socio-Emotional Field Theory}
+Standard social physics relies on fixed contagion probabilities or simple bounded confidence. ATELIER radically departs from this by constructing a continuous field model. The "Objective Center of Gravity" factors in \textbf{Skin in the Game Weighting}: an agent's impact is determined not just by structural influence, but dynamically modulated by their active emotional engagement tensor.
+
+Algorithm \ref{algo:physics} details the calculation of the \textit{Viral Center} using a \textbf{Nonlinear Outrage Contagion} model. Virality transcends simple SIR transmission; it is computed by combining raw emotional arousal (vector norm) with a \textbf{Network Validation Boost}. This boost is derived from the cosine similarity between the agent's emotion and their localized echo chamber's center. A sigmoid saturation model is subsequently applied to simulate algorithmic caps and user fatigue, creating a bounded localized feedback loop.
+
+Furthermore, the physics engine formally models an \textbf{Elite vs. Populist Split}. It separately aggregates the emotional center of gravity for the highest structural influence cohort (the top 1\%) against the broader general population. The resulting vector distance generates a continuous \textit{Elite Divergence} score, functioning as a primary macro-metric for societal instability.
+
+\begin{algorithm}
+\caption{Nonlinear Emotional Contagion}
+\label{algo:physics}
+\SetAlgoLined
+\textbf{Input:} Emotion Tensor $E$, Structural Weights $W_{struct}$, Engagement $Eng$, Adjacency Matrix $A$ \\
+\textbf{Output:} Viral Center $C_{viral}$, Autopoietic Event Trigger \\
+$W_{base} \gets W_{struct} \odot Eng$ \\
+$W_{norm} \gets \text{Normalize}(W_{base})$ \\
+\tcp{Calculate Local Topological Centers}
+$E_{local} \gets A \times E$ \\
+\tcp{Calculate Cosine Similarity (Alignment) with local consensus}
+$Align \gets \text{CosineSim}(E, E_{local}, \text{dim}=1)$ \\
+$ValMult \gets 1.0 + Align$ \tcp{Map [-1, 1] to [0, 2]}
+\tcp{Apply Sigmoid Saturation for Viral Boost}
+$ViralEnergy \gets \text{Norm}(E) \odot Eng \odot ValMult$ \\
+$Boost \gets 1.0 + MaxViral \cdot \text{Sigmoid}(Gain \cdot (ViralEnergy - Midpoint))$ \\
+$W_{viral} \gets \text{Normalize}(W_{norm} \odot Boost)$ \\
+$C_{viral} \gets \sum (E \odot W_{viral})$ \\
+\tcp{Check Autopoietic Thresholds}
+$D_{elite} \gets \text{Norm}(C_{elite} - C_{objective})$ \\
+\If{$D_{elite} > \tau_{elite}$ \textbf{and} Polarization $> \tau_{pol}$}{
+    Trigger Endogenous Event (e.g., Systemic Protest)
+}
+\Return $C_{viral}$
+\end{algorithm}
+
+\subsection{Autopoietic Simulation (Endogenous Events)}
+A notable innovation in ATELIER is its capacity for autopoiesis. The simulation does not conclude post-event processing. If the Social Physics Engine detects that \textit{Polarization} (dispersion and emotional entropy) and \textit{Elite Divergence} exceed critical thresholds, it synthesizes an \textbf{Endogenous Event} (e.g., a "Populist Uprising" or "Civil Protest"). This emergent event generates a distinct 12-dimensional action vector that recursively feeds back into the Cognitive Engine with high urgency, simulating self-sustaining societal dynamics.
+
+Algorithm \ref{algo:autopoiesis} illustrates this feedback loop, mapping macro-level societal thresholds to the organic synthesis of macro events while abstracting the proprietary generation matrices.
+
+\begin{algorithm}
+\caption{Autopoietic Endogenous Event Synthesis}
+\label{algo:autopoiesis}
+\SetAlgoLined
+\textbf{Input:} Aggregated Society Emotion $E_{pop}$, Elite Emotion $E_{elite}$, Polarization Index $\mathcal{P}$ \\
+\textbf{Output:} Synthesized World Tensor $\mathcal{W}_{new}$ \\
+\tcp{Evaluate Structural Divergence}
+$Div_{elite} \gets \text{Distance}(E_{pop}, E_{elite})$ \\
+\tcp{Check Systemic Thresholds}
+\If{$\mathcal{P} > \tau_{pol}$ \textbf{or} $Div_{elite} > \tau_{div}$}{
+    \tcp{Identify dominant friction axis}
+    $Axis_{conflict} \gets \text{ArgMax}(|E_{pop} - E_{elite}|)$ \\
+    \tcp{Procedurally generate emergent event tensor}
+    $\mathcal{W}_{new} \gets \text{GenerateTensor}(Axis_{conflict}, \mathcal{P})$ \\
+    $\mathcal{W}_{new} \gets \text{AssignMetadata}(\mathcal{W}_{new}, \text{Urgency}=\text{High})$ \\
+    \tcp{Recursively inject back into global environment}
+    $\text{TriggerBroadcast}(\mathcal{W}_{new})$ \\
+}
+\end{algorithm}
+
+\subsection{Societal Evolution}
+For longitudinal studies, ATELIER executes generational evolutions:
+\begin{itemize}
+    \item \textbf{Inheritance \& Redistribution:} A fraction of wealth is inherited; the remainder is collected as tax and redistributed uniformly as public infrastructure, mitigating terminal economic collapse.
+    \item \textbf{Economic Shocks \& Mobility:} Random multi-regime wealth shocks and topological class shuffling.
+    \item \textbf{Dynamic Bayesian Ideological Drift:} Agents update their traits toward a cultural attractor (global mean or Elite \textit{Cultural Hegemony}) using a novel dynamic Bayesian belief updating mechanism. Similar to a Kalman Gain, if the societal consensus is highly fragmented (high variance), agents trust the target less, reducing drift. Conversely, strong consensus accelerates drift. Highly alienated agents experience \textbf{Ideological Repulsion}, actively moving away from the mainstream to organically synthesize structural polarization.
+\end{itemize}
+
+Algorithm \ref{algo:evolution} defines the multi-generational progression mechanics, mathematically balancing economic redistribution with homophilic ideological drift.
+
+\begin{algorithm}
+\caption{Generational Evolution and Drift}
+\label{algo:evolution}
+\SetAlgoLined
+\textbf{Input:} Agent Society $S$ at generation $t$, Elite Attractor $A_{elite}$ \\
+\textbf{Output:} Evolved Society $S$ at generation $t+1$ \\
+$TaxPool \gets 0$ \\
+\For{each agent $i \in S$}{
+    \tcp{Economic Execution}
+    $Wealth_{i} \gets Wealth_{i} \cdot (1 - TaxRate) + \text{ROI}(Wealth_{i})$ \\
+    $TaxPool \gets TaxPool + Wealth_{i} \cdot TaxRate$ \\
+    \tcp{Ideological Drift Mechanics}
+    $Dist_{i} \gets \text{Distance}(P_{i}, A_{elite})$ \\
+    \eIf{$Dist_{i} > \tau_{alienation}$}{
+        $P_{i} \gets P_{i} - \alpha \cdot \nabla(Dist_{i})$ \tcp{Repulsion}
+    }{
+        $P_{i} \gets P_{i} + \beta \cdot \nabla(Dist_{i})$ \tcp{Assimilation}
+    }
+}
+\tcp{Universal Redistribution}
+$S_{wealth} \gets S_{wealth} + (TaxPool / N)$ \\
+\tcp{Dynamic Rewiring of Network Topology}
+$A_{new} \gets \text{RecomputeKNN}(S_{traits})$ \\
+\Return $S, A_{new}$
+\end{algorithm}
+
+% ------ VI. EMPIRICAL RESULTS AND EVALUATION ------
+\section{Empirical Results and Evaluation}
+\label{sec:testing}
+
+The comprehensive testing protocol verified that the hybrid ABM produces statistically robust outputs and models emotional contagion in alignment with theoretical expectations. Development utilized Python 3.10, PyTorch 2.0, and the FastAPI framework for orchestration. All computational simulations and evaluations were executed on a system (Acer Aspire A515-56) equipped with an 11th Gen Intel\textsuperscript{\textregistered} Core\textsuperscript{\texttrademark} i5-1135G7 processor ($\times 8$ threads), Intel\textsuperscript{\textregistered} Iris\textsuperscript{\textregistered} Xe Graphics (TGL GT2), and 8.0 GiB of memory, operating on Ubuntu 24.04.4 LTS (GNOME 46, Wayland). To validate semantic alignment, we measured the Wasserstein Distance and Kullback-Leibler (KL) Divergence between ATELIER's aggregated output and baseline probability distributions generated by distinct state-of-the-art NLP models. Beyond semantic alignment, rigorous structural evaluations validated the core mathematical subsystems:
+
+\subsection{Core Behavioral and Systemic Validation}
+To evaluate the fundamental behavioral mechanics and systemic feedback loops, we subjected the simulated population to targeted interventions. Table \ref{tab:core_validation} summarizes the aggregate effects of these tests.
+
+\begin{table}[htbp]
+\caption{Core Subsystem Validation Metrics}
+\begin{center}
+\begin{tabularx}{\columnwidth}{|l|X|X|}
+\hline
+\textbf{Subsystem Tested} & \textbf{Experimental Condition} & \textbf{Observed Systemic Effect} \\
+\hline
+Agent Memory & 50 iterations of severe threat & 6.2x amplification in engagement to novel minor threats due to latent stress. \\
+\hline
+Algorithmic Amplification & Two-pass curation on 10\% sample & +283.5\% artificial increase in total societal engagement via mutated dimensions. \\
+\hline
+Network Topology & Local KNN vs. Global broadcast & -0.11x dampening of virality, as local validation in insular networks contained energy. \\
+\hline
+Autopoietic Synthesis & Thresholds: Polarization (0.707), Elite Divergence (0.828) & Seamless generation of endogenous events ("Civil Protest" and "Populist Uprising"). \\
+\hline
+\end{tabularx}
+\label{tab:core_validation}
+\end{center}
+\end{table}
+
+Stateful memory demonstrated that accumulated aggregate stress outpaces dimension-specific fatigue, enabling trigger stacking. The two-pass algorithmic curation exaggerated perceived threats, functioning as an active volatility multiplier. Furthermore, sparse KNN homophilic networks suppressed total virality compared to global broadcasts, and the autopoietic engine effectively fed systemic macro-thresholds back into the cognitive layer.
+
+\subsection{Viral Cascades, Influence, and Bimodality}
+In an epidemiological simulation of 2000 agents, the Basic Reproduction Number ($R_0$) of shared sentiment averaged 23.63. The $R_0$ metric quantifies the viral potential of an event, formalized as:
+\begin{equation}
+R_0 = \tau \cdot \bar{c} \cdot d
+\end{equation}
+where $\tau$ is transmission probability per contact, $\bar{c}$ is average contact rate, and $d$ is duration of infectivity. An Influence-Susceptibility analysis (Fig. \ref{fig:influence}) revealed a strong correlation ($r=0.741$) between structural influence and emergent thought leadership. Influence and susceptibility exhibited near-zero correlation ($r=-0.051$), indicating statistical independence. This suggests that structural influence does not inherently confer immunity to emotional contagion.
+
+\begin{figure}[htbp]
+\centerline{\includegraphics[width=\columnwidth]
+{influence_susceptibility.png}}
+\caption{Influence vs. Susceptibility Ratio depicting organic thought leadership.}
+\label{fig:influence}
+\end{figure}
+
+To map the contagion spread, a Cascade Size Power-Law Analysis was conducted over 10,000 agents with 4,000 seeds. We observed a maximum cascade size of 306 agents, with the log-log distribution revealing a power-law exponent of $-0.21$ (Fig. \ref{fig:cascade}), following the probability distribution:
+\begin{equation}
+P(x) \propto x^{-\alpha}
+\end{equation}
+where $x$ is the cascade size and $\alpha$ is the scaling parameter. The deviation from a scale-free distribution is attributable to simulated structural constraints, including finite graph depth, exponential propagation decay, and boundary halts at echo chambers.
+
+\begin{figure}[htbp]
+\centerline{\includegraphics[width=\columnwidth]
+{cascade_power_law.png}}
+\caption{Log-Log distribution of Cascade Size Power-Law.}
+\label{fig:cascade}
+\end{figure}
+
+Simulating societal evolution over 200 generations revealed pronounced structural polarization. Key ideological dimensions began at a Gaussian consensus (Bimodality Coefficient $\approx 0.33$) but evolved into a bimodal distribution. Specifically, the BC for Fairness, Innovation, and In-Group dimensions rose from $\sim 0.41$ to $\sim 0.66$ (and $>0.88$ for Wealth). This transition illustrates the emergence of polarized factions via endogenous network dynamics. The observed BC approaches theoretical maximums, establishing polarization as a stable structural attractor.
+
+\begin{figure}[htbp]
+\centerline{\includegraphics[width=\columnwidth]
+{bimodality_ridge_plot.png}}
+\caption{Bimodality Ridge Plot depicting structural polarization over generations. The visualization illustrates how an initially unified society naturally bifurcates into polarized, bimodal distributions along key ideological axes due to ideological repulsion and selective exposure.}
+\label{fig:bimodality}
+\end{figure}
+
+\subsection{Network Modularity and Community Formation}
+To evaluate the structural integrity of the simulated networks over generational timeframes, we applied the Louvain Modularity algorithm to the resultant social graphs. The modularity $Q$ quantifies the strength of division of a network into modules, calculated as:
+\begin{equation}
+Q = \frac{1}{2m} \sum_{i,j} \left[ A_{ij} - \frac{k_i k_j}{2m} \right] \delta(c_i, c_j)
+\end{equation}
+where $A_{ij}$ is the adjacency matrix, $k_i$ is the degree of node $i$, $m$ is the total number of edges, and $c_i$ is the community assignment of node $i$. A threshold-based network ($t=0.90$) was constructed where edges strictly represent high ideological homophily. At Generation 0 (randomly initialized continuous field), the network modularity ($Q$) stood at 0.9912, reflecting a fragmented population. Following a 50-generation evolutionary cycle experiencing ideological drift and stochastic economic shocks, the network reduced the global modularity down to $Q=0.0337$. The initial $Q$ reflects sparse, disconnected pairings. The subsequent decrease ($\Delta = -0.9575$) indicates that the network maintains macro-level cohesion despite localized homophily.
+
+\subsection{Personal vs. Systemic Event Gating}
+To assess the cognitive engine's relevance filtering, we broadcasted identical structural threats tagged with varying "Personal" boolean flags. When an event was broadcast as non-personal (e.g., a macroeconomic shift), exactly 100.0\% of the tested population registered a mathematical reaction. Conversely, when the equivalent tensor was tagged as a "Personal Event" (e.g., an individual experiencing job loss), the attention filter substantially suppressed baseline interest. Only 29.0\% of the population reacted—specifically, agents within close conceptual proximity to the affected individual or those exhibiting high baseline Agreeableness (empathy). This demonstrates the relevance filter's ability to attenuate localized noise, limiting broad cascades to systemically relevant events or those eliciting proximal empathy.
+
+\subsection{Ideological Assortativity Analysis}
+Beyond modularity, we tracked network Assortativity specifically along the polarizing "Fairness" dimension to measure homophilic clustering within the KNN topology. At Generation 0, the baseline 5-NN graph exhibited an assortativity coefficient of 0.055. Over 30 generations, the coefficient increased to 0.319 ($\Delta = +0.264$), evidencing the emergent formation of insular, homophilic networks and selective exposure.
+
+\begin{figure}[htbp]
+\centerline{\includegraphics[width=\columnwidth]
+{umap_echo_chambers.png}}
+\caption{UMAP Trajectory Plot of Echo Chamber formation. This dimensional reduction highlights the clustering of agents into distinct, homogeneous communities, mathematically validating the emergence of echo chambers where interaction is strictly confined within ideologically similar nodes.}
+\label{fig:umap}
+\end{figure}
+
+\subsection{Generational Wealth Inequality and Structural Influence}
+To validate the framework's ability to model late-stage capital accumulation and structural influence, we simulated multi-generational wealth dynamics over 300 generations interspersed with stochastic economic shocks. Inequality was measured using the Gini coefficient:
+\begin{equation}
+G = \frac{\sum_{i=1}^{n} (2i - n - 1) x_i}{n \sum_{i=1}^{n} x_i}
+\end{equation}
+where $x_i$ is the wealth or influence of agent $i$ sorted in ascending order, and $n$ is the population size. Initially starting with a hybrid power-law distribution (Generation 0 Gini: 0.691, with the top 5\% holding 48.3\% of wealth), the society transitioned into extreme wealth concentration, resulting in the top 5\% holding 89.1\% of the total societal wealth, despite the overall Gini coefficient crashing to 0.003. This decoupling between the Gini index and top-tier wealth retention results from systemic redistribution mechanisms suppressing aggregate inequality while preserving elite capital accumulation.
+
+Furthermore, we contrasted different distributions of structural influence. Under a standard Lognormal distribution, the top 5\% of agents controlled 32.7\% of total societal influence (Gini: 0.601). However, when mapped to a Pareto distribution, the top 5\% controlled 73.9\% of the total influence (Gini: 0.862). These findings reflect rigid ecosystems characterized by disproportionate elite influence.
+
+\subsection{Semantic Alignment and Mathematical Validation}
+While the ATELIER framework operates primarily through abstract tensors to ensure determinism, it is imperative to validate its final outputs against established Natural Language Processing baselines. To ensure semantic alignment, we integrated a validation layer utilizing the \texttt{cardiffnlp/ twitter-roberta-base-sentiment} transformer model. We mapped the framework's 8-dimensional Plutchik emotional output into a normalized 3-dimensional sentiment space (Positive, Neutral, Negative) using weighted valence matrices.
+
+By computing the Wasserstein Distance and the Kullback-Leibler (KL) Divergence between the ATELIER framework's aggregated structural output and the RoBERTa baseline probabilities, we achieved a rigorous mathematical comparison. The Wasserstein Distance, which measures the effort required to transform one distribution into another, is defined as
+\begin{equation}
+W_1(P, Q) = \inf_{\gamma \in \Gamma(P, Q)} \int_{\mathbb{R} \times \mathbb{R}} |x - y| \, d\gamma(x, y)
+\end{equation}
+while the Information-theoretic KL Divergence is computed as:
+\begin{equation}
+D_{KL}(P \parallel Q) = \sum_{x \in \mathcal{X}} P(x) \log\left(\frac{P(x)}{Q(x)}\right)
+\end{equation}
+Validations across diverse events demonstrated that ATELIER consistently stays within a tight Wasserstein distance bound ($<0.2$) from the baseline for routine inputs. However, for polarized events involving deceptive framing (e.g., reframing workforce reductions as "efficiency initiatives"), ATELIER diverges from baseline models. By extracting the underlying structural threat rather than relying on surface syntax, it avoids misclassification and forecasts ensuing contagion more accurately.
+
+\subsection{Cluster Cohesion Metrics}
+The structural validity of the resulting emotional states was further verified via unsupervised clustering, utilizing the Silhouette Score and the Davies-Bouldin Index. These metrics confirm that the continuous trait field produces distinct, statistically cohesive groups that exhibit heterogeneous reactions to identical stimuli.
+
+\subsection{Explainability and Feature Attribution}
+A primary advantage of ATELIER's deterministic tensor pipeline over opaque end-to-end LLM architectures is its intrinsic capacity for \textbf{Explainability via Feature Attribution}. By tracing gradients backward through the Cognitive Attention Pipeline, the system quantifies the exact structural and psychological drivers of any macro-level spike. By quantifying precise causal tensor interactions—such as the correlation between specific macroeconomic indicators and psychological traits—this transparent attribution framework ensures ex-ante forecasting remains auditable for policy stress-testing.
+
+% ------ VII. DISCUSSION & IMPLICATIONS ------
+\section{Discussion and Implications}
+\label{sec:discussion}
+
+The empirical validation of the ATELIER framework presents significant methodological advancements for predictive sentiment analytics and digital sociology.
+
+\subsection{Algorithmic Curation as a Causal Mechanism}
+The filter bubble experiments demonstrate that engagement-maximizing delivery systems function as active volatility multipliers rather than passive conduits. This reframes algorithmic curation as a direct causal mechanism in sentiment dynamics, emphasizing the utility of ex-ante simulation for auditing platform policies prior to deployment.
+
+\subsection{Latent Stress and Systemic Fragility}
+Stateful agent memory provides a mechanistic explanation for disproportionate societal backlash. Intense cascade events frequently originate from accumulated latent stress rather than isolated final triggers. Consequently, longitudinal stress tracking is critical for accurately estimating institutional trust and systemic fragility.
+
+\subsection{Autopoietic Phase Transitions}
+By synthesizing endogenous events from structural thresholds, ATELIER formally links micro-level cognitive states to macro-level systemic transitions. This establishes that large-scale unrest and coordination failures can be modeled as internally generated phase changes resulting from polarization, rather than solely as reactions to exogenous shocks.
+
+\subsection{Architectural Efficacy of Neuro-Symbolic Decoupling}
+A foundational architectural finding is that neuro-symbolic decoupling maintains semantic flexibility while ensuring deterministic reproducibility. Restricting the stochastic LLM to objective semantic parsing while delegating cognitive simulation to rigorous tensor mathematics yields auditable, high-fidelity forecasting suitable for organizational risk analysis.
+
+% ------ VIII. CONCLUSION & FUTURE SCOPE ------
+\section{Conclusion and Future Scope}
+\label{sec:conclusion}
+
+ATELIER advances sentiment analysis from post-hoc classification toward predictive structural modeling. Its core contribution is a deterministic multi-agent engine informed by LLM-based semantic parsing, enabling heterogeneous population forecasting without stochastic simulation drift.
+
+Across the presented evaluations, the framework consistently captures memory effects, algorithmic amplification, local network validation, and endogenous cascade formation within a single unified pipeline. This integration provides an explainable foundation for ex-ante decision support in organizational and policy settings.
+
+By combining computational efficiency with auditability, ATELIER offers a practical route for deploying large-scale social simulations where interpretability and reproducibility are mandatory.
+
+\subsection{Future Scope}
+Future work can strengthen ATELIER along methodological, systems, and deployment axes:
+\begin{itemize}
+    \item \textbf{Streaming Data Integration:} Convert the current batch-style pipeline into an online forecasting system by ingesting event streams from platform APIs, updating the environmental tensor incrementally, and maintaining uncertainty bounds for short-horizon predictions.
+    \item \textbf{Causal and Intervention-Aware Simulation:} Add explicit modeling of policy actions (content throttling, counter-messaging, and fact-check injection) as controllable operators, enabling counterfactual analysis of what-if mitigation strategies before rollout.
+    \item \textbf{Adaptive Policy Optimization:} Explore constrained reinforcement learning, where agents optimize intervention sequences under fairness, transparency, and stability constraints instead of pure engagement objectives.
+    \item \textbf{Dynamic Network Evolution:} Extend beyond static KNN graphs by allowing tie formation and dissolution as a function of repeated interactions, perceived trust, and ideological distance, improving realism for long-horizon polarization studies.
+    \item \textbf{Cross-Domain Validation and Calibration:} Expand to multilingual and region-specific corpora, with periodic recalibration of parsing weights and emotion-to-sentiment mappings to preserve predictive validity across changing media ecosystems.
+\end{itemize}
+
+% ------ REFERENCES ------
+\begin{thebibliography}{00}
+
+\bibitem{dechoudhury2013}
+M. De Choudhury and S. Counts, ``The Dynamics of Emotions in Online Interaction,'' \textit{arXiv preprint arXiv:1605.03757}, 2013.
+
+\bibitem{yadollahi2016review}
+A. Yadollahi \textit{et al.}, ``A Review on Sentiment Analysis from Social Media Platforms,'' \textit{ResearchGate Publication 369204846}, 2016.
+
+\bibitem{kummervold2022}
+P. E. Kummervold \textit{et al.}, ``Sentiment Analysis in Public Health: A Systematic Review,'' \textit{PubMed:40620557}, 2022.
+
+\bibitem{cho2025bayesian}
+H. Cho \textit{et al.}, ``Bayesian State-Space Models for Sentiment Forecasting,'' \textit{Computational Social Science Journal}, 2025.
+
+\bibitem{nus2026silicon}
+NUS CSSH, ``Silicon Samples for Ex-Ante Policy Stress-Testing,'' \textit{Proceedings of the CSS Conference}, 2026.
+
+\bibitem{castellano2009statistical}
+C. Castellano, S. Fortunato, and V. Loreto, ``Statistical Physics of Social Dynamics,'' \textit{Reviews of Modern Physics}, vol. 81, no. 2, pp. 591--646, 2009.
+
+\bibitem{li2017multi}
+J. Li and R. Xiao, ``Multidimensional Opinion Polarization in Agent-Based Models,'' \textit{Journal of Artificial Societies and Social Simulation}, 2017.
+
+\bibitem{park2023generative}
+J. S. Park, J. C. O'Brien, C. J. Cai, M. R. Morris, P. Liang, and M. S. Bernstein, ``Generative Agents: Interactive Simulacra of Human Behavior,'' \textit{arXiv preprint arXiv:2304.03442}, 2023.
+
+\bibitem{gao2023s3}
+C. Gao \textit{et al.}, ``S$^3$: Social-network Simulation System with Large Language Model-Empowered Agents,'' \textit{arXiv preprint arXiv:2307.14984}, 2023.
+
+\bibitem{park2023agentsociety}
+J. S. Park \textit{et al.}, ``AgentSociety: Large-Scale LLM-Driven Generative Agents,'' \textit{arXiv preprint}, 2023.
+
+\bibitem{wang2024sociocognitive}
+L. Wang \textit{et al.}, ``SocioVerse: LLM Agents for Social Simulation,'' \textit{arXiv preprint}, 2024.
+
+\bibitem{chen2025decoding}
+X. Chen \textit{et al.}, ``Decoding Echo Chambers: LLM-Powered Simulations,'' \textit{arXiv preprint}, 2025.
+
+\bibitem{zhao2024triple}
+Y. Zhao \textit{et al.}, ``The Triple-Filter-Bubble Framework in Social Media,'' \textit{Journal of Computational Sociology}, 2024.
+
+\bibitem{cinelli2021echo}
+M. Cinelli \textit{et al.}, ``The Echo Chamber Effect on Social Media,'' \textit{PNAS}, vol. 118, no. 9, 2021.
+
+\bibitem{cambria2022senticnet}
+E. Cambria \textit{et al.}, ``SenticNet 7: A Commonsense-based Framework for Concept-level Sentiment Analysis,'' \textit{Cognitive Computation}, 2022.
+
+\bibitem{chen2024nspa}
+X. Chen \textit{et al.}, ``NSPA-AI: Neuro-Symbolic Psychological Agents for Longitudinal Sentiment Tracking,'' \textit{arXiv preprint}, 2024.
+
+\bibitem{vaswani2017attention}
+A. Vaswani \textit{et al.}, ``Attention is All You Need,'' \textit{Advances in Neural Information Processing Systems}, vol. 30, 2017.
+
+\end{thebibliography}
+
+\end{document}

@@ -623,6 +623,7 @@ async def run_simulation(req: SimulationRequest, background_tasks: BackgroundTas
                 )
                 final_emotions = final_emotions_2
                 attention_weights = attention_weights_2
+                engagement_scores = engagement_scores_2
                 social_state["endogenous_event"] = action_name
 
             # 7. Validation
@@ -645,7 +646,13 @@ async def run_simulation(req: SimulationRequest, background_tasks: BackgroundTas
 
             # Prepare emotions for UI
             emotion_indices = torch.argmax(final_emotions, dim=1).tolist()
-            current_agent_emotions = [EMOTION_LABELS[idx] for idx in emotion_indices]
+            engagement_list = engagement_scores.tolist()
+            current_agent_emotions = []
+            for k, idx in enumerate(emotion_indices):
+                if engagement_list[k] <= 0.0:
+                    current_agent_emotions.append("Neutral")
+                else:
+                    current_agent_emotions.append(EMOTION_LABELS[idx])
 
             # Prepare Agent Metadata
             agent_data = []

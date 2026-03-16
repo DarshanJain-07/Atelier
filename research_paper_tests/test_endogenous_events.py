@@ -17,6 +17,7 @@ def test_endogenous_events():
         seed=42,
         elite_divergence_threshold=0.3,  # lower thresholds to force trigger
         polarization_threshold=0.3,
+        stewing_ticks=1,
     )
 
     phys_engine = SocialPhysicsEngine(config)

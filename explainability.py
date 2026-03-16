@@ -296,8 +296,8 @@ class ExplainabilityEngine:
         reason_str = " and ".join(reasons) if reasons else "high societal tension"
         
         return (
-            f"⚠️ **Autopoietic Trigger**: The simulation generated an endogenous event "
-            f"(**{action_name}**). Due to {reason_str}, the system reached a breaking point, "
+            f"Autopoietic Trigger: The simulation generated an endogenous event "
+            f"{action_name}, due to {reason_str}, combined with **sufficient individual Action Potential** across the populace, the system reached a breaking point, "
             f"automatically feeding this new macro-action back into the society."
         )
 

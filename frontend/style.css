@@ -1394,14 +1394,6 @@ input[type="range"]::-moz-range-track {
     font-weight: 700;
 }
 
-.filmstrip-stats {
-    font-family: var(--font-mono);
-    font-size: 0.65rem;
-    color: var(--text-muted);
-    display: flex;
-    justify-content: space-between;
-}
-
 .run-filmstrip::-webkit-scrollbar {
     height: 4px;
 }
@@ -1731,7 +1723,9 @@ input[type="range"]::-moz-range-track {
     align-items: center;
     justify-content: center;
     border-radius: 4px;
-    transition: color 0.2s ease, background-color 0.2s ease;
+    transition:
+        color 0.2s ease,
+        background-color 0.2s ease;
 }
 
 .reset-section-btn:hover {

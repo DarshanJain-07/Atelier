@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+from sklearn.metrics import silhouette_score, davies_bouldin_score, silhouette_samples
 
 from schema import EMOTION_LABELS, VALENCE_WEIGHTS
 
@@ -186,7 +187,53 @@ class SocialPhysicsEngine:
         # Polarization Metrics
         # ============================================================
         global_distances = torch.norm(current_emotions - center_of_gravity, dim=1)
-        polarization = (global_distances * weights).sum().item()
+        # Old metric: Dispersion (Weighted average distance from center)
+        dispersion = (global_distances * weights).sum().item()
+
+        # New Metric: Clustering-based Polarization (Silhouette Score)
+        per_cluster_sil = {}
+        try:
+            # Move to CPU for sklearn
+            features_np = current_emotions.detach().cpu().numpy()
+            # Determine clusters by dominant emotion
+            labels_np = np.argmax(features_np, axis=1)
+            unique_labels = np.unique(labels_np)
+
+            if len(unique_labels) > 1 and len(unique_labels) < len(labels_np):
+                # Sample size for Silhouette (O(N^2)) to ensure performance
+                sample_size = min(2000, len(labels_np))
+                sil_score = silhouette_score(
+                    features_np, labels_np, sample_size=sample_size
+                )
+                # DB Index (O(N))
+                db_score = davies_bouldin_score(features_np, labels_np)
+
+                # Use Silhouette as the primary polarization metric
+                # A score > 0.5 is strong structure.
+                polarization = max(0.0, float(sil_score))
+
+                # Per-Cluster Silhouette (Expensive, so limit to reasonable N)
+                # Only calculate if we are within the sample limit to avoid massive lag
+                if len(labels_np) <= 2500:
+                    samples = silhouette_samples(features_np, labels_np)
+                    for label in unique_labels:
+                        label_idx = int(label)
+                        if label_idx < len(EMOTION_LABELS):
+                            emotion_name = EMOTION_LABELS[label_idx]
+                            mask = labels_np == label
+                            if mask.sum() > 1:
+                                per_cluster_sil[emotion_name] = float(np.mean(samples[mask]))
+            else:
+                sil_score = 0.0
+                db_score = 0.0
+                # If only 1 cluster, polarization is effectively 0 (Consensus)
+                polarization = 0.0
+        except Exception as e:
+            # Fallback to dispersion if sklearn fails
+            print(f"Polarization calc failed: {e}")
+            polarization = dispersion
+            sil_score = 0.0
+            db_score = 0.0
 
         cg_prob = torch.clamp(center_of_gravity, min=1e-9)
         cg_prob = cg_prob / cg_prob.sum()
@@ -319,11 +366,20 @@ class SocialPhysicsEngine:
             "max_outrage_multiplier": round(outrage_boost.max().item(), 3),
             # Stability metrics
             "polarization": polarization,
+            "dispersion": dispersion,
+            "cluster_metrics": {
+                "silhouette_score": sil_score,
+                "davies_bouldin_index": db_score,
+                "per_cluster_silhouette": per_cluster_sil,
+                "per_cluster_davies_bouldin": {} # Not implemented to save perf
+            },
             "entropy": entropy,
             "bimodality": bimodality,
             "elite_divergence": elite_divergence,
             "action_vector": action_vector,
             "action_name": action_name,
+            "acting_ratio": acting_ratio,
+            "total_eligible": total_eligible,
             "labels": EMOTION_LABELS,
         }
 

@@ -1,0 +1,6 @@
+Prompt Type,Ground Truth,SST-2 (Baseline),RoBERTa (Baseline),Hartmann (Baseline),ATELIER
+Corporate Spin,Negative,Positive,Positive,Neutral,Negative
+Corporate Euphemism,Negative,Positive,Positive,Positive,Error
+Political Spin,Negative,Positive,Positive,Negative,Error
+Authoritarian Framing,Negative,Positive,Neutral,Neutral,Error
+Objective Positive,Positive,Positive,Positive,Positive,Negative

@@ -281,10 +281,6 @@ function renderFilmstrip(results) {
                 <div class="emotion-indicator" style="background: ${PALETTE[res.dominant_emotion] || "#333"}"></div>
             </div>
             <div class="filmstrip-emotion" style="color: ${PALETTE[res.dominant_emotion]}">${res.dominant_emotion.toUpperCase()}</div>
-            <div class="filmstrip-stats">
-                <span>POL: ${res.polarization}</span>
-                <span>W-DIST: ${res.divergence.toFixed(2)} | KL: ${res.kl_divergence.toFixed(2)}</span>
-            </div>
         `;
     filmstrip.appendChild(card);
   });
@@ -363,6 +359,12 @@ function displayResult(data) {
       else if (negIntVal < 5.0) negIntEl.style.color = "#fbbf24";
       else negIntEl.style.color = "#ef4444";
     }
+  }
+
+  const activePopVal = data.acting_ratio !== undefined ? parseFloat(data.acting_ratio) * 100 : NaN;
+  const activePopEl = document.getElementById("val-active-pop");
+  if (activePopEl) {
+    activePopEl.textContent = isNaN(activePopVal) ? "--" : `${activePopVal.toFixed(1)}%`;
   }
 
   // 4. Update Agents

@@ -645,8 +645,11 @@ async def run_simulation(req: SimulationRequest, background_tasks: BackgroundTas
                 social_state.get("negative_integral", 0.0), getattr(config, "stewing_ticks", 5)
             )
 
-            # Clustering metrics
-            cluster_metrics = validator.calculate_cluster_metrics(final_emotions)
+            # Clustering metrics (Now provided by Physics Engine)
+            cluster_metrics = social_state.get("cluster_metrics", {
+                "silhouette_score": 0.0,
+                "davies_bouldin_index": 0.0
+            })
 
             # 8. Explainability
             explain_engine = ExplainabilityEngine()
@@ -702,6 +705,8 @@ async def run_simulation(req: SimulationRequest, background_tasks: BackgroundTas
                     "detected_biases": detected_biases,
                     "reasoning": reasoning,
                     "negative_integral": social_state.get("negative_integral", 0.0),
+                    "acting_ratio": social_state.get("acting_ratio"),
+                    "total_eligible": social_state.get("total_eligible"),
                 }
             )
 

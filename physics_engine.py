@@ -315,7 +315,9 @@ class SocialPhysicsEngine:
         acting_count = acting_agents.sum().item()
         total_eligible = engaged_mask.sum().item()
         
-        acting_ratio = acting_count / (total_eligible + 1e-9) if total_eligible > 0 else 0.0
+        # FIX: Acting ratio should be relative to TOTAL population, not just eligible.
+        # Otherwise, a single angry agent causes 100% acting ratio.
+        acting_ratio = acting_count / N
 
         elite_div_threshold = getattr(self.config, "elite_divergence_threshold", 0.4)
         pol_threshold = getattr(self.config, "polarization_threshold", 0.5)

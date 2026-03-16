@@ -14,6 +14,8 @@ load_dotenv()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 MODEL = "gemini-3-flash-preview"
 
+# Simple in-memory cache to prevent redundant API calls
+LLM_CACHE = {}
 
 class LLMGenerationError(Exception):
     """Raised when the LLM API call fails or returns an unexpected format."""
@@ -59,6 +61,11 @@ def get_world_state(user_input: str) -> Tuple[torch.Tensor, float, bool, list[st
         4. Detected Biases (list[str]): List of biases detected in the text.
         5. Reasoning (str): The chain of thought analysis from the LLM.
     """
+    
+    # Check Cache
+    if user_input in LLM_CACHE:
+        print(f"> Using Cached LLM Result for: '{user_input[:30]}...'")
+        return LLM_CACHE[user_input]
 
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent"
     headers = {
@@ -214,7 +221,9 @@ def get_world_state(user_input: str) -> Tuple[torch.Tensor, float, bool, list[st
     print(f"> Detected Biases: {detected_biases}")
     print(f"> {result.Reasoning}\n--------------------")
 
-    return world_tensor, urgency, is_personal, detected_biases, result.Reasoning
+    output = (world_tensor, urgency, is_personal, detected_biases, result.Reasoning)
+    LLM_CACHE[user_input] = output
+    return output
 
 
 if __name__ == "__main__":

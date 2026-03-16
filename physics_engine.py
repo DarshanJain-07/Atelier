@@ -315,9 +315,18 @@ class SocialPhysicsEngine:
         acting_count = acting_agents.sum().item()
         total_eligible = engaged_mask.sum().item()
         
-        # FIX: Acting ratio should be relative to TOTAL population, not just eligible.
-        # Otherwise, a single angry agent causes 100% acting ratio.
-        acting_ratio = acting_count / N
+        # FIX: Acting ratio should be relative to TOTAL population (SimConfig.num_agents), not just the current N.
+        # This ensures that if we filter for "Elites" (small N), we don't get 100% acting ratio just because all Elites are acting.
+        # We want to know "What % of the TOTAL society is acting?"
+        # Note: acting_count is already the intersection of:
+        # 1. The filtered subset (implicit in N)
+        # 2. Engaged/Personal mask
+        # 3. Non-neutral (Action Potential > 0)
+        total_pop = getattr(self.config, "num_agents", N)
+        if total_pop <= 0:
+            total_pop = N
+        
+        acting_ratio = acting_count / total_pop
 
         elite_div_threshold = getattr(self.config, "elite_divergence_threshold", 0.4)
         pol_threshold = getattr(self.config, "polarization_threshold", 0.5)

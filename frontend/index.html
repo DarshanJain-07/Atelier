@@ -65,6 +65,14 @@
                         <span class="value" id="val-kl-divergence">--</span>
                     </div>
                     <div class="separator"></div>
+                    <div
+                        class="metric" tabindex="0"
+                        data-tooltip="Area under the curve for negative emotional valence over time (stewing)."
+                    >
+                        <span class="label">NEG-INT</span>
+                        <span class="value" id="val-negative-integral">--</span>
+                    </div>
+                    <div class="separator"></div>
                     <div class="metric" tabindex="0">
                         <span class="label">STATUS</span>
                         <span class="value" id="sys-status">--</span>
@@ -108,6 +116,10 @@
                     <div class="explain-section">
                         <h4>SOCIETAL STRUCTURE</h4>
                         <p id="ex-structure">--</p>
+                    </div>
+                    <div class="explain-section">
+                        <h4>LONG-TERM IMPACT</h4>
+                        <p id="ex-stewing-impact">--</p>
                     </div>
                     <div class="explain-section">
                         <h4>ENDOGENOUS EVENTS</h4>
@@ -539,6 +551,37 @@
                                     value="0.5"
                                     class="sidebar-input"
                                 />
+                            </div>
+                        </div>
+                    </div>
+                    <div class="config-section">
+                        <div class="section-header">
+                            <label class="section-title" tabindex="0" data-tooltip="Parameters for multi-tick temporal loop.">TIME-SERIES STEWING</label>
+                            <button class="reset-section-btn" onclick="resetSection(this)" data-tooltip="Reset section" aria-label="Reset Defaults">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                                    <path d="M3 3v5h5"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="sidebar-grid">
+                            <div class="sidebar-field">
+                                <label data-tooltip="Number of discrete ticks to simulate.">Ticks</label>
+                                <input type="number" id="res-stew-ticks" step="1" value="5" class="sidebar-input" />
+                            </div>
+                            <div class="sidebar-field">
+                                <label data-tooltip="Agent's self-retention weight.">Self Ret.</label>
+                                <input type="number" id="res-stew-self" step="0.1" value="0.6" class="sidebar-input" />
+                            </div>
+                        </div>
+                        <div class="sidebar-grid">
+                            <div class="sidebar-field">
+                                <label data-tooltip="Agent's local echo chamber influence.">Local Infl.</label>
+                                <input type="number" id="res-stew-local" step="0.1" value="0.3" class="sidebar-input" />
+                            </div>
+                            <div class="sidebar-field">
+                                <label data-tooltip="Viral contagion influence.">Viral Infl.</label>
+                                <input type="number" id="res-stew-viral" step="0.1" value="0.1" class="sidebar-input" />
                             </div>
                         </div>
                     </div>

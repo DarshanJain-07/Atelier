@@ -72,6 +72,11 @@ class RunProfile(BaseModel):
     panic_threshold: float = Field(default=-1.2, le=0.0)
 
     # New Features
+    stewing_ticks: int = 5
+    stewing_self_retention: float = 0.6
+    stewing_local_influence: float = 0.3
+    stewing_viral_influence: float = 0.1
+
     use_algorithmic_amplification: bool = False
     algo_sample_size: float = 0.1
     algo_exaggeration_factor: float = 1.5
@@ -159,6 +164,10 @@ def prepare_society_sync(run: RunProfile, run_output_dir: str):
         memory_decay_rate=run.memory_decay_rate,
         memory_desensitization_gain=run.memory_desensitization_gain,
         memory_trigger_stacking_gain=run.memory_trigger_stacking_gain,
+        stewing_ticks=run.stewing_ticks,
+        stewing_self_retention=run.stewing_self_retention,
+        stewing_local_influence=run.stewing_local_influence,
+        stewing_viral_influence=run.stewing_viral_influence,
         use_network_topology=run.use_network_topology,
         enable_evolution=run.enable_evolution,
     )
@@ -630,6 +639,9 @@ async def run_simulation(req: SimulationRequest, background_tasks: BackgroundTas
             validation_result = validator.calculate_divergence(
                 social_state["objective_center"], baseline_result
             )
+            validation_result["stewing_interpretation"] = validator.validate_stewing(
+                social_state.get("negative_integral", 0.0), getattr(config, "stewing_ticks", 5)
+            )
 
             # Clustering metrics
             cluster_metrics = validator.calculate_cluster_metrics(final_emotions)
@@ -687,6 +699,7 @@ async def run_simulation(req: SimulationRequest, background_tasks: BackgroundTas
                     "endogenous_event": social_state.get("endogenous_event"),
                     "detected_biases": detected_biases,
                     "reasoning": reasoning,
+                    "negative_integral": social_state.get("negative_integral", 0.0),
                 }
             )
 

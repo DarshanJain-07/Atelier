@@ -308,6 +308,12 @@ class SimConfig:
         0.33  # Standard deviation for generating initial trait bell curves
     )
 
+    # --- Time-Series Stewing Parameters ---
+    stewing_ticks: int = 5
+    stewing_self_retention: float = 0.6
+    stewing_local_influence: float = 0.3
+    stewing_viral_influence: float = 0.1
+
     # --- Physics Engine Parameters ---
     outrage_gain: float = 5.0
     max_viral_multiplier: float = 10.0

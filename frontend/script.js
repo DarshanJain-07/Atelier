@@ -202,6 +202,10 @@ document.getElementById("btn-add-run").addEventListener("click", () => {
         memory_decay_rate: parseFloat(document.getElementById("res-mem-decay")?.value || 0.7),
         memory_desensitization_gain: parseFloat(document.getElementById("res-mem-desens")?.value || 0.5),
         memory_trigger_stacking_gain: parseFloat(document.getElementById("res-mem-trigger")?.value || 1.2),
+        stewing_ticks: parseInt(document.getElementById("res-stew-ticks")?.value || 5),
+        stewing_self_retention: parseFloat(document.getElementById("res-stew-self")?.value || 0.6),
+        stewing_local_influence: parseFloat(document.getElementById("res-stew-local")?.value || 0.3),
+        stewing_viral_influence: parseFloat(document.getElementById("res-stew-viral")?.value || 0.1),
     };
   }
 
@@ -227,6 +231,10 @@ document.getElementById("btn-add-run").addEventListener("click", () => {
     memory_decay_rate: defaults.memory_decay_rate,
     memory_desensitization_gain: defaults.memory_desensitization_gain,
     memory_trigger_stacking_gain: defaults.memory_trigger_stacking_gain,
+    stewing_ticks: defaults.stewing_ticks,
+    stewing_self_retention: defaults.stewing_self_retention,
+    stewing_local_influence: defaults.stewing_local_influence,
+    stewing_viral_influence: defaults.stewing_viral_influence,
     cross_dim_interaction_strength: defaults.cross_dim_interaction_strength,
     threat_sensitivity_gain: defaults.threat_sensitivity_gain,
     k_processing_tanh_gain: defaults.k_processing_tanh_gain,
@@ -346,6 +354,17 @@ function displayResult(data) {
     klDivEl.textContent = isNaN(klDivVal) ? "--" : klDivVal.toFixed(3);
   }
 
+  const negIntVal = data.negative_integral !== undefined ? parseFloat(data.negative_integral) : NaN;
+  const negIntEl = document.getElementById("val-negative-integral");
+  if (negIntEl) {
+    negIntEl.textContent = isNaN(negIntVal) ? "--" : negIntVal.toFixed(3);
+    if (!isNaN(negIntVal)) {
+      if (negIntVal < 2.0) negIntEl.style.color = "#10b981";
+      else if (negIntVal < 5.0) negIntEl.style.color = "#fbbf24";
+      else negIntEl.style.color = "#ef4444";
+    }
+  }
+
   // 4. Update Agents
   const states = data.agent_states;
   const influences = data.agent_influence || [];
@@ -403,6 +422,7 @@ function displayResult(data) {
     document.getElementById("ex-viral").innerHTML = formatBold(data.explainability.viral_dynamics || "--");
     document.getElementById("ex-tug-of-war").innerHTML = formatBold(data.explainability.tug_of_war || "--");
     document.getElementById("ex-structure").innerHTML = formatBold(data.explainability.societal_structure || "--");
+    document.getElementById("ex-stewing-impact").innerHTML = formatBold(data.validation_details?.stewing_interpretation || "--");
     document.getElementById("ex-endogenous-events").innerHTML = formatBold(data.explainability.endogenous_events || "--");
 
     const biasContainer = document.getElementById("ex-biases");
@@ -792,6 +812,18 @@ async function runSimulation() {
     memory_trigger_stacking_gain: parseFloat(
       document.getElementById("res-mem-trigger")?.value || 1.2,
     ),
+    stewing_ticks: parseInt(
+      document.getElementById("res-stew-ticks")?.value || 5,
+    ),
+    stewing_self_retention: parseFloat(
+      document.getElementById("res-stew-self")?.value || 0.6,
+    ),
+    stewing_local_influence: parseFloat(
+      document.getElementById("res-stew-local")?.value || 0.3,
+    ),
+    stewing_viral_influence: parseFloat(
+      document.getElementById("res-stew-viral")?.value || 0.1,
+    ),
     cross_dim_interaction_strength: parseFloat(
       document.getElementById("res-cross-dim")?.value || 0.3,
     ),
@@ -873,6 +905,10 @@ async function runSimulation() {
         memory_decay_rate: run.memory_decay_rate,
         memory_desensitization_gain: run.memory_desensitization_gain,
         memory_trigger_stacking_gain: run.memory_trigger_stacking_gain,
+        stewing_ticks: run.stewing_ticks,
+        stewing_self_retention: run.stewing_self_retention,
+        stewing_local_influence: run.stewing_local_influence,
+        stewing_viral_influence: run.stewing_viral_influence,
         cross_dim_interaction_strength: run.cross_dim_interaction_strength,
         threat_sensitivity_gain: run.threat_sensitivity_gain,
         k_processing_tanh_gain: run.k_processing_tanh_gain,

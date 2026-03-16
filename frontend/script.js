@@ -1229,30 +1229,6 @@ function showDossier(index) {
       }
     }
     
-    // Update global and cluster specific metrics
-    const silEl = document.getElementById("c-val-silhouette");
-    const dbEl = document.getElementById("c-val-davies-bouldin");
-    const cSilEl = document.getElementById("c-val-cluster-silhouette");
-    const cDbEl = document.getElementById("c-val-cluster-davies-bouldin");
-
-    if (silEl) silEl.textContent = clusterMetrics.silhouette_score ? clusterMetrics.silhouette_score.toFixed(3) : "0.000";
-    if (dbEl) dbEl.textContent = clusterMetrics.davies_bouldin_index ? clusterMetrics.davies_bouldin_index.toFixed(3) : "0.000";
-
-    if (cSilEl) {
-      if (clusterMetrics.per_cluster_silhouette && typeof clusterMetrics.per_cluster_silhouette[emotion] !== 'undefined') {
-        cSilEl.textContent = clusterMetrics.per_cluster_silhouette[emotion].toFixed(3);
-      } else {
-        cSilEl.textContent = "N/A";
-      }
-    }
-    
-    if (cDbEl) {
-      if (clusterMetrics.per_cluster_davies_bouldin && typeof clusterMetrics.per_cluster_davies_bouldin[emotion] !== 'undefined') {
-        cDbEl.textContent = clusterMetrics.per_cluster_davies_bouldin[emotion].toFixed(3);
-      } else {
-        cDbEl.textContent = "N/A";
-      }
-    }
   }
   dossier.classList.remove("hidden");
 }

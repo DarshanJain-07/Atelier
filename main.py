@@ -582,7 +582,8 @@ async def run_simulation(req: SimulationRequest, background_tasks: BackgroundTas
             # 6. Social Physics
             phys_engine = SocialPhysicsEngine(config)
             social_state = phys_engine.aggregate_society(
-                final_emotions, influence, engagement_scores, adjacency_matrix
+                final_emotions, influence, engagement_scores, adjacency_matrix,
+                personalities=personalities, is_personal=is_personal
             )
 
             # --- ENDOGENOUS EVENT FEEDBACK LOOP (Autopoietic Simulation) ---
@@ -628,7 +629,8 @@ async def run_simulation(req: SimulationRequest, background_tasks: BackgroundTas
 
                 # Re-aggregate society with the new emotional state
                 social_state = phys_engine.aggregate_society(
-                    final_emotions_2, influence, engagement_scores_2, adjacency_matrix
+                    final_emotions_2, influence, engagement_scores_2, adjacency_matrix,
+                    personalities=personalities, is_personal=True
                 )
                 final_emotions = final_emotions_2
                 attention_weights = attention_weights_2

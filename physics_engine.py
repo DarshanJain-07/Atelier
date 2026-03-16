@@ -32,6 +32,8 @@ class SocialPhysicsEngine:
         influence_scores,
         engagement_scores=None,
         adjacency_matrix=None,
+        personalities=None,
+        is_personal=False,
     ):
         """
         Calculates the socio-emotional metrics for a single event over time (stewing).
@@ -212,36 +214,90 @@ class SocialPhysicsEngine:
         elite_divergence = torch.norm(elite_center - center_of_gravity).item()
 
         # ============================================================
-        # Endogenous Event Generation
+        # Endogenous Event Generation (Action Potential)
         # ============================================================
         action_vector = None
         action_name = None
 
+        # Re-calculate final local centers for validation
+        if adjacency_matrix is not None:
+            local_centers = torch.mm(
+                adjacency_matrix.to(current_emotions.device).to_dense(), current_emotions
+            )
+        else:
+            local_centers = center_of_gravity.unsqueeze(0).expand(N, -1)
+            
+        final_arousal = torch.norm(current_emotions, dim=1)
+        norm_emotion = current_emotions / (final_arousal.unsqueeze(1) + 1e-9)
+        local_arousal = torch.norm(local_centers, dim=1)
+        norm_local = local_centers / (local_arousal.unsqueeze(1) + 1e-9)
+        alignment = (norm_emotion * norm_local).sum(dim=1)
+        social_validation = 1.0 + alignment
+
+        base_cost = getattr(self.config, "base_action_cost", 0.5)
+        if personalities is not None:
+            extraversion = personalities[:, 2]
+            neuroticism = personalities[:, 4]
+            # Higher extraversion and neuroticism lower the cost of acting
+            # Influence lowers the cost slightly
+            inf = torch.tensor(influence_scores, device=current_emotions.device) if not isinstance(influence_scores, torch.Tensor) else influence_scores.to(current_emotions.device)
+            action_cost = base_cost - 0.1 * extraversion.to(current_emotions.device) - 0.1 * neuroticism.to(current_emotions.device) - 0.05 * torch.log1p(inf)
+        else:
+            action_cost = torch.full((N,), base_cost, device=current_emotions.device)
+            
+        action_cost = torch.clamp(action_cost, min=0.05)
+        action_potential = (final_arousal * social_validation) - action_cost
+
+        # Filter by engaged population (crucial for is_personal events)
+        if is_personal:
+            # Do not override the logic of is_personal, select from that targeted sample
+            if engagement_scores is not None:
+                # Only the heavily engaged local cluster
+                engaged_mask = engagement_scores > (engagement_scores.max() * 0.5)
+            else:
+                # Fallback if no engagement scores provided for personal event
+                engaged_mask = torch.rand(N, device=current_emotions.device) > 0.95
+        else:
+            if engagement_scores is not None:
+                # Those with non-trivial engagement
+                engaged_mask = engagement_scores > (engagement_scores.mean() * 0.1)
+            else:
+                engaged_mask = torch.ones(N, dtype=torch.bool, device=current_emotions.device)
+            
+        acting_agents = (action_potential > 0) & engaged_mask
+        acting_count = acting_agents.sum().item()
+        total_eligible = engaged_mask.sum().item()
+        
+        acting_ratio = acting_count / (total_eligible + 1e-9) if total_eligible > 0 else 0.0
+
         elite_div_threshold = getattr(self.config, "elite_divergence_threshold", 0.4)
         pol_threshold = getattr(self.config, "polarization_threshold", 0.5)
+        act_threshold = getattr(self.config, "action_threshold", 0.15)
 
-        if elite_divergence > elite_div_threshold and polarization > pol_threshold:
-            # Populist Uprising
-            action_vector = [0.0] * 12
-            action_vector[1] = -0.5  # Negative Safety
-            action_vector[2] = -0.8  # Negative Stability
-            action_vector[4] = -0.9  # Negative Fairness
-            action_vector[7] = 0.5  # Positive Freedom
-            action_name = "Populist Uprising"
-        elif elite_divergence > elite_div_threshold:
-            # Policy Shift (Elite push through changes)
-            action_vector = [0.0] * 12
-            action_vector[0] = 0.4  # Wealth impact
-            action_vector[4] = -0.3  # Negative Fairness
-            action_vector[6] = 0.6  # Positive Innovation
-            action_name = "Elite Policy Shift"
-        elif polarization > pol_threshold:
-            # Protest
-            action_vector = [0.0] * 12
-            action_vector[2] = -0.6  # Negative Stability
-            action_vector[4] = -0.5  # Negative Fairness
-            action_vector[5] = 0.7  # Positive In-Group
-            action_name = "Civil Protest"
+        # Only trigger an event if enough eligible people have the activation energy
+        if acting_ratio > act_threshold:
+            if elite_divergence > elite_div_threshold and polarization > pol_threshold:
+                # Populist Uprising
+                action_vector = [0.0] * 12
+                action_vector[1] = -0.5  # Negative Safety
+                action_vector[2] = -0.8  # Negative Stability
+                action_vector[4] = -0.9  # Negative Fairness
+                action_vector[7] = 0.5  # Positive Freedom
+                action_name = "Populist Uprising"
+            elif elite_divergence > elite_div_threshold:
+                # Policy Shift (Elite push through changes)
+                action_vector = [0.0] * 12
+                action_vector[0] = 0.4  # Wealth impact
+                action_vector[4] = -0.3  # Negative Fairness
+                action_vector[6] = 0.6  # Positive Innovation
+                action_name = "Elite Policy Shift"
+            elif polarization > pol_threshold:
+                # Protest
+                action_vector = [0.0] * 12
+                action_vector[2] = -0.6  # Negative Stability
+                action_vector[4] = -0.5  # Negative Fairness
+                action_vector[5] = 0.7  # Positive In-Group
+                action_name = "Civil Protest"
 
         # ============================================================
         # Final State Object

@@ -49,6 +49,13 @@ class CognitiveEngine:
         # --- Apply Gaussian noise ---
         noise = torch.randn(N, 12, device=device)
 
+        # Scale distortion magnitude by the signal strength to prevent
+        # overwhelming small signals with large additive noise.
+        signal_magnitude = torch.norm(event_signal, p=2)
+        
+        # Ensure alpha scales with signal strength (multiplicative noise effect)
+        alpha = alpha * signal_magnitude
+
         distorted = event_signal.unsqueeze(0) + alpha * noise
 
         return torch.clamp(distorted, -1.5, 1.5)

@@ -341,7 +341,7 @@ function displayResult(data) {
 
   const divVal = parseFloat(data.divergence);
   document.getElementById("val-divergence").textContent = isNaN(divVal)
-    ? data.divergence
+    ? "--"
     : divVal.toFixed(3);
 
   const klDivVal = data.kl_divergence ? parseFloat(data.kl_divergence) : NaN;

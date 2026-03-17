@@ -184,74 +184,47 @@ class SocialPhysicsEngine:
             elite_center = center_of_gravity.clone()
 
         # ============================================================
-        # Polarization Metrics
+        # Polarization Metrics (Bimodality Coefficient & Dispersion)
         # ============================================================
-        # Polarization is now defined by the Silhouette Score (Clustering Structure)
-        # 1.0 = Perfect separation, 0.0 = Overlapping/Random, -1.0 = Wrong clusters
+        # Instead of Silhouette Score (which fails on consensus/single clusters),
+        # we use Sarle's Bimodality Coefficient (BC) along the dominant emotional axis.
+        # BC > 0.555 indicates a bimodal (polarized) distribution.
+        
         global_distances = torch.norm(current_emotions - center_of_gravity, dim=1)
         dispersion = (global_distances * weights).sum().item()
-
-        per_cluster_sil = {}
-        sil_score = 0.0
-        db_score = 0.0
-        
-        try:
-            # Move to CPU for sklearn
-            features_np = current_emotions.detach().cpu().numpy()
-            # Determine clusters by dominant emotion
-            labels_np = np.argmax(features_np, axis=1)
-            
-            # Group agents below the threshold into a distinct "Neutral" cluster (label 8)
-            max_vals_np = np.max(features_np, axis=1)
-            labels_np[max_vals_np < self.config.dominant_emotion_threshold] = 8
-
-            unique_labels = np.unique(labels_np)
-
-            if len(unique_labels) > 1 and len(unique_labels) < len(labels_np):
-                # Sample size for Silhouette (O(N^2)) to ensure performance
-                sample_size = min(2000, len(labels_np))
-                sil_score = silhouette_score(
-                    features_np, labels_np, sample_size=sample_size
-                )
-                # DB Index (O(N))
-                db_score = davies_bouldin_score(features_np, labels_np)
-
-                # Use Silhouette as the primary polarization metric
-                # We clamp at 0 because negative silhouette implies "wrong clustering", 
-                # which in our case just means "messy/no polarization".
-                polarization = max(0.0, float(sil_score))
-
-                # Per-Cluster Silhouette (Expensive, so limit to reasonable N)
-                if len(labels_np) <= 2500:
-                    samples = silhouette_samples(features_np, labels_np)
-                    for label in unique_labels:
-                        label_idx = int(label)
-                        if label_idx < len(EMOTION_LABELS):
-                            emotion_name = EMOTION_LABELS[label_idx]
-                        elif label_idx == 8:
-                            emotion_name = "Neutral"
-                        else:
-                            continue
-                            
-                        mask = labels_np == label
-                        if mask.sum() > 1:
-                            per_cluster_sil[emotion_name] = float(np.mean(samples[mask]))
-            else:
-                # If only 1 cluster, polarization is effectively 0 (Consensus)
-                polarization = 0.0
-        except Exception as e:
-            # Fallback to dispersion if sklearn fails (though scale is different)
-            print(f"Polarization calc failed: {e}")
-            polarization = 0.0 # Default to 0 if metrics fail
-
-        cg_prob = torch.clamp(center_of_gravity, min=1e-9)
-        cg_prob = cg_prob / cg_prob.sum()
-        entropy = -(cg_prob * torch.log(cg_prob)).sum().item()
 
         dominant_axis = center_of_gravity
         dominant_axis_norm = dominant_axis / (torch.norm(dominant_axis) + 1e-9)
         projections = torch.matmul(current_emotions, dominant_axis_norm)
-        bimodality = projections.std().item()
+        
+        # Calculate Bimodality Coefficient using PyTorch
+        mean_proj = projections.mean()
+        std_proj = projections.std(unbiased=False)
+        
+        if std_proj > 1e-6:
+            skew = torch.mean(((projections - mean_proj) / std_proj) ** 3)
+            kurtosis = torch.mean(((projections - mean_proj) / std_proj) ** 4)
+            if kurtosis > 1e-6:
+                bimodality_coeff = (skew**2 + 1) / kurtosis
+            else:
+                bimodality_coeff = torch.tensor(0.0)
+        else:
+            bimodality_coeff = torch.tensor(0.0)
+            
+        bimodality = bimodality_coeff.item()
+        
+        # We define structural polarization as the Bimodality Coefficient.
+        # It's a continuous metric [0, ~1.0], avoiding the 0.0 dropouts of clustering algorithms.
+        polarization = bimodality
+
+        # Keep placeholder cluster metrics to satisfy the UI/validation
+        per_cluster_sil = {}
+        sil_score = 0.0
+        db_score = 0.0
+
+        cg_prob = torch.clamp(center_of_gravity, min=1e-9)
+        cg_prob = cg_prob / cg_prob.sum()
+        entropy = -(cg_prob * torch.log(cg_prob)).sum().item()
 
         # 1D Sentiment/Valence
         valence_score = torch.dot(center_of_gravity, VALENCE_WEIGHTS).item()

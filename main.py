@@ -663,10 +663,11 @@ async def run_simulation(req: SimulationRequest, background_tasks: BackgroundTas
 
             # Prepare emotions for UI
             emotion_indices = torch.argmax(final_emotions, dim=1).tolist()
-            engagement_list = engagement_scores.tolist()
+            max_vals, _ = torch.max(final_emotions, dim=1)
+            max_vals_list = max_vals.tolist()
             current_agent_emotions = []
             for k, idx in enumerate(emotion_indices):
-                if engagement_list[k] <= 0.0:
+                if max_vals_list[k] < config.dominant_emotion_threshold:
                     current_agent_emotions.append("Neutral")
                 else:
                     current_agent_emotions.append(EMOTION_LABELS[idx])

@@ -322,7 +322,7 @@ class SimConfig:
     dominant_emotion_threshold: float = 0.1
     elite_divergence_threshold: float = 0.4
     polarization_threshold: float = 0.5
-    action_threshold: float = 0.6
+    action_threshold: float = 0.75
     base_action_cost: float = 0.5
 
     # --- Cascade Parameters ---

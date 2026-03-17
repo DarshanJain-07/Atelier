@@ -596,7 +596,7 @@ async def run_simulation(req: SimulationRequest, background_tasks: BackgroundTas
             action_name = social_state.get("action_name")
 
             if action_vector is not None:
-                print(f"[{request_id}] ⚠️ Autopoietic Trigger: {action_name} generated.")
+                print(f"[{request_id}] Autopoietic Trigger: {action_name} generated.")
                 action_tensor = torch.tensor(
                     [action_vector],
                     dtype=torch.float32,

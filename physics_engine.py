@@ -186,17 +186,25 @@ class SocialPhysicsEngine:
         # ============================================================
         # Polarization Metrics
         # ============================================================
+        # Polarization is now defined by the Silhouette Score (Clustering Structure)
+        # 1.0 = Perfect separation, 0.0 = Overlapping/Random, -1.0 = Wrong clusters
         global_distances = torch.norm(current_emotions - center_of_gravity, dim=1)
-        # Old metric: Dispersion (Weighted average distance from center)
         dispersion = (global_distances * weights).sum().item()
 
-        # New Metric: Clustering-based Polarization (Silhouette Score)
         per_cluster_sil = {}
+        sil_score = 0.0
+        db_score = 0.0
+        
         try:
             # Move to CPU for sklearn
             features_np = current_emotions.detach().cpu().numpy()
             # Determine clusters by dominant emotion
             labels_np = np.argmax(features_np, axis=1)
+            
+            # Group agents below the threshold into a distinct "Neutral" cluster (label 8)
+            max_vals_np = np.max(features_np, axis=1)
+            labels_np[max_vals_np < self.config.dominant_emotion_threshold] = 8
+
             unique_labels = np.unique(labels_np)
 
             if len(unique_labels) > 1 and len(unique_labels) < len(labels_np):
@@ -209,31 +217,32 @@ class SocialPhysicsEngine:
                 db_score = davies_bouldin_score(features_np, labels_np)
 
                 # Use Silhouette as the primary polarization metric
-                # A score > 0.5 is strong structure.
+                # We clamp at 0 because negative silhouette implies "wrong clustering", 
+                # which in our case just means "messy/no polarization".
                 polarization = max(0.0, float(sil_score))
 
                 # Per-Cluster Silhouette (Expensive, so limit to reasonable N)
-                # Only calculate if we are within the sample limit to avoid massive lag
                 if len(labels_np) <= 2500:
                     samples = silhouette_samples(features_np, labels_np)
                     for label in unique_labels:
                         label_idx = int(label)
                         if label_idx < len(EMOTION_LABELS):
                             emotion_name = EMOTION_LABELS[label_idx]
-                            mask = labels_np == label
-                            if mask.sum() > 1:
-                                per_cluster_sil[emotion_name] = float(np.mean(samples[mask]))
+                        elif label_idx == 8:
+                            emotion_name = "Neutral"
+                        else:
+                            continue
+                            
+                        mask = labels_np == label
+                        if mask.sum() > 1:
+                            per_cluster_sil[emotion_name] = float(np.mean(samples[mask]))
             else:
-                sil_score = 0.0
-                db_score = 0.0
                 # If only 1 cluster, polarization is effectively 0 (Consensus)
                 polarization = 0.0
         except Exception as e:
-            # Fallback to dispersion if sklearn fails
+            # Fallback to dispersion if sklearn fails (though scale is different)
             print(f"Polarization calc failed: {e}")
-            polarization = dispersion
-            sil_score = 0.0
-            db_score = 0.0
+            polarization = 0.0 # Default to 0 if metrics fail
 
         cg_prob = torch.clamp(center_of_gravity, min=1e-9)
         cg_prob = cg_prob / cg_prob.sum()
@@ -311,8 +320,18 @@ class SocialPhysicsEngine:
             else:
                 engaged_mask = torch.ones(N, dtype=torch.bool, device=current_emotions.device)
             
-        acting_agents = (action_potential > 0) & engaged_mask
+        # FIX: Active Population should match the "Non-Neutral" clusters in the UI.
+        # Instead of using Action Potential > 0 (Behavioral), we use Emotion > Threshold (State).
+        # This ensures the "Class Distribution" in Active Pop matches the Cluster Dossier.
+        max_vals, _ = torch.max(current_emotions, dim=1)
+        non_neutral_mask = max_vals >= self.config.dominant_emotion_threshold
+        
+        # We rely solely on the emotion threshold. 
+        # If the agent has a strong emotion, they are "Active/Engaged" by definition.
+        # The previous 'engaged_mask' (based on raw scores) was too aggressive (cutting off valid emotions).
+        acting_agents = non_neutral_mask
         acting_count = acting_agents.sum().item()
+        
         total_eligible = engaged_mask.sum().item()
         
         # FIX: Acting ratio should be relative to TOTAL population (SimConfig.num_agents), not just the current N.
@@ -320,8 +339,7 @@ class SocialPhysicsEngine:
         # We want to know "What % of the TOTAL society is acting?"
         # Note: acting_count is already the intersection of:
         # 1. The filtered subset (implicit in N)
-        # 2. Engaged/Personal mask
-        # 3. Non-neutral (Action Potential > 0)
+        # 2. Non-neutral (Dominant Emotion >= Threshold)
         total_pop = getattr(self.config, "num_agents", N)
         if total_pop <= 0:
             total_pop = N

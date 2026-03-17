@@ -246,7 +246,7 @@ class SimConfig:
     stress_extraversion_boost: float = 0.7
 
     # --- Agent Memory Parameters ---
-    use_agent_memory: bool = True
+    use_agent_memory: bool = False
     memory_decay_rate: float = (
         0.7  # How much memory is retained each event (0.0 to 1.0)
     )

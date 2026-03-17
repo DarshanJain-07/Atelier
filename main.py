@@ -81,7 +81,7 @@ class RunProfile(BaseModel):
     algo_sample_size: float = 0.1
     algo_exaggeration_factor: float = 1.5
 
-    use_agent_memory: bool = True
+    use_agent_memory: bool = False
     memory_decay_rate: float = 0.7
     memory_desensitization_gain: float = 0.5
     memory_trigger_stacking_gain: float = 1.2
@@ -421,6 +421,11 @@ async def run_simulation(req: SimulationRequest, background_tasks: BackgroundTas
                 memory_full,
                 adjacency_matrix_full,
             ) = society_result
+
+            # --- ENFORCE DETERMINISM ---
+            # Reset RNG state before simulation logic (e.g. CognitiveEngine noise) executes
+            torch.manual_seed(config.seed)
+            np.random.seed(config.seed)
 
             # --- CLASS FILTERING ---
             indices_torch = []

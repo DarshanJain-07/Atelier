@@ -159,7 +159,7 @@ def create_topology(
     # Ensure inputs are on the same device
     device = exposures.device
     features_norm = features_norm.to(device)
-    
+
     # Target influence for Preferential Attachment
     inf_tensor = torch.tensor(influence_scores, dtype=torch.float32, device=device)
     inf_tensor = inf_tensor / inf_tensor.mean()
@@ -174,7 +174,7 @@ def create_topology(
 
         # Add homophily bias. Exponentiate to punish low similarity heavily.
         sim = torch.pow((sim + 1.0) / 2.0, getattr(config, "homophily_strength", 2.0))
-        
+
         # Preferential Attachment: Scale probability by target's influence
         prob_matrix = sim * inf_tensor.unsqueeze(0)
 
@@ -187,7 +187,7 @@ def create_topology(
         # Determine k for this batch
         batch_k = k_array[i:end]  # numpy array
         max_k = int(np.max(batch_k))
-        
+
         if max_k == 0:
             continue
 
@@ -272,29 +272,6 @@ def generate_society(config: SimConfig):
         pareto_multiplier = (np.random.pareto(alpha, config.num_agents) + 1) * 2.0
         influence_scores *= pareto_multiplier
 
-    # To create a realistic correlation between structural influence and susceptibility,
-    # we slightly modify personalities of top influencers to be less susceptible
-    # (lower agreeableness, lower openness to external change)
-    # and lower influencers to be more standard.
-
-    # rank influence to get percentiles
-    influence_ranks = np.argsort(np.argsort(influence_scores)) / (config.num_agents - 1)
-
-    # Agreeableness is index 3, Openness is index 0
-    # Top influencers (rank near 1.0) get a reduction in agreeableness and openness
-    stubbornness_modifier = (
-        torch.tensor(influence_ranks, dtype=torch.float32).unsqueeze(1) * 0.3
-    )
-
-    # Reduce agreeableness (index 3) and openness (index 0)
-    # Give them a minimum floor so they can still be occasionally swayed (e.g. by board members/peers)
-    personalities[:, 0] = torch.clamp(
-        personalities[:, 0] - stubbornness_modifier.squeeze() * 0.4, 0.3, 1.0
-    )
-    personalities[:, 3] = torch.clamp(
-        personalities[:, 3] - stubbornness_modifier.squeeze() * 0.4, 0.3, 1.0
-    )
-
     # ---- Wealth (no role multipliers) ----
     wealth_base = np.ones(config.num_agents)
 
@@ -320,9 +297,7 @@ def generate_society(config: SimConfig):
     # Squish non-wealth traits smoothly to strict bounds to avoid artificial extremest clusters
     non_wealth_mask = torch.ones(num_dims, dtype=torch.bool)
     non_wealth_mask[wealth_idx] = False
-    exposures[:, non_wealth_mask] = torch.tanh(
-        exposures[:, non_wealth_mask]
-    )
+    exposures[:, non_wealth_mask] = torch.tanh(exposures[:, non_wealth_mask])
     personalities = torch.clamp(personalities, 0.0, 1.0)
 
     # --- Affinity Normalization (Cognitive Bandwidth) ---

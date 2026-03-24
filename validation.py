@@ -2,7 +2,6 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from dotenv import load_dotenv
-from sklearn.metrics import davies_bouldin_score, silhouette_score
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
 from schema import EMOTION_LABELS
@@ -114,75 +113,13 @@ class Validator:
             "interpretation": interpretation,
         }
 
-    def calculate_cluster_metrics(self, final_emotions: torch.Tensor):
-        try:
-            features = final_emotions.cpu().numpy()
-            labels = np.argmax(features, axis=1)
-
-            unique_labels = np.unique(labels)
-            
-            per_cluster_sil = {}
-            per_cluster_db = {}
-            
-            if len(unique_labels) > 1 and len(unique_labels) < len(labels):
-                sil_score = silhouette_score(features, labels)
-                db_score = davies_bouldin_score(features, labels)
-                
-                from sklearn.metrics import silhouette_samples
-                from sklearn.metrics.pairwise import pairwise_distances
-                
-                sil_samples = silhouette_samples(features, labels)
-                for label in unique_labels:
-                    emotion_name = EMOTION_LABELS[label]
-                    per_cluster_sil[emotion_name] = float(np.mean(sil_samples[labels == label]))
-                    
-                centroids = []
-                s_i = []
-                for label in unique_labels:
-                    cluster_points = features[labels == label]
-                    centroid = np.mean(cluster_points, axis=0)
-                    centroids.append(centroid)
-                    s_i.append(np.mean(pairwise_distances(cluster_points, [centroid])))
-                    
-                centroids_dist = pairwise_distances(centroids)
-                
-                for i, label in enumerate(unique_labels):
-                    max_R_ij = 0.0
-                    for j in range(len(unique_labels)):
-                        if i != j and centroids_dist[i, j] > 0:
-                            R_ij = (s_i[i] + s_i[j]) / centroids_dist[i, j]
-                            if R_ij > max_R_ij:
-                                max_R_ij = R_ij
-                    emotion_name = EMOTION_LABELS[label]
-                    per_cluster_db[emotion_name] = float(max_R_ij)
-            else:
-                sil_score = 0.0
-                db_score = 0.0
-                per_cluster_sil = {EMOTION_LABELS[label]: 0.0 for label in unique_labels}
-                per_cluster_db = {EMOTION_LABELS[label]: 0.0 for label in unique_labels}
-
-            return {
-                "silhouette_score": round(float(sil_score), 4),
-                "davies_bouldin_index": round(float(db_score), 4),
-                "per_cluster_silhouette": {k: round(v, 4) for k, v in per_cluster_sil.items()},
-                "per_cluster_davies_bouldin": {k: round(v, 4) for k, v in per_cluster_db.items()}
-            }
-        except Exception as e:
-            print(f"Failed to calculate cluster metrics: {e}")
-            return {
-                "silhouette_score": 0.0, 
-                "davies_bouldin_index": 0.0,
-                "per_cluster_silhouette": {},
-                "per_cluster_davies_bouldin": {}
-            }
-
     def validate_stewing(self, negative_integral: float, ticks: int):
         """
         Interprets the long-term impact based on the sustained negative emotion
         over multiple time ticks.
         """
         avg_negativity = negative_integral / max(1, ticks)
-        
+
         if avg_negativity > 0.8:
             return "Deep Structural Consequence (Severe, sustained outrage)"
         elif avg_negativity > 0.4:

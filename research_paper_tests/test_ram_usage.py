@@ -103,9 +103,9 @@ async def run_full_pipeline(count, prompt):
     validation_result = validator.calculate_divergence(
         social_state["objective_center"], baseline_result
     )
-    cluster_metrics = validator.calculate_cluster_metrics(final_emotions)
-    
+
     # 7. Explainability
+
     print("-> Running Explainability Engine...")
     explain_engine = ExplainabilityEngine()
     explainability_data = explain_engine.generate_explanation(

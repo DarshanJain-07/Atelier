@@ -650,12 +650,6 @@ async def run_simulation(req: SimulationRequest, background_tasks: BackgroundTas
                 social_state.get("negative_integral", 0.0), getattr(config, "stewing_ticks", 5)
             )
 
-            # Clustering metrics (Now provided by Physics Engine)
-            cluster_metrics = social_state.get("cluster_metrics", {
-                "silhouette_score": 0.0,
-                "davies_bouldin_index": 0.0
-            })
-
             # 8. Explainability
             explain_engine = ExplainabilityEngine()
             explainability_data = explain_engine.generate_explanation(
@@ -701,7 +695,6 @@ async def run_simulation(req: SimulationRequest, background_tasks: BackgroundTas
                     ],  # Keep key for UI compatibility
                     "wasserstein_distance": validation_result["wasserstein_distance"],
                     "kl_divergence": validation_result["kl_divergence"],
-                    "cluster_metrics": cluster_metrics,
                     "validation_details": validation_result,
                     "explainability": explainability_data,
                     "agent_states": current_agent_emotions,

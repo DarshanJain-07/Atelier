@@ -1,6 +1,5 @@
 import numpy as np
 import torch
-from sklearn.metrics import silhouette_score, davies_bouldin_score, silhouette_samples
 
 from schema import EMOTION_LABELS, VALENCE_WEIGHTS
 
@@ -217,11 +216,6 @@ class SocialPhysicsEngine:
         # It's a continuous metric [0, ~1.0], avoiding the 0.0 dropouts of clustering algorithms.
         polarization = bimodality
 
-        # Keep placeholder cluster metrics to satisfy the UI/validation
-        per_cluster_sil = {}
-        sil_score = 0.0
-        db_score = 0.0
-
         cg_prob = torch.clamp(center_of_gravity, min=1e-9)
         cg_prob = cg_prob / cg_prob.sum()
         entropy = -(cg_prob * torch.log(cg_prob)).sum().item()
@@ -369,12 +363,6 @@ class SocialPhysicsEngine:
             # Stability metrics
             "polarization": polarization,
             "dispersion": dispersion,
-            "cluster_metrics": {
-                "silhouette_score": sil_score,
-                "davies_bouldin_index": db_score,
-                "per_cluster_silhouette": per_cluster_sil,
-                "per_cluster_davies_bouldin": {} # Not implemented to save perf
-            },
             "entropy": entropy,
             "bimodality": bimodality,
             "elite_divergence": elite_divergence,

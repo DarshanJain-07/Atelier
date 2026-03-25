@@ -276,6 +276,7 @@ class SimConfig:
     memory_trigger_stacking_gain: float = (
         1.2  # How much past stress amplifies new similar threats
     )
+    memory_social_rehearsal_gain: float = 0.4 # Stage 2: Social Consolidation
 
     # --- Algorithmic Amplification (2-Pass Filter Bubble) ---
     use_algorithmic_amplification: bool = False

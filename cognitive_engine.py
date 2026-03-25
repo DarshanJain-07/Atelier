@@ -292,13 +292,32 @@ class CognitiveEngine:
         context_vector = perceived_world * attention_weights
         context_vector = torch.clamp(context_vector, -2.0, 2.0)
 
-        # ---------------------------------
-        # 7. Memory Update
-        # ---------------------------------
-        updated_memory = agent_memory
-        if agent_memory is not None and getattr(self.config, "use_agent_memory", False):
-            decay = getattr(self.config, "memory_decay_rate", 0.7)
-            # They remember what they actually internalized
-            updated_memory = (agent_memory.to(device) * decay) + context_vector
+        return context_vector, attention_weights, engagement_scores
 
-        return context_vector, attention_weights, engagement_scores, updated_memory
+    def consolidate_memory(
+        self,
+        agent_memory: torch.Tensor,
+        context_vector: torch.Tensor,
+        social_rehearsal_factor: float = 0.0,
+    ) -> torch.Tensor:
+        """
+        Stage 2 Memory Consolidation: Social Rehearsal.
+        The decay rate is reduced if the event is globally viral/rehearsed.
+        """
+        if not getattr(self.config, "use_agent_memory", False):
+            return agent_memory
+
+        device = agent_memory.device
+        base_decay = getattr(self.config, "memory_decay_rate", 0.7)
+        rehearsal_gain = getattr(self.config, "memory_social_rehearsal_gain", 0.4)
+        
+        # Effective decay: 
+        # If rehearsal is high, the memory 'sticks' (decay -> 1.0)
+        # If rehearsal is low, the memory fades (decay -> base_decay)
+        # We blend the base decay with a higher persistence factor.
+        effective_decay = base_decay + (1.0 - base_decay) * (social_rehearsal_factor * rehearsal_gain)
+        effective_decay = min(0.99, effective_decay)
+        
+        # Consolidation Update
+        updated_memory = (agent_memory.to(device) * effective_decay) + context_vector.to(device)
+        return updated_memory

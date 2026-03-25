@@ -85,6 +85,7 @@ class RunProfile(BaseModel):
     memory_decay_rate: float = 0.7
     memory_desensitization_gain: float = 0.5
     memory_trigger_stacking_gain: float = 1.2
+    memory_social_rehearsal_gain: float = 0.4
 
     use_network_topology: bool = True
     enable_evolution: bool = True
@@ -166,6 +167,7 @@ def prepare_society_sync(run: RunProfile, run_output_dir: str):
         memory_decay_rate=run.memory_decay_rate,
         memory_desensitization_gain=run.memory_desensitization_gain,
         memory_trigger_stacking_gain=run.memory_trigger_stacking_gain,
+        memory_social_rehearsal_gain=run.memory_social_rehearsal_gain,
         stewing_ticks=run.stewing_ticks,
         stewing_self_retention=run.stewing_self_retention,
         stewing_local_influence=run.stewing_local_influence,
@@ -507,7 +509,7 @@ async def run_simulation(req: SimulationRequest, background_tasks: BackgroundTas
                 # We need a subset of the adjacency matrix for the A/B test sample
                 ab_adj = subset_adjacency(adjacency_matrix, torch.arange(sample_size, device=exposures.device))
 
-                _, ab_attention, ab_engagement, _ = cog_engine.run(
+                _, ab_attention, ab_engagement = cog_engine.run(
                     world_tensor_raw=world_tensor,
                     urgency=urgency,
                     is_personal=is_personal,
@@ -557,7 +559,7 @@ async def run_simulation(req: SimulationRequest, background_tasks: BackgroundTas
                 final_world_tensor = world_tensor
 
             # --- PASS 2: The Viral Broadcast ---
-            context_vector, attention_weights, engagement_scores, updated_memory = (
+            context_vector, attention_weights, engagement_scores = (
                 cog_engine.run(
                     world_tensor_raw=final_world_tensor,
                     urgency=urgency,
@@ -569,16 +571,6 @@ async def run_simulation(req: SimulationRequest, background_tasks: BackgroundTas
                     adjacency_matrix=adjacency_matrix,
                 )
             )
-
-            # --- MEMORY UPDATE ---
-            # Update the global memory array for this specific run
-            if getattr(config, "use_agent_memory", False) and updated_memory is not None:
-                if run.social_class != "All":
-                    memory_full[indices_torch[:limit]] = updated_memory.to(
-                        memory_full.device
-                    )
-                else:
-                    memory_full[:limit] = updated_memory.to(memory_full.device)
 
             device = context_vector.device
             projection_matrix = PSYCH_PROJECTION.to(device)
@@ -615,7 +607,6 @@ async def run_simulation(req: SimulationRequest, background_tasks: BackgroundTas
                     context_vector_2,
                     attention_weights_2,
                     engagement_scores_2,
-                    updated_memory_2,
                 ) = cog_engine.run(
                     world_tensor_raw=action_tensor,
                     urgency=0.8,  # High urgency for endogenous events
@@ -623,17 +614,9 @@ async def run_simulation(req: SimulationRequest, background_tasks: BackgroundTas
                     exposures=exposures,
                     personalities=personalities,
                     agent_affinities=affinities,
-                    agent_memory=updated_memory,
+                    agent_memory=memory, # Use original memory for the 2nd pass imprint
                     adjacency_matrix=adjacency_matrix,
                 )
-
-                if getattr(config, "use_agent_memory", False) and updated_memory_2 is not None:
-                    if run.social_class != "All":
-                        memory_full[indices_torch[:limit]] = updated_memory_2.to(
-                            memory_full.device
-                        )
-                    else:
-                        memory_full[:limit] = updated_memory_2.to(memory_full.device)
 
                 final_emotions_2 = torch.matmul(context_vector_2, projection_matrix)
                 final_emotions_2 = F.softmax(
@@ -645,10 +628,35 @@ async def run_simulation(req: SimulationRequest, background_tasks: BackgroundTas
                     final_emotions_2, influence, engagement_scores_2, adjacency_matrix,
                     personalities=personalities, is_personal=True
                 )
+                
+                # Update loop variables for consolidation
                 final_emotions = final_emotions_2
                 attention_weights = attention_weights_2
                 engagement_scores = engagement_scores_2
+                context_vector = context_vector_2 # The final internalized thing
                 social_state["endogenous_event"] = action_name
+
+            # --- 2-STAGE MEMORY CONSOLIDATION ---
+            # Update the global memory array for this specific run
+            if getattr(config, "use_agent_memory", False):
+                # Calculate Social Rehearsal Factor (Salience)
+                # Proxy: Combination of Confidence (intensity) and Acting Ratio (volume)
+                conf = social_state.get("confidence", 0.0)
+                act_ratio = social_state.get("acting_ratio", 0.0)
+                rehearsal_factor = (conf + act_ratio) / 2.0
+                
+                updated_memory = cog_engine.consolidate_memory(
+                    agent_memory=memory,
+                    context_vector=context_vector,
+                    social_rehearsal_factor=rehearsal_factor
+                )
+                
+                if run.social_class != "All":
+                    memory_full[indices_torch[:limit]] = updated_memory.to(
+                        memory_full.device
+                    )
+                else:
+                    memory_full[:limit] = updated_memory.to(memory_full.device)
 
             # 7. Validation
             validation_result = validator.calculate_divergence(

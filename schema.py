@@ -257,7 +257,7 @@ class SimConfig:
     temp_neuroticism_weight: float = 0.6
 
     threshold_base: float = (
-        0.05  # Lowered from 0.1 to allow smaller emotional responses through
+        0.02  # Lowered from 0.05 to allow subtle unique triggers through
     )
     threshold_extraversion_weight: float = 0.15
 
@@ -328,9 +328,9 @@ class SimConfig:
 
     # --- Initialization Parameters ---
     initial_trait_std_dev: float = (
-        0.33  # Standard deviation for generating initial trait bell curves
+        0.40  # Increased from 0.33 to provide more baseline variety
     )
-    personality_socialization_gain: float = 0.2 # Stage 2: Nurture/Socialization
+    personality_socialization_gain: float = 0.05 # Stage 2: Nurture/Socialization (Lowered to preserve diversity)
 
     # --- Time-Series Stewing Parameters ---
     stewing_ticks: int = 5
@@ -339,9 +339,9 @@ class SimConfig:
     stewing_viral_influence: float = 0.1
 
     # --- Physics Engine Parameters ---
-    outrage_gain: float = 5.0
+    outrage_gain: float = 8.0
     max_viral_multiplier: float = 10.0
-    saturation_midpoint: float = 0.5
+    saturation_midpoint: float = 0.25
     elite_percentile: float = 0.95
     dominant_emotion_threshold: float = 0.1
     elite_divergence_threshold: float = 0.4

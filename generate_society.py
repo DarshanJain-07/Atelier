@@ -308,13 +308,13 @@ def generate_society(config: SimConfig):
     exposures[:, wealth_idx] = 0.0 # Placeholder
 
     # 2. Correlated Personalities
-    raw_personalities = traits[:, num_dims : num_dims + num_personalities]
+    # Use a higher multiplier (1.5 vs 1.0) for personalities to ensure we cover sigmoid tails
+    raw_personalities = (traits[:, num_dims : num_dims + num_personalities] / config.initial_trait_std_dev) * 1.5
+    
     try:
-        standard_noise = raw_personalities / config.initial_trait_std_dev
         jitter = torch.eye(5) * 1e-4
         L = torch.linalg.cholesky(PERSONALITY_CORRELATIONS + jitter)
-        correlated_noise = torch.matmul(standard_noise, L.T)
-        raw_personalities = correlated_noise * config.initial_trait_std_dev
+        raw_personalities = torch.matmul(raw_personalities, L.T)
     except Exception as e:
         print(f"Warning: Cholesky failed ({e}).")
 
@@ -342,8 +342,8 @@ def generate_society(config: SimConfig):
     # 4.5 Stage 2: Personality Socialization (Nurture/Drift)
     # Drift personalities slightly toward the local network mean
     if adjacency_matrix is not None and getattr(config, "personality_socialization_gain", 0.0) > 0:
-        gain = config.personality_social_consensus_gain if hasattr(config, "personality_socialization_gain") else 0.2
-        gain = getattr(config, "personality_socialization_gain", 0.2)
+        # Reduced default gain to prevent variance collapse
+        gain = getattr(config, "personality_socialization_gain", 0.05)
         print(f"Applying Personality Socialization (Stage 2, Gain={gain})...")
         # Use row-normalized adjacency to get local means
         local_personality_mean = torch.sparse.mm(adjacency_matrix, personalities)

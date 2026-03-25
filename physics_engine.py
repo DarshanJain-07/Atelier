@@ -250,6 +250,12 @@ class SocialPhysicsEngine:
         else:
             local_centers = center_of_gravity.unsqueeze(0).expand(N, -1)
             
+        # ============================================================
+        # 2-Stage Action Potential (Granovetter's Threshold Model)
+        # ============================================================
+        # Stage 1: Individual Motivation
+        # Stage 2: Critical Mass / Social Thresholds
+        
         final_arousal = torch.norm(current_emotions, dim=1)
         norm_emotion = current_emotions / (final_arousal.unsqueeze(1) + 1e-9)
         local_arousal = torch.norm(local_centers, dim=1)
@@ -259,57 +265,75 @@ class SocialPhysicsEngine:
 
         base_cost = getattr(self.config, "base_action_cost", 0.5)
         if personalities is not None:
-            extraversion = personalities[:, 2]
-            neuroticism = personalities[:, 4]
-            # Higher extraversion and neuroticism lower the cost of acting
-            # Influence lowers the cost slightly
+            extraversion = personalities[:, 2].to(current_emotions.device)
+            neuroticism = personalities[:, 4].to(current_emotions.device)
             inf = torch.tensor(influence_scores, device=current_emotions.device) if not isinstance(influence_scores, torch.Tensor) else influence_scores.to(current_emotions.device)
-            action_cost = base_cost - 0.1 * extraversion.to(current_emotions.device) - 0.1 * neuroticism.to(current_emotions.device) - 0.05 * torch.log1p(inf)
+            action_cost = base_cost - 0.1 * extraversion - 0.1 * neuroticism - 0.05 * torch.log1p(inf)
         else:
             action_cost = torch.full((N,), base_cost, device=current_emotions.device)
             
         action_cost = torch.clamp(action_cost, min=0.05)
-        action_potential = (final_arousal * social_validation) - action_cost
-
+        
+        # --- Stage 1: Individual Motivation (Internal Willingness) ---
+        # Motivation is raw energy minus the cost to act
+        individual_motivation = (final_arousal * social_validation) - action_cost
+        
+        # --- Stage 2: Critical Mass / Local Thresholds ---
+        # Threshold: Emotion must be dominant AND motivation must be positive.
+        max_vals, _ = torch.max(current_emotions, dim=1)
+        is_motivated = individual_motivation > 0.1
+        is_emotional = max_vals >= self.config.dominant_emotion_threshold
+        
         # Filter by engaged population (crucial for is_personal events)
         if is_personal:
-            # Do not override the logic of is_personal, select from that targeted sample
             if engagement_scores is not None:
-                # Only the heavily engaged local cluster
                 engaged_mask = engagement_scores > (engagement_scores.max() * 0.5)
             else:
-                # Fallback if no engagement scores provided for personal event
                 engaged_mask = torch.rand(N, device=current_emotions.device) > 0.95
         else:
             if engagement_scores is not None:
-                # Those with non-trivial engagement
                 engaged_mask = engagement_scores > (engagement_scores.mean() * 0.1)
             else:
                 engaged_mask = torch.ones(N, dtype=torch.bool, device=current_emotions.device)
+
+        # Initial set of acting agents: Motivated, Emotional, and Engaged
+        acting_agents = (is_motivated & is_emotional & engaged_mask).float()
+        
+        if adjacency_matrix is not None and getattr(self.config, "use_granovetter_thresholds", True):
+            # Personal thresholds for "following the crowd"
+            t_mean = getattr(self.config, "granovetter_threshold_mean", 0.25)
+            t_std = getattr(self.config, "granovetter_threshold_std", 0.15)
             
-        # FIX: Active Population should match the "Non-Neutral" clusters in the UI.
-        # Instead of using Action Potential > 0 (Behavioral), we use Emotion > Threshold (State).
-        # This ensures the "Class Distribution" in Active Pop matches the Cluster Dossier.
-        max_vals, _ = torch.max(current_emotions, dim=1)
-        non_neutral_mask = max_vals >= self.config.dominant_emotion_threshold
-        
-        # We rely solely on the emotion threshold. 
-        # If the agent has a strong emotion, they are "Active/Engaged" by definition.
-        # The previous 'engaged_mask' (based on raw scores) was too aggressive (cutting off valid emotions).
-        acting_agents = non_neutral_mask
+            if personalities is not None:
+                consc = personalities[:, 1].to(current_emotions.device)
+                agree = personalities[:, 3].to(current_emotions.device)
+                # Conscientiousness and Agreeableness increase the threshold (harder to flip)
+                personal_thresholds = t_mean + (consc + agree - 1.0) * t_std
+            else:
+                personal_thresholds = torch.full((N,), t_mean, device=current_emotions.device)
+            
+            personal_thresholds = torch.clamp(personal_thresholds, min=0.01, max=0.9)
+            
+            # Iterative activation (Snowball effect)
+            for _ in range(3):
+                # Calculate fraction of acting neighbors
+                neighbor_acting_ratio = torch.mm(adjacency_matrix.to_dense().to(current_emotions.device), acting_agents.unsqueeze(1)).squeeze()
+                
+                # An agent acts if:
+                # 1. They were already acting (Persistence)
+                # 2. They are emotional, engaged AND (their motivation is marginal OR neighbors cross threshold)
+                marginal_motivation = individual_motivation > -0.1
+                social_trigger = neighbor_acting_ratio > personal_thresholds
+                
+                new_acting = (is_emotional & engaged_mask & (is_motivated | (marginal_motivation & social_trigger)))
+                acting_agents = new_acting.float()
+
+        # Final acting count and ratio
         acting_count = acting_agents.sum().item()
-        
         total_eligible = engaged_mask.sum().item()
         
-        # FIX: Acting ratio should be relative to TOTAL population (SimConfig.num_agents), not just the current N.
-        # This ensures that if we filter for "Elites" (small N), we don't get 100% acting ratio just because all Elites are acting.
-        # We want to know "What % of the TOTAL society is acting?"
-        # Note: acting_count is already the intersection of:
-        # 1. The filtered subset (implicit in N)
-        # 2. Non-neutral (Dominant Emotion >= Threshold)
         total_pop = getattr(self.config, "num_agents", N)
-        if total_pop <= 0:
-            total_pop = N
+        if total_pop <= 0: total_pop = N
         
         acting_ratio = acting_count / total_pop
 

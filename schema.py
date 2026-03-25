@@ -344,8 +344,11 @@ class SimConfig:
     dominant_emotion_threshold: float = 0.1
     elite_divergence_threshold: float = 0.4
     polarization_threshold: float = 0.5
-    action_threshold: float = 0.75
+    action_threshold: float = 0.15
     base_action_cost: float = 0.5
+    use_granovetter_thresholds: bool = True # Stage 2: Critical Mass
+    granovetter_threshold_mean: float = 0.25 # Fraction of neighbors acting
+    granovetter_threshold_std: float = 0.15
 
     # --- Cascade Parameters ---
     cascade_knn_k: int = 8

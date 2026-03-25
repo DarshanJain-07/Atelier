@@ -88,6 +88,12 @@ class RunProfile(BaseModel):
     memory_social_rehearsal_gain: float = 0.4
 
     use_network_topology: bool = True
+    triadic_closure_prob: float = 0.2
+    triadic_closure_iterations: int = 1
+    use_granovetter_thresholds: bool = True
+    granovetter_threshold_mean: float = 0.25
+    granovetter_threshold_std: float = 0.15
+    personality_socialization_gain: float = 0.2
     enable_evolution: bool = True
 
     # Researcher (Cognitive)
@@ -173,6 +179,12 @@ def prepare_society_sync(run: RunProfile, run_output_dir: str):
         stewing_local_influence=run.stewing_local_influence,
         stewing_viral_influence=run.stewing_viral_influence,
         use_network_topology=run.use_network_topology,
+        triadic_closure_prob=run.triadic_closure_prob,
+        triadic_closure_iterations=run.triadic_closure_iterations,
+        use_granovetter_thresholds=run.use_granovetter_thresholds,
+        granovetter_threshold_mean=run.granovetter_threshold_mean,
+        granovetter_threshold_std=run.granovetter_threshold_std,
+        personality_socialization_gain=run.personality_socialization_gain,
         enable_evolution=run.enable_evolution,
     )
     config.wealth_dim_idx = DIMENSION_INDICES["Wealth"]

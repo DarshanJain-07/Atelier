@@ -8,6 +8,7 @@ import torch
 from schema import (
     DIMENSION_INDICES,
     DIMENSIONS,
+    PERSONALITY_CORRELATIONS,
     SimConfig,
 )
 from society_evolution import SocietyEvolution
@@ -16,9 +17,9 @@ from society_evolution import SocietyEvolution
 # ================================
 # Mutation Logic
 # ================================
-def apply_random_mutations(exposures, personalities, temperature, seed):
+def apply_random_mutations(exposures, personality_logits, temperature, seed):
     if temperature <= 0.0:
-        return exposures, personalities
+        return exposures, personality_logits
 
     rng = torch.Generator()
     rng.manual_seed(seed + 999)
@@ -31,7 +32,7 @@ def apply_random_mutations(exposures, personalities, temperature, seed):
     mutant_indices = torch.where(mutant_mask)[0]
 
     if len(mutant_indices) == 0:
-        return exposures, personalities
+        return exposures, personality_logits
 
     num_changes = math.ceil(3 * temperature)
 
@@ -43,12 +44,30 @@ def apply_random_mutations(exposures, personalities, temperature, seed):
         )
         exposures[mutant_indices, col_indices] = random_values
 
+    # Apply additive noise to personality logits to preserve correlations
     for _ in range(num_changes):
         col_indices = torch.randint(0, 5, (len(mutant_indices),), generator=rng)
-        random_values = torch.rand(len(mutant_indices), generator=rng)
-        personalities[mutant_indices, col_indices] = random_values
+        # Additive Gaussian noise (logits)
+        noise = torch.randn(len(mutant_indices), generator=rng) * 0.5
+        personality_logits[mutant_indices, col_indices] += noise
 
-    return exposures, personalities
+    # ---- Radical Outliers (Paradoxical Archetypes) ----
+    # Creates "Complete Personality Flips" (e.g., Low Openness CEO, Poor Celebrity).
+    # These agents deliberately break the correlation matrix to provide realistic variety.
+    radical_prob = 0.05 * temperature
+    radical_mask = torch.rand(n_agents, generator=rng) < radical_prob
+    radical_indices = torch.where(radical_mask)[0]
+
+    if len(radical_indices) > 0:
+        # For these outliers, we completely overwrite 1-2 traits with strong independent noise
+        # range ~[-4, 4] in logits -> [0.01, 0.99] in sigmoid
+        # This breaks the Cholesky constraint for this specific trait.
+        for _ in range(2):
+            col_indices = torch.randint(0, 5, (len(radical_indices),), generator=rng)
+            radical_values = torch.randn(len(radical_indices), generator=rng) * 2.5
+            personality_logits[radical_indices, col_indices] = radical_values
+
+    return exposures, personality_logits
 
 
 # ================================
@@ -254,13 +273,40 @@ def generate_society(config: SimConfig):
     traits = torch.randn(config.num_agents, total_dims) * config.initial_trait_std_dev
 
     exposures = traits[:, :num_dims]
-    # Sigmoid to bound personalities between 0 and 1
-    personalities = torch.sigmoid(traits[:, num_dims : num_dims + num_personalities])
+
+    # ---- Apply Cholesky Decomposition for Correlated Personalities ----
+    raw_personalities = traits[:, num_dims : num_dims + num_personalities]
+
+    try:
+        # standard_noise needs to be roughly N(0, 1) for the correlation matrix to hold true meaning
+        # Our traits are generated with std=config.initial_trait_std_dev
+        standard_noise = raw_personalities / config.initial_trait_std_dev
+
+        # Cholesky: L * L.T = Sigma
+        # Y = X * L.T where X is N(0, I)
+
+        # Add tiny jitter to diagonal for numerical stability (ensure positive definite)
+        jitter = torch.eye(5) * 1e-4
+        L = torch.linalg.cholesky(PERSONALITY_CORRELATIONS + jitter)
+        correlated_noise = torch.matmul(standard_noise, L.T)
+
+        # Scale back
+        raw_personalities = correlated_noise * config.initial_trait_std_dev
+        print("Applied Cholesky Decomposition for Realistic Personality Correlations.")
+    except Exception as e:
+        print(
+            f"Warning: Cholesky Decomposition failed ({e}). Using uncorrelated traits."
+        )
+
     raw_affinities = traits[:, num_dims + num_personalities :]
 
-    exposures, personalities = apply_random_mutations(
-        exposures, personalities, config.mutation_temperature, config.seed
+    # Apply mutations to LOGITS (raw_personalities) to preserve Cholesky correlations
+    exposures, raw_personalities = apply_random_mutations(
+        exposures, raw_personalities, config.mutation_temperature, config.seed
     )
+
+    # Sigmoid to bound personalities between 0 and 1 AFTER mutations
+    personalities = torch.sigmoid(raw_personalities)
 
     # ---- Influence (no role-based anchoring) ----
     influence_scores = np.random.lognormal(
@@ -278,6 +324,7 @@ def generate_society(config: SimConfig):
     wealth_values = generate_hybrid_wealth(
         wealth_base,
         influence_scores,
+        raw_personalities,
         config.mutation_temperature,
         config.seed,
     )

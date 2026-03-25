@@ -179,6 +179,25 @@ PERSONALITY_QUERY_MATRIX = torch.tensor(
     ]
 ).float()
 
+# Realistic correlations between Big Five traits (OCEAN order)
+# O, C, E, A, N
+# Based on Park et al. (2020) Meta-Analysis
+# Clusters: Plasticity (O-E) and Stability (C-A-N)
+PERSONALITY_CORRELATIONS = torch.tensor(
+    [
+        # O
+        [ 1.00,  0.01,  0.35,  0.01, -0.01], 
+        # C
+        [ 0.01,  1.00,  0.01,  0.40, -0.40], 
+        # E
+        [ 0.35,  0.01,  1.00,  0.01, -0.01], 
+        # A
+        [ 0.01,  0.40,  0.01,  1.00, -0.40], 
+        # N
+        [-0.01, -0.40, -0.01, -0.40,  1.00], 
+    ]
+).float()
+
 # Cross Dimension Interaction Matrix
 CROSS_DIM_INTERACTIONS = torch.zeros((12, 12), dtype=torch.float32)
 CROSS_DIM_INTERACTIONS[1, 2] = 0.4  # Safety -> Stability

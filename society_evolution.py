@@ -33,6 +33,26 @@ class SocietyEvolution:
             "influence": [self.influence.clone()],
         }
 
+        # ---- Deterministic Idiosyncrasy Factors (Outlier Engine) ----
+        # These represent persistent, compounding personality drifts (e.g., "becoming more bitter" or "more open")
+        # generated deterministically so the same agent always evolves the same way given the same seed.
+        gen = torch.Generator()
+        gen.manual_seed(self.config.seed + 888)  # Distinct seed
+        
+        # LogNormal centered at 0 (so exp is centered at 1). 
+        # Small std dev (0.01) results in factors like 0.99 or 1.01.
+        # Over 10 generations, 1.02^10 = ~1.22 (+22%), creating meaningful outliers.
+        self.idiosyncrasy_factors = torch.exp(torch.randn(self.num_agents, 5, generator=gen) * 0.015)
+
+    def apply_idiosyncrasies(self):
+        """
+        Apply deterministic multiplicative drift to personalities.
+        This compounds over generations, naturally creating 'eccentric' outliers
+        who drift away from the correlation matrix.
+        """
+        self.personalities *= self.idiosyncrasy_factors
+        self.personalities = torch.clamp(self.personalities, 0.001, 0.999)
+
     def apply_inheritance(self):
         """
         Simulate intergenerational inheritance with some decay and noise.
@@ -296,6 +316,9 @@ class SocietyEvolution:
 
             if self.config.use_dynamic_classes:
                 self.reassign_classes()
+
+            # Apply idiosyncratic personality drift (creates outliers)
+            self.apply_idiosyncrasies()
 
             # Clamp wealth to avoid negative values or extreme outliers
             self.exposures[:, self.wealth_idx] = torch.clamp(

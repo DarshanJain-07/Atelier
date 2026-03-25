@@ -339,6 +339,19 @@ def generate_society(config: SimConfig):
         print("Generating Network Topology...")
         adjacency_matrix = create_topology(config, exposures, personalities, influence_scores)
 
+    # 4.5 Stage 2: Personality Socialization (Nurture/Drift)
+    # Drift personalities slightly toward the local network mean
+    if adjacency_matrix is not None and getattr(config, "personality_socialization_gain", 0.0) > 0:
+        gain = config.personality_social_consensus_gain if hasattr(config, "personality_socialization_gain") else 0.2
+        gain = getattr(config, "personality_socialization_gain", 0.2)
+        print(f"Applying Personality Socialization (Stage 2, Gain={gain})...")
+        # Use row-normalized adjacency to get local means
+        local_personality_mean = torch.sparse.mm(adjacency_matrix, personalities)
+        # Drift toward mean
+        personalities = (1.0 - gain) * personalities + gain * local_personality_mean
+        # Ensure sigmoid range is preserved
+        personalities = torch.clamp(personalities, 0.001, 0.999)
+
     # 5. Clustered Wealth Generation (Stage 2 Synergy)
     wealth_values = generate_network_wealth(
         influence_scores,

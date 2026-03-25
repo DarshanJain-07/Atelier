@@ -330,6 +330,7 @@ class SimConfig:
     initial_trait_std_dev: float = (
         0.33  # Standard deviation for generating initial trait bell curves
     )
+    personality_socialization_gain: float = 0.2 # Stage 2: Nurture/Socialization
 
     # --- Time-Series Stewing Parameters ---
     stewing_ticks: int = 5

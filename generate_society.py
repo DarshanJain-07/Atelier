@@ -139,6 +139,67 @@ def generate_network_wealth(
 # ================================
 # Main Generator (Topology-First)
 # ================================
+def apply_triadic_closure(config: SimConfig, adj: torch.Tensor):
+    """
+    Stage 2: Community Cohesion via Iterative Triadic Closure.
+    Forms new edges between neighbors-of-neighbors (A->B, B->C => A->C).
+    """
+    if not getattr(config, "triadic_closure_prob", 0.0) > 0:
+        return adj
+
+    N = config.num_agents
+    prob = config.triadic_closure_prob
+    iterations = getattr(config, "triadic_closure_iterations", 1)
+    
+    current_adj = adj.coalesce()
+
+    for _ in range(iterations):
+        # 1. Find neighbors-of-neighbors using sparse matrix multiplication
+        # A_2[i, j] > 0 if there is a path i -> k -> j
+        # We use a simplified version: just the structure, not the weights
+        indices = current_adj.indices()
+        vals = torch.ones_like(current_adj.values())
+        binary_adj = torch.sparse_coo_tensor(indices, vals, size=(N, N)).coalesce()
+        
+        # Paths of length 2
+        paths_2 = torch.sparse.mm(binary_adj, binary_adj).coalesce()
+        
+        p2_indices = paths_2.indices()
+        p2_values = paths_2.values()
+        
+        # 2. Filter: Remove self-loops and existing edges
+        # We only want NEW edges
+        mask_self = p2_indices[0] != p2_indices[1]
+        
+        # To check existing edges efficiently, we can use a temporary sparse mask
+        # or just combine and let coalesce() handle duplicates (but we want to exclude them)
+        # A better way: use a small random sample of paths_2
+        
+        # Sample based on triadic_closure_prob
+        sample_mask = torch.rand(len(p2_values)) < prob
+        valid_mask = mask_self & sample_mask
+        
+        if not valid_mask.any():
+            break
+            
+        new_indices = p2_indices[:, valid_mask]
+        # Assign a base weight for these new 'social' connections
+        # We use the average weight of existing connections to keep it balanced
+        new_values = torch.full((new_indices.shape[1],), current_adj.values().mean())
+        
+        # 3. Merge with original backbone
+        combined_indices = torch.cat([current_adj.indices(), new_indices], dim=1)
+        combined_values = torch.cat([current_adj.values(), new_values])
+        
+        current_adj = torch.sparse_coo_tensor(combined_indices, combined_values, size=(N, N)).coalesce()
+        
+        # Cap connections to prevent exploding density
+        # (Optional, but safe for performance)
+        if current_adj._nnz() > N * config.max_connections:
+            break
+
+    return current_adj
+
 def create_topology(
     config: SimConfig,
     exposures: torch.Tensor,
@@ -146,7 +207,9 @@ def create_topology(
     influence_scores: np.ndarray,
 ):
     """
-    Creates a sparse stochastic adjacency matrix based on Preferential Attachment and Homophily.
+    2-Stage Topology Construction:
+    1. Structural Backbone: Preferential Attachment and Homophily.
+    2. Community Cohesion: Iterative Triadic Closure (Neighbors-of-Neighbors).
     """
     N = config.num_agents
     inf_mean = np.mean(influence_scores)
@@ -168,6 +231,7 @@ def create_topology(
     inf_tensor = torch.tensor(influence_scores, dtype=torch.float32, device=device)
     inf_tensor = inf_tensor / inf_tensor.mean()
 
+    # --- Stage 1: Structural Backbone ---
     for i in range(0, N, batch_size):
         end = min(i + batch_size, N)
         batch_size_actual = end - i
@@ -203,16 +267,24 @@ def create_topology(
 
     indices_tensor = torch.cat(indices_list, dim=1)
     values_tensor = torch.cat(values_list)
-    sparse_adj = torch.sparse_coo_tensor(indices_tensor, values_tensor, size=(N, N))
+    backbone_adj = torch.sparse_coo_tensor(indices_tensor, values_tensor, size=(N, N)).to(device)
 
-    dense_sums = torch.sparse.sum(sparse_adj, dim=1).to_dense()
+    # --- Stage 2: Community Cohesion (Triadic Closure) ---
+    print(f"Applying Triadic Closure (Stage 2)...")
+    final_adj = apply_triadic_closure(config, backbone_adj)
+
+    # --- Final Normalization ---
+    final_adj = final_adj.coalesce()
+    row_indices = final_adj.indices()[0]
+    dense_sums = torch.sparse.sum(final_adj, dim=1).to_dense()
     dense_sums = torch.clamp(dense_sums, min=1e-8)
-    row_indices = indices_tensor[0]
-    normalized_values = values_tensor / dense_sums[row_indices]
+    
+    normalized_values = final_adj.values() / dense_sums[row_indices]
 
     normalized_sparse_adj = torch.sparse_coo_tensor(
-        indices_tensor, normalized_values, size=(N, N)
+        final_adj.indices(), normalized_values, size=(N, N)
     ).coalesce()
+    
     return normalized_sparse_adj
 
 

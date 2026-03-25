@@ -295,6 +295,8 @@ class SimConfig:
     base_connections: int = 15  # Average connections for a normal user
     max_connections: int = 500  # Cap on connections for elite influencers
     homophily_strength: float = 2.0  # How strongly they prefer similar agents
+    triadic_closure_prob: float = 0.2 # Stage 2: Community Cohesion
+    triadic_closure_iterations: int = 1
 
     # --- Society Evolution ---
     enable_evolution: bool = True

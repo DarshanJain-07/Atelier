@@ -108,6 +108,7 @@ class RunProfile(BaseModel):
     # Researcher (Distortion)
     distortion_max_noise: float = 0.4
     distortion_neurotic_gain: float = 0.6
+    perception_social_consensus_gain: float = 0.25 # New 2-Stage Perception
 
     # Researcher (Evolution)
     evolution_generations: int = 10
@@ -153,6 +154,7 @@ def prepare_society_sync(run: RunProfile, run_output_dir: str):
         saturation_midpoint=run.saturation_midpoint,
         distortion_max_noise=run.distortion_max_noise,
         distortion_neurotic_gain=run.distortion_neurotic_gain,
+        perception_social_consensus_gain=run.perception_social_consensus_gain,
         evolution_generations=run.evolution_generations,
         inheritance_fraction=run.inheritance_fraction,
         shock_frequency=run.shock_frequency,
@@ -501,6 +503,9 @@ async def run_simulation(req: SimulationRequest, background_tasks: BackgroundTas
 
                 # We don't want to update global memory during the A/B test pass, so we clone it
                 ab_memory = memory[:sample_size].clone() if memory is not None else None
+                
+                # We need a subset of the adjacency matrix for the A/B test sample
+                ab_adj = subset_adjacency(adjacency_matrix, torch.arange(sample_size, device=exposures.device))
 
                 _, ab_attention, ab_engagement, _ = cog_engine.run(
                     world_tensor_raw=world_tensor,
@@ -510,6 +515,7 @@ async def run_simulation(req: SimulationRequest, background_tasks: BackgroundTas
                     personalities=personalities[:sample_size],
                     agent_affinities=affinities[:sample_size],
                     agent_memory=ab_memory,
+                    adjacency_matrix=ab_adj,
                 )
 
                 # --- The Algorithm's Intervention ---
@@ -560,6 +566,7 @@ async def run_simulation(req: SimulationRequest, background_tasks: BackgroundTas
                     personalities=personalities,
                     agent_affinities=affinities,
                     agent_memory=memory,
+                    adjacency_matrix=adjacency_matrix,
                 )
             )
 
@@ -617,6 +624,7 @@ async def run_simulation(req: SimulationRequest, background_tasks: BackgroundTas
                     personalities=personalities,
                     agent_affinities=affinities,
                     agent_memory=updated_memory,
+                    adjacency_matrix=adjacency_matrix,
                 )
 
                 if getattr(config, "use_agent_memory", False) and updated_memory_2 is not None:

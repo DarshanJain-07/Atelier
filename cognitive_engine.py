@@ -187,6 +187,7 @@ class CognitiveEngine:
         personalities: torch.Tensor,
         agent_affinities: torch.Tensor,
         agent_memory: Optional[torch.Tensor] = None,
+        adjacency_matrix: Optional[torch.Tensor] = None,
     ):
         """
         Full cognitive simulation pipeline.
@@ -200,7 +201,7 @@ class CognitiveEngine:
         device = exposures.device
 
         # ---------------------------------
-        # 1. Signal Distortion
+        # 1. Stage 1: Individual Signal Distortion
         # ---------------------------------
         distorted_world = self.distort_signal(
             world_tensor_raw.squeeze().to(device),
@@ -208,7 +209,22 @@ class CognitiveEngine:
         )  # (N,12)
 
         # ---------------------------------
-        # 2. Memory Layer (Desensitization & Trigger Stacking)
+        # 2. Stage 2: Socially Constructed Reality (Consensus)
+        # ---------------------------------
+        # Agents align their misinterpretations with their neighbors.
+        # This simulates the "Telephone Game" reaching local consensus.
+        if adjacency_matrix is not None and getattr(self.config, "perception_social_consensus_gain", 0.0) > 0:
+            social_gain = self.config.perception_social_consensus_gain
+            
+            # Use the sparse adjacency matrix to calculate the local neighborhood mean distortion
+            # adjacency_matrix is expected to be row-normalized (row_sum = 1.0)
+            local_consensus = torch.sparse.mm(adjacency_matrix.to(device), distorted_world)
+            
+            # Blend: (1 - gain) * Individual + (gain) * Neighborhood
+            distorted_world = (1.0 - social_gain) * distorted_world + social_gain * local_consensus
+
+        # ---------------------------------
+        # 3. Memory Layer (Desensitization & Trigger Stacking)
         # ---------------------------------
         if agent_memory is not None and getattr(self.config, "use_agent_memory", False):
             mem = agent_memory.to(device)

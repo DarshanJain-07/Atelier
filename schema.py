@@ -244,6 +244,7 @@ class SimConfig:
     status_factor: float = 1.0
 
     # --- Cognitive Engine Parameters ---
+    perception_social_consensus_gain: float = 0.25 # Stage 2: Socially Constructed Reality
     cross_dim_interaction_strength: float = 0.3
     threat_sensitivity_gain: float = 1.5
     k_processing_tanh_gain: float = 1.5

@@ -212,11 +212,16 @@ def create_topology(
     2. Community Cohesion: Iterative Triadic Closure (Neighbors-of-Neighbors).
     """
     N = config.num_agents
+    if N <= 1:
+        return None
+
+    max_available_neighbors = N - 1
+    max_connections = min(config.max_connections, max_available_neighbors)
     inf_mean = np.mean(influence_scores)
     k_array = np.clip(
         (influence_scores / inf_mean) * config.base_connections,
         1,
-        config.max_connections,
+        max_connections,
     ).astype(int)
 
     features = torch.cat([exposures, personalities], dim=1)
@@ -244,9 +249,10 @@ def create_topology(
         global_indices = batch_indices + i
         prob_matrix[batch_indices, global_indices] = 0.0
 
-        batch_k = k_array[i:end]
+        batch_k = np.minimum(k_array[i:end], max_available_neighbors)
         max_k = int(np.max(batch_k))
-        if max_k == 0: continue
+        if max_k == 0:
+            continue
 
         prob_matrix = prob_matrix + 1e-9
         sampled_indices = torch.multinomial(prob_matrix, max_k, replacement=False)

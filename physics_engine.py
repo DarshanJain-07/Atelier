@@ -21,6 +21,13 @@ class SocialPhysicsEngine:
     def __init__(self, config):
         self.config = config
 
+    @staticmethod
+    def _neighbor_average(adjacency_matrix: torch.Tensor, values: torch.Tensor) -> torch.Tensor:
+        return torch.sparse.mm(
+            adjacency_matrix.coalesce().to(values.device),
+            values,
+        )
+
     # ============================================================
     # Core Aggregation
     # ============================================================
@@ -84,6 +91,9 @@ class SocialPhysicsEngine:
         num_ticks = getattr(self.config, "stewing_ticks", 5)
         current_emotions = emotion_tensor.clone()
         negative_integral = 0.0
+        topology = None
+        if adjacency_matrix is not None:
+            topology = adjacency_matrix.coalesce().to(current_emotions.device)
 
         for tick in range(num_ticks):
             # ============================================================
@@ -97,9 +107,7 @@ class SocialPhysicsEngine:
             if adjacency_matrix is not None:
                 # Each agent's emotional baseline is now the weighted average of their connections
                 # adjacency_matrix is row-normalized, so mm acts as a weighted mean
-                local_centers = torch.mm(
-                    adjacency_matrix.to(current_emotions.device).to_dense(), current_emotions
-                )
+                local_centers = self._neighbor_average(topology, current_emotions)
             else:
                 # If no topology, the local context is just the global context for everyone
                 local_centers = center_of_gravity.unsqueeze(0).expand(N, -1)
@@ -116,9 +124,6 @@ class SocialPhysicsEngine:
                 viral_energy = arousal
 
             norm_emotion = current_emotions / (arousal.unsqueeze(1) + 1e-9)
-
-            if local_centers.is_sparse:
-                local_centers = local_centers.to_dense()
 
             local_arousal = torch.norm(local_centers, dim=1)
             norm_local = local_centers / (local_arousal.unsqueeze(1) + 1e-9)
@@ -249,9 +254,7 @@ class SocialPhysicsEngine:
 
         # Re-calculate final local centers for validation
         if adjacency_matrix is not None:
-            local_centers = torch.mm(
-                adjacency_matrix.to(current_emotions.device).to_dense(), current_emotions
-            )
+            local_centers = self._neighbor_average(topology, current_emotions)
         else:
             local_centers = center_of_gravity.unsqueeze(0).expand(N, -1)
             
@@ -322,7 +325,9 @@ class SocialPhysicsEngine:
             # Iterative activation (Snowball effect)
             for _ in range(3):
                 # Calculate fraction of acting neighbors
-                neighbor_acting_ratio = torch.mm(adjacency_matrix.to_dense().to(current_emotions.device), acting_agents.unsqueeze(1)).squeeze()
+                neighbor_acting_ratio = self._neighbor_average(
+                    topology, acting_agents.unsqueeze(1)
+                ).squeeze(1)
                 
                 # An agent acts if:
                 # 1. They were already acting (Persistence)
@@ -336,11 +341,8 @@ class SocialPhysicsEngine:
         # Final acting count and ratio
         acting_count = acting_agents.sum().item()
         total_eligible = engaged_mask.sum().item()
-        
-        total_pop = getattr(self.config, "num_agents", N)
-        if total_pop <= 0: total_pop = N
-        
-        acting_ratio = acting_count / total_pop
+        population_size = max(1, N)
+        acting_ratio = acting_count / population_size
 
         elite_div_threshold = getattr(self.config, "elite_divergence_threshold", 0.4)
         pol_threshold = getattr(self.config, "polarization_threshold", 0.5)
@@ -402,7 +404,9 @@ class SocialPhysicsEngine:
             "action_vector": action_vector,
             "action_name": action_name,
             "acting_ratio": acting_ratio,
+            "acting_count": int(acting_count),
             "total_eligible": total_eligible,
+            "population_size": population_size,
             "labels": EMOTION_LABELS,
         }
 

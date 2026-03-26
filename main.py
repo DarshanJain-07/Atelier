@@ -1,9 +1,13 @@
 import asyncio
+import hashlib
+import json
 import os
 import shutil
 import time
 import uuid
 from collections import OrderedDict
+from dataclasses import asdict
+from threading import Lock
 from typing import Any, List, Tuple, cast
 
 import numpy as np
@@ -56,12 +60,12 @@ print("✅ Server Ready.")
 # Persistent LRU cache for societies (seed + count + temp -> data)
 MAX_CACHE_SIZE = 7
 SOCIETY_CACHE: OrderedDict[str, Any] = OrderedDict()
+SOCIETY_CACHE_LOCK = Lock()
 
 
 class RunProfile(BaseModel):
     seed: int = 42
     temperature: float = Field(default=0.7, ge=0.0, le=1.0)
-    region: str = "All"
     social_class: str = "All"
     agent_count: int = Field(default=1000, gt=0)
     use_distortion: bool = True
@@ -134,6 +138,16 @@ async def health_check():
     return {"status": "ok"}
 
 
+def build_society_cache_key(config: SimConfig) -> str:
+    cache_payload = asdict(config)
+    cache_payload.pop("output_dir", None)
+    cache_payload.pop("wealth_dim_idx", None)
+    cache_payload["_cache_version"] = 2
+
+    raw_key = json.dumps(cache_payload, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(raw_key.encode("utf-8")).hexdigest()
+
+
 def prepare_society_sync(run: RunProfile, run_output_dir: str):
     """Generates and evolves society synchronously"""
     config = SimConfig(
@@ -188,20 +202,24 @@ def prepare_society_sync(run: RunProfile, run_output_dir: str):
         enable_evolution=run.enable_evolution,
     )
     config.wealth_dim_idx = DIMENSION_INDICES["Wealth"]
+    cache_key = build_society_cache_key(config)
 
-    cache_key = f"{run.seed}_{run.agent_count}_{run.temperature}_{run.use_power_law}"
+    with SOCIETY_CACHE_LOCK:
+        cached_entry = SOCIETY_CACHE.get(cache_key)
+        if cached_entry is not None:
+            print(f"Cache Hit for {cache_key[:12]}")
+            SOCIETY_CACHE.move_to_end(cache_key)
 
-    if cache_key in SOCIETY_CACHE:
-        print(f"Cache Hit for {cache_key}")
-        SOCIETY_CACHE.move_to_end(cache_key)
+    if cached_entry is not None:
         (
             metadata_full,
             exposures_full,
             personalities_full,
             affinities_full,
-            memory_full,
             adjacency_matrix,
-        ) = SOCIETY_CACHE[cache_key]
+            cached_warnings,
+        ) = cached_entry
+        memory_full = torch.zeros_like(exposures_full)
         return (
             config,
             metadata_full,
@@ -210,9 +228,10 @@ def prepare_society_sync(run: RunProfile, run_output_dir: str):
             affinities_full,
             memory_full,
             adjacency_matrix,
+            list(cached_warnings),
         )
 
-    print(f"Cache Miss. Generating & Caching {cache_key}")
+    print(f"Cache Miss. Generating & Caching {cache_key[:12]}")
     (
         metadata_full,
         exposures_full,
@@ -220,6 +239,8 @@ def prepare_society_sync(run: RunProfile, run_output_dir: str):
         affinities_full,
         adjacency_matrix,
     ) = generate_society(config)
+
+    generation_warnings: list[str] = []
 
     # Evolution phase
     if getattr(config, "enable_evolution", True):
@@ -229,23 +250,26 @@ def prepare_society_sync(run: RunProfile, run_output_dir: str):
             )
             metadata_full, exposures_full, personalities_full = evolver.evolve()
         except Exception as e:
-            print(f"Evolution failed or skipped: {e}")
-            pass
+            warning = f"Evolution failed; using base society instead: {e}"
+            generation_warnings.append(warning)
+            print(warning)
 
     memory_full = torch.zeros_like(exposures_full)
 
-    SOCIETY_CACHE[cache_key] = (
-        metadata_full,
-        exposures_full,
-        personalities_full,
-        affinities_full,
-        memory_full,
-        adjacency_matrix,
-    )
+    with SOCIETY_CACHE_LOCK:
+        SOCIETY_CACHE[cache_key] = (
+            metadata_full,
+            exposures_full,
+            personalities_full,
+            affinities_full,
+            adjacency_matrix,
+            tuple(generation_warnings),
+        )
 
-    if len(SOCIETY_CACHE) > MAX_CACHE_SIZE:
-        evicted_key, _ = SOCIETY_CACHE.popitem(last=False)
-        print(f"🧹 LRU Evicted {evicted_key} from RAM cache.")
+        if len(SOCIETY_CACHE) > MAX_CACHE_SIZE:
+            evicted_key, _ = SOCIETY_CACHE.popitem(last=False)
+            print(f"🧹 LRU Evicted {evicted_key[:12]} from RAM cache.")
+
     return (
         config,
         metadata_full,
@@ -254,6 +278,7 @@ def prepare_society_sync(run: RunProfile, run_output_dir: str):
         affinities_full,
         memory_full,
         adjacency_matrix,
+        generation_warnings,
     )
 
 
@@ -344,8 +369,8 @@ def cleanup_old_files():
                 # Only delete if older than 5 minutes to avoid race conditions with concurrent requests
                 if current_time - os.path.getctime(folder) > 300:
                     shutil.rmtree(folder)
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"Cleanup skipped for {folder}: {e}")
 
 
 @app.post("/simulate")
@@ -424,6 +449,7 @@ async def run_simulation(req: SimulationRequest, background_tasks: BackgroundTas
                     torch.Tensor,
                     torch.Tensor,
                     Any,
+                    list[str],
                 ],
                 society_result,
             )
@@ -436,6 +462,7 @@ async def run_simulation(req: SimulationRequest, background_tasks: BackgroundTas
                 affinities_full,
                 memory_full,
                 adjacency_matrix_full,
+                generation_warnings,
             ) = society_result
 
             # --- ENFORCE DETERMINISM ---
@@ -743,6 +770,8 @@ async def run_simulation(req: SimulationRequest, background_tasks: BackgroundTas
                     "negative_integral": social_state.get("negative_integral", 0.0),
                     "acting_ratio": social_state.get("acting_ratio"),
                     "total_eligible": social_state.get("total_eligible"),
+                    "population_size": social_state.get("population_size"),
+                    "warnings": generation_warnings,
                 }
             )
 

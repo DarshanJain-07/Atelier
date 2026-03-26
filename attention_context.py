@@ -86,6 +86,51 @@ class AttentionContext:
         self.Q = torch.tanh(Q_base + personality_mod)
         return self
 
+    def logic_consistency_layer(self):
+        """
+        The 'Skepticism' Cognitive Gate.
+        If there is a massive discrepancy between Short_Term and Long_Term impacts,
+        agents with high Openness/Conscientiousness will penalize the Short_Term signal
+        and focus on the Long_Term reality (detecting 'too good to be true' flaws).
+        """
+        if self.Q is None:
+            return self
+
+        # Indices 10 (Short_Term) and 11 (Long_Term)
+        st = self.world_tensor[:, 10:11]
+        lt = self.world_tensor[:, 11:12]
+        
+        # Calculate Logic Gap (discrepancy)
+        # If one is very positive and the other very negative, gap is high.
+        logic_gap = torch.abs(st - lt)
+        
+        # Skepticism is driven by Openness (Intellectual) and Conscientiousness (Analytical)
+        openness = self.personalities[:, 0:1]
+        conscientiousness = self.personalities[:, 1:2]
+        
+        # We blend them for a 'Skepticism' trait
+        skepticism_trait = (openness + conscientiousness) / 2.0
+        
+        # Sensitivity to the gap
+        sensitivity = skepticism_trait * getattr(self.config, "skepticism_gain", 2.0)
+        
+        # Penalty applies if the gap is significant
+        gap_threshold = getattr(self.config, "logic_gap_threshold", 0.5)
+        
+        # Probability of detecting the flaw (Sigmoid response)
+        detection_prob = torch.sigmoid(sensitivity * (logic_gap - gap_threshold))
+        
+        # Apply suppression to Short_Term attention (Index 10)
+        # Higher detection_prob -> lower attention on Short_Term
+        new_Q = self.Q.clone()
+        new_Q[:, 10:11] = new_Q[:, 10:11] * (1.0 - (detection_prob * 0.85))
+        
+        # Boost attention on Long_Term (Index 11) to focus on the 'hidden' reality
+        new_Q[:, 11:12] = new_Q[:, 11:12] * (1.0 + (detection_prob * 0.6))
+        
+        self.Q = new_Q
+        return self
+
     def personal_event_layer(self):
         if not self.is_personal:
             return self

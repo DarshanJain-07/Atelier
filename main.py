@@ -115,7 +115,7 @@ class RunProfile(BaseModel):
     # Researcher (Distortion)
     distortion_max_noise: float = 0.4
     distortion_neurotic_gain: float = 0.6
-    perception_social_consensus_gain: float = 0.25 # New 2-Stage Perception
+    perception_social_consensus_gain: float = 0.25  # New 2-Stage Perception
 
     # Researcher (Evolution)
     evolution_generations: int = 10
@@ -517,9 +517,11 @@ async def run_simulation(req: SimulationRequest, background_tasks: BackgroundTas
 
                 # We don't want to update global memory during the A/B test pass, so we clone it
                 ab_memory = memory[:sample_size].clone() if memory is not None else None
-                
+
                 # We need a subset of the adjacency matrix for the A/B test sample
-                ab_adj = subset_adjacency(adjacency_matrix, torch.arange(sample_size, device=exposures.device))
+                ab_adj = subset_adjacency(
+                    adjacency_matrix, torch.arange(sample_size, device=exposures.device)
+                )
 
                 _, ab_attention, ab_engagement = cog_engine.run(
                     world_tensor_raw=world_tensor,
@@ -571,17 +573,15 @@ async def run_simulation(req: SimulationRequest, background_tasks: BackgroundTas
                 final_world_tensor = world_tensor
 
             # --- PASS 2: The Viral Broadcast ---
-            context_vector, attention_weights, engagement_scores = (
-                cog_engine.run(
-                    world_tensor_raw=final_world_tensor,
-                    urgency=urgency,
-                    is_personal=is_personal,
-                    exposures=exposures,
-                    personalities=personalities,
-                    agent_affinities=affinities,
-                    agent_memory=memory,
-                    adjacency_matrix=adjacency_matrix,
-                )
+            context_vector, attention_weights, engagement_scores = cog_engine.run(
+                world_tensor_raw=final_world_tensor,
+                urgency=urgency,
+                is_personal=is_personal,
+                exposures=exposures,
+                personalities=personalities,
+                agent_affinities=affinities,
+                agent_memory=memory,
+                adjacency_matrix=adjacency_matrix,
             )
 
             device = context_vector.device
@@ -598,8 +598,12 @@ async def run_simulation(req: SimulationRequest, background_tasks: BackgroundTas
             # 6. Social Physics
             phys_engine = SocialPhysicsEngine(config)
             social_state = phys_engine.aggregate_society(
-                final_emotions, influence, engagement_scores, adjacency_matrix,
-                personalities=personalities, is_personal=is_personal
+                final_emotions,
+                influence,
+                engagement_scores,
+                adjacency_matrix,
+                personalities=personalities,
+                is_personal=is_personal,
             )
 
             # --- ENDOGENOUS EVENT FEEDBACK LOOP (Autopoietic Simulation) ---
@@ -626,7 +630,7 @@ async def run_simulation(req: SimulationRequest, background_tasks: BackgroundTas
                     exposures=exposures,
                     personalities=personalities,
                     agent_affinities=affinities,
-                    agent_memory=memory, # Use original memory for the 2nd pass imprint
+                    agent_memory=memory,  # Use original memory for the 2nd pass imprint
                     adjacency_matrix=adjacency_matrix,
                 )
 
@@ -637,15 +641,19 @@ async def run_simulation(req: SimulationRequest, background_tasks: BackgroundTas
 
                 # Re-aggregate society with the new emotional state
                 social_state = phys_engine.aggregate_society(
-                    final_emotions_2, influence, engagement_scores_2, adjacency_matrix,
-                    personalities=personalities, is_personal=True
+                    final_emotions_2,
+                    influence,
+                    engagement_scores_2,
+                    adjacency_matrix,
+                    personalities=personalities,
+                    is_personal=True,
                 )
-                
+
                 # Update loop variables for consolidation
                 final_emotions = final_emotions_2
                 attention_weights = attention_weights_2
                 engagement_scores = engagement_scores_2
-                context_vector = context_vector_2 # The final internalized thing
+                context_vector = context_vector_2  # The final internalized thing
                 social_state["endogenous_event"] = action_name
 
             # --- 2-STAGE MEMORY CONSOLIDATION ---
@@ -656,13 +664,13 @@ async def run_simulation(req: SimulationRequest, background_tasks: BackgroundTas
                 conf = social_state.get("confidence", 0.0)
                 act_ratio = social_state.get("acting_ratio", 0.0)
                 rehearsal_factor = (conf + act_ratio) / 2.0
-                
+
                 updated_memory = cog_engine.consolidate_memory(
                     agent_memory=memory,
                     context_vector=context_vector,
-                    social_rehearsal_factor=rehearsal_factor
+                    social_rehearsal_factor=rehearsal_factor,
                 )
-                
+
                 if run.social_class != "All":
                     memory_full[indices_torch[:limit]] = updated_memory.to(
                         memory_full.device
@@ -675,7 +683,8 @@ async def run_simulation(req: SimulationRequest, background_tasks: BackgroundTas
                 social_state["objective_center"], baseline_result
             )
             validation_result["stewing_interpretation"] = validator.validate_stewing(
-                social_state.get("negative_integral", 0.0), getattr(config, "stewing_ticks", 5)
+                social_state.get("negative_integral", 0.0),
+                getattr(config, "stewing_ticks", 5),
             )
 
             # 8. Explainability

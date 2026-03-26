@@ -245,6 +245,8 @@ class SimConfig:
 
     # --- Cognitive Engine Parameters ---
     perception_social_consensus_gain: float = 0.25 # Stage 2: Socially Constructed Reality
+    skepticism_gain: float = 2.0  # How much Openness/Conscientiousness penalizes logic gaps
+    logic_gap_threshold: float = 0.5 # Discrepancy between ST/LT that triggers skepticism
     cross_dim_interaction_strength: float = 0.3
     threat_sensitivity_gain: float = 1.5
     k_processing_tanh_gain: float = 1.5

@@ -84,6 +84,7 @@ class CognitiveEngine:
         ctx = (
             ctx.rde_layer()
             .personality_query_layer()
+            .logic_consistency_layer()
             .personal_event_layer()
             .selective_exposure_layer()
             .key_processing_layer()

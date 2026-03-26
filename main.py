@@ -756,6 +756,16 @@ async def run_simulation(req: SimulationRequest, background_tasks: BackgroundTas
     return {"status": "success", "results": all_results}
 
 
+# app.mount("/docs/", StaticFiles(directory="site", html=True), name="docs")
+
+
+# @app.get("/docs")
+# async def docs_redirect():
+#     from fastapi.responses import RedirectResponse
+
+#     return RedirectResponse(url="/docs/")
+
+
 app.mount("/", StaticFiles(directory="frontend", html=True), name="frontend")
 
 if __name__ == "__main__":

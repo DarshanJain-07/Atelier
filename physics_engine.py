@@ -172,15 +172,17 @@ class SocialPhysicsEngine:
         # Elite Emotional Center
         # ============================================================
         elite_percentile = self.config.elite_percentile
-        threshold = torch.quantile(weights, elite_percentile)
-
-        elite_mask = weights >= threshold
-        if elite_mask.sum() > 0:
-            elite_weights = weights * elite_mask
-            elite_weights = elite_weights / elite_weights.sum()
-            elite_center = (current_emotions * elite_weights.unsqueeze(1)).sum(dim=0)
-        else:
-            elite_center = center_of_gravity.clone()
+        k_elites = max(1, int(N * (1.0 - elite_percentile)))
+        
+        # Get indices of top K weights
+        _, top_indices = torch.topk(weights, k=k_elites)
+        
+        elite_mask = torch.zeros(N, dtype=torch.bool, device=weights.device)
+        elite_mask[top_indices] = True
+        
+        elite_weights = weights * elite_mask
+        elite_weights = elite_weights / (elite_weights.sum() + 1e-9)
+        elite_center = (current_emotions * elite_weights.unsqueeze(1)).sum(dim=0)
 
         # ============================================================
         # Polarization Metrics (Bimodality Coefficient & Dispersion)
@@ -201,19 +203,26 @@ class SocialPhysicsEngine:
         std_proj = projections.std(unbiased=False)
         
         if std_proj > 1e-6:
+            # Add a small epsilon to denominator and handle small N bias
+            n = projections.numel()
             skew = torch.mean(((projections - mean_proj) / std_proj) ** 3)
             kurtosis = torch.mean(((projections - mean_proj) / std_proj) ** 4)
-            if kurtosis > 1e-6:
-                bimodality_coeff = (skew**2 + 1) / kurtosis
+            
+            # Sarle's Bimodality Coefficient: (skew^2 + 1) / kurtosis
+            # For a normal distribution, BC = 0.333. For uniform, BC = 0.555.
+            # We add a correction factor for small N to avoid over-estimation
+            if n > 3:
+                # Standard BC
+                bimodality_coeff = (skew**2 + 1) / (kurtosis + 1e-6)
             else:
+                # Insufficient data for bimodality
                 bimodality_coeff = torch.tensor(0.0)
         else:
             bimodality_coeff = torch.tensor(0.0)
             
-        bimodality = bimodality_coeff.item()
+        bimodality = torch.clamp(bimodality_coeff, 0.0, 1.0).item()
         
         # We define structural polarization as the Bimodality Coefficient.
-        # It's a continuous metric [0, ~1.0], avoiding the 0.0 dropouts of clustering algorithms.
         polarization = bimodality
 
         cg_prob = torch.clamp(center_of_gravity, min=1e-9)
@@ -225,11 +234,7 @@ class SocialPhysicsEngine:
 
         # Dominant Emotion (Viral State)
         max_val, dominant_idx = torch.max(viral_center, dim=0)
-
-        if max_val < self.config.dominant_emotion_threshold:
-            dominant_label = "Neutral"
-        else:
-            dominant_label = EMOTION_LABELS[int(dominant_idx.item())]
+        dominant_label = EMOTION_LABELS[int(dominant_idx.item())] if max_val >= self.config.dominant_emotion_threshold else "Neutral"
 
         # ============================================================
         # Elite–Population Divergence
@@ -341,30 +346,34 @@ class SocialPhysicsEngine:
         pol_threshold = getattr(self.config, "polarization_threshold", 0.5)
         act_threshold = getattr(self.config, "action_threshold", 0.15)
 
-        # Only trigger an event if enough eligible people have the activation energy
+        # Trigger logic refinement
         if acting_ratio > act_threshold:
-            if elite_divergence > elite_div_threshold and polarization > pol_threshold:
-                # Populist Uprising
+            # Populist Uprising: High Divergence + High Polarization + Negative Valence
+            if elite_divergence > elite_div_threshold and polarization > pol_threshold and valence_score < -0.2:
                 action_vector = [0.0] * 12
                 action_vector[1] = -0.5  # Negative Safety
                 action_vector[2] = -0.8  # Negative Stability
                 action_vector[4] = -0.9  # Negative Fairness
-                action_vector[7] = 0.5  # Positive Freedom
+                action_vector[7] = 0.5   # Positive Freedom
                 action_name = "Populist Uprising"
-            elif elite_divergence > elite_div_threshold:
-                # Policy Shift (Elite push through changes)
+            
+            # Elite Policy Shift: High Divergence + Elite-specific arousal
+            elif elite_divergence > elite_div_threshold and torch.norm(elite_center) > 0.3:
                 action_vector = [0.0] * 12
-                action_vector[0] = 0.4  # Wealth impact
+                action_vector[0] = 0.4   # Wealth impact
                 action_vector[4] = -0.3  # Negative Fairness
-                action_vector[6] = 0.6  # Positive Innovation
+                action_vector[6] = 0.6   # Positive Innovation
                 action_name = "Elite Policy Shift"
-            elif polarization > pol_threshold:
-                # Protest
+                
+            # Civil Protest: High Polarization + High Anger/Disgust + Negative Valence
+            elif polarization > pol_threshold and (dominant_label in ["Anger", "Disgust", "Sadness"]) and valence_score < -0.1:
                 action_vector = [0.0] * 12
                 action_vector[2] = -0.6  # Negative Stability
                 action_vector[4] = -0.5  # Negative Fairness
-                action_vector[5] = 0.7  # Positive In-Group
+                action_vector[5] = 0.7   # Positive In-Group
                 action_name = "Civil Protest"
+
+
 
         # ============================================================
         # Final State Object

@@ -43,26 +43,18 @@
                     <div class="separator"></div>
                     <div
                         class="metric" tabindex="0"
-                        data-tooltip="Measures societal fragmentation. High values indicate strong emotional disagreement among agents; low values indicate consensus."
+                        data-tooltip="Sarle's Bimodality Coefficient. > 0.555 indicates a true societal schism/polarization."
                     >
-                        <span class="label">POLARIZATION</span>
+                        <span class="label">BIMODALITY</span>
                         <span class="value" id="val-polarization">--</span>
                     </div>
                     <div class="separator"></div>
                     <div
                         class="metric" tabindex="0"
-                        data-tooltip="Wasserstein Distance from standard AI sentiment baseline. Higher values suggest deviation from normal."
+                        data-tooltip="Distance between the emotional center of elites vs the general population."
                     >
-                        <span class="label">W-DIST</span>
-                        <span class="value" id="val-divergence">--</span>
-                    </div>
-                    <div class="separator"></div>
-                    <div
-                        class="metric" tabindex="0"
-                        data-tooltip="KL Divergence from standard AI baseline. Measures information difference."
-                    >
-                        <span class="label">KL-DIV</span>
-                        <span class="value" id="val-kl-divergence">--</span>
+                        <span class="label">ELITE DIV</span>
+                        <span class="value" id="val-elite-divergence">--</span>
                     </div>
                     <div class="separator"></div>
                     <div
@@ -75,7 +67,7 @@
                     <div class="separator"></div>
                     <div
                         class="metric" tabindex="0"
-                        data-tooltip="Percentage of the population actively engaging with and reacting to the event."
+                        data-tooltip="Percentage of the population crossing the Granovetter behavioral threshold."
                     >
                         <span class="label">ACTIVE POP</span>
                         <span class="value" id="val-active-pop">--</span>
@@ -417,12 +409,12 @@
                                 />
                             </div>
                             <div class="sidebar-field">
-                                <label data-tooltip="Threat sensitivity multiplier for perception.">Threat Sens</label
+                                <label data-tooltip="Social Consensus Gain. How much agents align misinterpretations.">Consensus</label
                                 ><input
                                     type="number"
-                                    id="res-threat-sens"
-                                    step="0.1"
-                                    value="1.5"
+                                    id="res-consensus"
+                                    step="0.05"
+                                    value="0.25"
                                     class="sidebar-input"
                                 />
                             </div>
@@ -449,29 +441,42 @@
                                 />
                             </div>
                         </div>
+                    </div>
+
+                    <div class="config-section">
+                        <div class="section-header">
+                            <label class="section-title" tabindex="0" data-tooltip="Topology construction and community cohesion.">NETWORK TOPOLOGY</label>
+                            <button class="reset-section-btn" onclick="resetSection(this)" data-tooltip="Reset section" aria-label="Reset Defaults">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                                    <path d="M3 3v5h5"/>
+                                </svg>
+                            </button>
+                        </div>
                         <div class="sidebar-grid">
                             <div class="sidebar-field">
-                                <label data-tooltip="Base weight in relevance calculation.">Rel Base Wt</label
+                                <label data-tooltip="Triadic Closure Probability (Neighbors-of-Neighbors).">Closure Prob</label
                                 ><input
                                     type="number"
-                                    id="res-rel-base"
-                                    step="0.1"
-                                    value="0.3"
+                                    id="res-triadic-prob"
+                                    step="0.05"
+                                    value="0.2"
                                     class="sidebar-input"
                                 />
                             </div>
                             <div class="sidebar-field">
-                                <label data-tooltip="Amplification factor for identified threats.">Threat Amp</label
+                                <label data-tooltip="Iterations of triadic closure refinement.">Iterations</label
                                 ><input
                                     type="number"
-                                    id="res-threat-amp"
-                                    step="0.1"
-                                    value="1.5"
+                                    id="res-triadic-iter"
+                                    step="1"
+                                    value="1"
                                     class="sidebar-input"
                                 />
                             </div>
                         </div>
                     </div>
+
                     <div class="config-section">
                         <div class="section-header">
                             <label class="section-title" tabindex="0" data-tooltip="How psychological traits react under high urgency/stress.">STRESS MULTIPLIERS</label>
@@ -494,24 +499,12 @@
                                 />
                             </div>
                             <div class="sidebar-field">
-                                <label data-tooltip="Reduction of openness under stress.">Open Red</label
+                                <label data-tooltip="Personality Socialization Gain (Nurture).">Socialize</label
                                 ><input
                                     type="number"
-                                    id="res-stress-open"
-                                    step="0.1"
-                                    value="0.5"
-                                    class="sidebar-input"
-                                />
-                            </div>
-                        </div>
-                        <div class="sidebar-grid">
-                            <div class="sidebar-field">
-                                <label data-tooltip="Boost to extraversion under stress.">Ext Boost</label
-                                ><input
-                                    type="number"
-                                    id="res-stress-ext"
-                                    step="0.1"
-                                    value="0.7"
+                                    id="res-socialize"
+                                    step="0.01"
+                                    value="0.05"
                                     class="sidebar-input"
                                 />
                             </div>
@@ -519,13 +512,45 @@
                     </div>
                     <div class="config-section">
                         <div class="section-header">
-                            <label class="section-title" tabindex="0" data-tooltip="Parameters controlling the spread of emotion through the network.">PHYSICS ENGINE</label>
+                            <label class="section-title" tabindex="0" data-tooltip="Parameters governing emergence and action thresholds.">PHYSICS ENGINE</label>
                             <button class="reset-section-btn" onclick="resetSection(this)" data-tooltip="Reset section" aria-label="Reset Defaults">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
                                     <path d="M3 3v5h5"/>
                                 </svg>
                             </button>
+                        </div>
+                        <div class="toggle-grid margin-y-12">
+                            <button
+                                class="toggle-btn active"
+                                id="tog-granovetter"
+                                onclick="this.classList.toggle('active')"
+                                data-tooltip="Enable Granovetter Threshold Model (Critical Mass Cascades)"
+                            >
+                                Granovetter Model
+                            </button>
+                        </div>
+                        <div class="sidebar-grid">
+                            <div class="sidebar-field">
+                                <label data-tooltip="Mean local threshold for joining action.">Threshold μ</label
+                                ><input
+                                    type="number"
+                                    id="res-gran-mean"
+                                    step="0.05"
+                                    value="0.25"
+                                    class="sidebar-input"
+                                />
+                            </div>
+                            <div class="sidebar-field">
+                                <label data-tooltip="Standard deviation of action thresholds.">Threshold σ</label
+                                ><input
+                                    type="number"
+                                    id="res-gran-std"
+                                    step="0.05"
+                                    value="0.15"
+                                    class="sidebar-input"
+                                />
+                            </div>
                         </div>
                         <div class="sidebar-grid">
                             <div class="sidebar-field">
@@ -534,7 +559,7 @@
                                     type="number"
                                     id="res-outrage"
                                     step="0.1"
-                                    value="5.0"
+                                    value="8.0"
                                     class="sidebar-input"
                                 />
                             </div>
@@ -545,18 +570,6 @@
                                     id="res-viral"
                                     step="0.1"
                                     value="10.0"
-                                    class="sidebar-input"
-                                />
-                            </div>
-                        </div>
-                        <div class="sidebar-grid">
-                            <div class="sidebar-field">
-                                <label data-tooltip="Midpoint for saturation curve in social influence.">Saturation</label
-                                ><input
-                                    type="number"
-                                    id="res-sat"
-                                    step="0.1"
-                                    value="0.5"
                                     class="sidebar-input"
                                 />
                             </div>
@@ -615,6 +628,18 @@
                                 />
                             </div>
                             <div class="sidebar-field">
+                                <label data-tooltip="Social Rehearsal Gain. Slower decay for viral events.">Rehearsal</label
+                                ><input
+                                    type="number"
+                                    id="res-mem-rehearsal"
+                                    step="0.1"
+                                    value="0.4"
+                                    class="sidebar-input"
+                                />
+                            </div>
+                        </div>
+                        <div class="sidebar-grid">
+                            <div class="sidebar-field">
                                 <label data-tooltip="How much past identical events suppress reaction.">Desensitize</label
                                 ><input
                                     type="number"
@@ -624,8 +649,6 @@
                                     class="sidebar-input"
                                 />
                             </div>
-                        </div>
-                        <div class="sidebar-grid">
                             <div class="sidebar-field">
                                 <label data-tooltip="How much past stress amplifies new threats.">Trigger Stack</label
                                 ><input

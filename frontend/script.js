@@ -112,6 +112,7 @@ function renderBatchUI() {
                 <button class="batch-tog ${run.use_algorithmic_amplification ? "active" : ""}" onclick="this.classList.toggle('active'); debouncedUpdateRun(${run.id}, 'use_algorithmic_amplification', this.classList.contains('active'))" title="Algo Amplification">ALGO</button>
                 <button class="batch-tog ${run.use_network_topology ? "active" : ""}" onclick="this.classList.toggle('active'); debouncedUpdateRun(${run.id}, 'use_network_topology', this.classList.contains('active'))" title="Network Topology">NET</button>
                 <button class="batch-tog ${run.enable_evolution ? "active" : ""}" onclick="this.classList.toggle('active'); debouncedUpdateRun(${run.id}, 'enable_evolution', this.classList.contains('active'))" title="Evolution">EVO</button>
+                <button class="batch-tog ${run.use_granovetter_thresholds ? "active" : ""}" onclick="this.classList.toggle('active'); debouncedUpdateRun(${run.id}, 'use_granovetter_thresholds', this.classList.contains('active'))" title="Granovetter Model">GRAN</button>
             </div>
         `;
     container.appendChild(item);
@@ -206,6 +207,14 @@ document.getElementById("btn-add-run").addEventListener("click", () => {
         stewing_self_retention: parseFloat(document.getElementById("res-stew-self")?.value || 0.6),
         stewing_local_influence: parseFloat(document.getElementById("res-stew-local")?.value || 0.3),
         stewing_viral_influence: parseFloat(document.getElementById("res-stew-viral")?.value || 0.1),
+        perception_social_consensus_gain: parseFloat(document.getElementById("res-consensus")?.value || 0.25),
+        triadic_closure_prob: parseFloat(document.getElementById("res-triadic-prob")?.value || 0.2),
+        triadic_closure_iterations: parseInt(document.getElementById("res-triadic-iter")?.value || 1),
+        personality_socialization_gain: parseFloat(document.getElementById("res-socialize")?.value || 0.05),
+        use_granovetter_thresholds: document.getElementById("tog-granovetter")?.classList.contains("active"),
+        granovetter_threshold_mean: parseFloat(document.getElementById("res-gran-mean")?.value || 0.25),
+        granovetter_threshold_std: parseFloat(document.getElementById("res-gran-std")?.value || 0.15),
+        memory_social_rehearsal_gain: parseFloat(document.getElementById("res-mem-rehearsal")?.value || 0.4),
     };
   }
 
@@ -235,6 +244,14 @@ document.getElementById("btn-add-run").addEventListener("click", () => {
     stewing_self_retention: defaults.stewing_self_retention,
     stewing_local_influence: defaults.stewing_local_influence,
     stewing_viral_influence: defaults.stewing_viral_influence,
+    perception_social_consensus_gain: defaults.perception_social_consensus_gain,
+    triadic_closure_prob: defaults.triadic_closure_prob,
+    triadic_closure_iterations: defaults.triadic_closure_iterations,
+    personality_socialization_gain: defaults.personality_socialization_gain,
+    use_granovetter_thresholds: defaults.use_granovetter_thresholds,
+    granovetter_threshold_mean: defaults.granovetter_threshold_mean,
+    granovetter_threshold_std: defaults.granovetter_threshold_std,
+    memory_social_rehearsal_gain: defaults.memory_social_rehearsal_gain,
     cross_dim_interaction_strength: defaults.cross_dim_interaction_strength,
     threat_sensitivity_gain: defaults.threat_sensitivity_gain,
     k_processing_tanh_gain: defaults.k_processing_tanh_gain,
@@ -329,25 +346,25 @@ function displayResult(data) {
   sentimentEl.textContent = data.dominant_emotion.toUpperCase();
   sentimentEl.style.color = PALETTE[data.dominant_emotion] || "#ffffff";
 
-  const polVal = parseFloat(data.polarization);
+  const polVal = parseFloat(data.bimodality !== undefined ? data.bimodality : data.polarization);
   const polEl = document.getElementById("val-polarization");
   polEl.textContent = isNaN(polVal) ? "--" : polVal.toFixed(3);
 
   if (!isNaN(polVal)) {
-    if (polVal < 0.15) polEl.style.color = "#10b981";
-    else if (polVal < 0.35) polEl.style.color = "#fbbf24";
-    else polEl.style.color = "#ef4444";
+    if (polVal < 0.3) polEl.style.color = "#10b981"; // Consensus
+    else if (polVal < 0.555) polEl.style.color = "#fbbf24"; // Fragmenting
+    else polEl.style.color = "#ef4444"; // Bimodal (Sarle's Threshold)
   }
 
-  const divVal = parseFloat(data.divergence);
-  document.getElementById("val-divergence").textContent = isNaN(divVal)
-    ? "--"
-    : divVal.toFixed(3);
-
-  const klDivVal = data.kl_divergence ? parseFloat(data.kl_divergence) : NaN;
-  const klDivEl = document.getElementById("val-kl-divergence");
-  if (klDivEl) {
-    klDivEl.textContent = isNaN(klDivVal) ? "--" : klDivVal.toFixed(3);
+  const eliteDivVal = parseFloat(data.elite_divergence);
+  const eliteDivEl = document.getElementById("val-elite-divergence");
+  if (eliteDivEl) {
+    eliteDivEl.textContent = isNaN(eliteDivVal) ? "--" : eliteDivVal.toFixed(3);
+    if (!isNaN(eliteDivVal)) {
+        if (eliteDivVal < 0.2) eliteDivEl.style.color = "#10b981";
+        else if (eliteDivVal < 0.4) eliteDivEl.style.color = "#fbbf24";
+        else eliteDivEl.style.color = "#ef4444";
+    }
   }
 
   const negIntVal = data.negative_integral !== undefined ? parseFloat(data.negative_integral) : NaN;
@@ -826,6 +843,30 @@ async function runSimulation() {
     stewing_viral_influence: parseFloat(
       document.getElementById("res-stew-viral")?.value || 0.1,
     ),
+    perception_social_consensus_gain: parseFloat(
+        document.getElementById("res-consensus")?.value || 0.25,
+    ),
+    triadic_closure_prob: parseFloat(
+        document.getElementById("res-triadic-prob")?.value || 0.2,
+    ),
+    triadic_closure_iterations: parseInt(
+        document.getElementById("res-triadic-iter")?.value || 1,
+    ),
+    personality_socialization_gain: parseFloat(
+        document.getElementById("res-socialize")?.value || 0.05,
+    ),
+    use_granovetter_thresholds: document
+        .getElementById("tog-granovetter")
+        .classList.contains("active"),
+    granovetter_threshold_mean: parseFloat(
+        document.getElementById("res-gran-mean")?.value || 0.25,
+    ),
+    granovetter_threshold_std: parseFloat(
+        document.getElementById("res-gran-std")?.value || 0.15,
+    ),
+    memory_social_rehearsal_gain: parseFloat(
+        document.getElementById("res-mem-rehearsal")?.value || 0.4,
+    ),
     cross_dim_interaction_strength: parseFloat(
       document.getElementById("res-cross-dim")?.value || 0.3,
     ),
@@ -854,13 +895,13 @@ async function runSimulation() {
       document.getElementById("res-stress-ext")?.value || 0.7,
     ),
     outrage_gain: parseFloat(
-      document.getElementById("res-outrage")?.value || 2.5,
+      document.getElementById("res-outrage")?.value || 8.0,
     ),
     max_viral_multiplier: parseFloat(
       document.getElementById("res-viral")?.value || 10.0,
     ),
     saturation_midpoint: parseFloat(
-      document.getElementById("res-sat")?.value || 1.5,
+      document.getElementById("res-sat")?.value || 0.5,
     ),
     distortion_max_noise: parseFloat(
       document.getElementById("res-dist-max")?.value || 0.4,
@@ -911,6 +952,14 @@ async function runSimulation() {
         stewing_self_retention: run.stewing_self_retention,
         stewing_local_influence: run.stewing_local_influence,
         stewing_viral_influence: run.stewing_viral_influence,
+        perception_social_consensus_gain: run.perception_social_consensus_gain,
+        triadic_closure_prob: run.triadic_closure_prob,
+        triadic_closure_iterations: run.triadic_closure_iterations,
+        personality_socialization_gain: run.personality_socialization_gain,
+        use_granovetter_thresholds: run.use_granovetter_thresholds,
+        granovetter_threshold_mean: run.granovetter_threshold_mean,
+        granovetter_threshold_std: run.granovetter_threshold_std,
+        memory_social_rehearsal_gain: run.memory_social_rehearsal_gain,
         cross_dim_interaction_strength: run.cross_dim_interaction_strength,
         threat_sensitivity_gain: run.threat_sensitivity_gain,
         k_processing_tanh_gain: run.k_processing_tanh_gain,

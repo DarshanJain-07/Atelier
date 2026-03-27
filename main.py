@@ -6,7 +6,7 @@ import shutil
 import time
 import uuid
 from collections import OrderedDict
-from dataclasses import asdict
+from dataclasses import asdict, dataclass, replace
 from threading import Lock
 from typing import Any, List, Tuple, cast
 
@@ -23,14 +23,16 @@ from pydantic import BaseModel, Field
 
 from cognitive_engine import CognitiveEngine
 from explainability import ExplainabilityEngine
-from generate_society import generate_society
+from generate_society import apply_triadic_closure, create_topology, generate_society
 from input_layer import get_world_state
 from physics_engine import SocialPhysicsEngine
 
 # Import our Core Logic
 from schema import (
+    DIMENSIONS,
     DIMENSION_INDICES,
     EMOTION_LABELS,
+    PERSONALITY_CORRELATIONS,
     PSYCH_PROJECTION,
     SimConfig,
 )
@@ -131,6 +133,377 @@ class RunProfile(BaseModel):
 class SimulationRequest(BaseModel):
     news_text: str
     runs: List[RunProfile]
+
+
+@dataclass
+class PreparedSociety:
+    config: SimConfig
+    metadata: pd.DataFrame
+    exposures: torch.Tensor
+    personalities: torch.Tensor
+    affinities: torch.Tensor
+    memory: torch.Tensor
+    adjacency_matrix: Any | None
+
+
+@dataclass
+class DebugSimulationResult:
+    society: PreparedSociety
+    input_world_tensor: torch.Tensor
+    final_world_tensor: torch.Tensor
+    context_vector: torch.Tensor
+    attention_weights: torch.Tensor
+    engagement_scores: torch.Tensor
+    final_emotions: torch.Tensor
+    social_state: dict[str, Any]
+    validation_result: dict[str, Any] | None = None
+
+
+def seed_everything(seed: int) -> None:
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+
+
+def create_sim_config(**overrides: Any) -> SimConfig:
+    config = SimConfig(**overrides)
+    config.wealth_dim_idx = DIMENSION_INDICES["Wealth"]
+    return config
+
+
+def clone_sim_config(config: SimConfig, **overrides: Any) -> SimConfig:
+    cloned = replace(config, **overrides)
+    cloned.wealth_dim_idx = DIMENSION_INDICES["Wealth"]
+    return cloned
+
+
+def build_debug_society(
+    config: SimConfig,
+    exposures: torch.Tensor,
+    personalities: torch.Tensor,
+    affinities: torch.Tensor | None = None,
+    influence_scores: torch.Tensor | np.ndarray | list[float] | None = None,
+    adjacency_matrix: Any | None = None,
+    memory: torch.Tensor | None = None,
+    metadata: pd.DataFrame | None = None,
+) -> PreparedSociety:
+    config = clone_sim_config(config)
+    count = int(exposures.shape[0])
+
+    if affinities is None:
+        affinities = torch.ones_like(exposures)
+    if memory is None:
+        memory = torch.zeros_like(exposures)
+
+    if influence_scores is None:
+        influence_np = np.ones(count, dtype=np.float32)
+    elif isinstance(influence_scores, torch.Tensor):
+        influence_np = influence_scores.detach().cpu().numpy().astype(np.float32)
+    else:
+        influence_np = np.asarray(influence_scores, dtype=np.float32)
+
+    if metadata is None:
+        metadata = pd.DataFrame(
+            {
+                "Agent_ID": np.arange(count),
+                "Class": ["Agent"] * count,
+                "Region": ["Global"] * count,
+                "Influence": influence_np,
+            }
+        )
+    elif "Influence" not in metadata.columns:
+        metadata = metadata.copy()
+        metadata["Influence"] = influence_np
+
+    return PreparedSociety(
+        config=config,
+        metadata=metadata,
+        exposures=exposures,
+        personalities=personalities,
+        affinities=affinities,
+        memory=memory,
+        adjacency_matrix=adjacency_matrix,
+    )
+
+
+def prepare_society_for_debug(
+    config: SimConfig,
+    *,
+    output_dir: str | None = None,
+    evolve: bool | None = None,
+) -> PreparedSociety:
+    effective_config = clone_sim_config(
+        config,
+        output_dir=output_dir or getattr(config, "output_dir", "society_data"),
+    )
+    if evolve is not None:
+        effective_config.enable_evolution = evolve
+
+    seed_everything(effective_config.seed)
+
+    metadata, exposures, personalities, affinities, adjacency_matrix = generate_society(
+        effective_config
+    )
+
+    if getattr(effective_config, "enable_evolution", True):
+        evolver = SocietyEvolution(
+            effective_config, metadata, exposures, personalities
+        )
+        metadata, exposures, personalities = evolver.evolve()
+
+    return build_debug_society(
+        effective_config,
+        exposures=exposures,
+        personalities=personalities,
+        affinities=affinities,
+        influence_scores=metadata["Influence"].to_numpy(dtype=np.float32),
+        adjacency_matrix=adjacency_matrix,
+        metadata=metadata,
+    )
+
+
+def evolve_society_for_debug(
+    config: SimConfig,
+    metadata: pd.DataFrame,
+    exposures: torch.Tensor,
+    personalities: torch.Tensor,
+) -> tuple[pd.DataFrame, torch.Tensor, torch.Tensor]:
+    effective_config = clone_sim_config(config)
+    evolver = SocietyEvolution(effective_config, metadata, exposures, personalities)
+    return evolver.evolve()
+
+
+def distort_world_signal(
+    config: SimConfig,
+    world_tensor_raw: torch.Tensor,
+    personalities: torch.Tensor,
+    adjacency_matrix: Any | None = None,
+) -> torch.Tensor:
+    engine = CognitiveEngine(clone_sim_config(config))
+    distorted_world = engine.distort_signal(world_tensor_raw.squeeze(), personalities)
+
+    if (
+        adjacency_matrix is not None
+        and getattr(config, "perception_social_consensus_gain", 0.0) > 0
+    ):
+        local_consensus = torch.sparse.mm(
+            adjacency_matrix.coalesce().to(distorted_world.device), distorted_world
+        )
+        gain = config.perception_social_consensus_gain
+        distorted_world = (1.0 - gain) * distorted_world + gain * local_consensus
+
+    return distorted_world
+
+
+def run_cognitive_cycle(
+    config: SimConfig,
+    world_tensor_raw: torch.Tensor,
+    urgency: float,
+    is_personal: bool,
+    exposures: torch.Tensor,
+    personalities: torch.Tensor,
+    affinities: torch.Tensor,
+    memory: torch.Tensor | None = None,
+    adjacency_matrix: Any | None = None,
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    engine = CognitiveEngine(clone_sim_config(config))
+    return engine.run(
+        world_tensor_raw=world_tensor_raw,
+        urgency=urgency,
+        is_personal=is_personal,
+        exposures=exposures,
+        personalities=personalities,
+        agent_affinities=affinities,
+        agent_memory=memory,
+        adjacency_matrix=adjacency_matrix,
+    )
+
+
+def consolidate_agent_memory(
+    config: SimConfig,
+    agent_memory: torch.Tensor,
+    context_vector: torch.Tensor,
+    social_rehearsal_factor: float = 0.0,
+) -> torch.Tensor:
+    engine = CognitiveEngine(clone_sim_config(config))
+    return engine.consolidate_memory(
+        agent_memory=agent_memory,
+        context_vector=context_vector,
+        social_rehearsal_factor=social_rehearsal_factor,
+    )
+
+
+def project_emotions(
+    config: SimConfig,
+    context_vector: torch.Tensor,
+) -> torch.Tensor:
+    projection_matrix = PSYCH_PROJECTION.to(context_vector.device)
+    logits = torch.matmul(context_vector, projection_matrix)
+    return F.softmax(logits / max(0.01, config.emotion_temperature), dim=1)
+
+
+def aggregate_social_state(
+    config: SimConfig,
+    emotion_tensor: torch.Tensor,
+    influence_scores: torch.Tensor | np.ndarray | list[float],
+    engagement_scores: torch.Tensor | None = None,
+    adjacency_matrix: Any | None = None,
+    personalities: torch.Tensor | None = None,
+    is_personal: bool = False,
+) -> dict[str, Any]:
+    engine = SocialPhysicsEngine(clone_sim_config(config))
+    return engine.aggregate_society(
+        emotion_tensor,
+        influence_scores,
+        engagement_scores=engagement_scores,
+        adjacency_matrix=adjacency_matrix,
+        personalities=personalities,
+        is_personal=is_personal,
+    )
+
+
+def map_emotions_to_sentiment(emotion_probs_8dim: torch.Tensor | np.ndarray) -> np.ndarray:
+    return validator.map_plutchik_to_sentiment(emotion_probs_8dim)
+
+
+def calculate_validation_metrics(
+    system_probs_8dim: torch.Tensor | np.ndarray,
+    baseline_probs: torch.Tensor | np.ndarray | list[float],
+) -> dict[str, Any]:
+    return validator.calculate_divergence(system_probs_8dim, baseline_probs)
+
+
+def create_topology_for_debug(
+    config: SimConfig,
+    exposures: torch.Tensor,
+    personalities: torch.Tensor,
+    influence_scores: torch.Tensor | np.ndarray | list[float],
+) -> Any | None:
+    if isinstance(influence_scores, torch.Tensor):
+        influence_np = influence_scores.detach().cpu().numpy()
+    else:
+        influence_np = np.asarray(influence_scores)
+    return create_topology(clone_sim_config(config), exposures, personalities, influence_np)
+
+
+def apply_triadic_closure_for_debug(config: SimConfig, adjacency_matrix: torch.Tensor):
+    return apply_triadic_closure(clone_sim_config(config), adjacency_matrix)
+
+
+def run_debug_simulation(
+    config: SimConfig,
+    world_tensor_raw: torch.Tensor,
+    *,
+    society: PreparedSociety | None = None,
+    urgency: float = 0.5,
+    is_personal: bool = False,
+    baseline_probs: torch.Tensor | np.ndarray | list[float] | None = None,
+) -> DebugSimulationResult:
+    effective_config = clone_sim_config(config)
+    active_society = society or prepare_society_for_debug(effective_config)
+    memory = active_society.memory.clone()
+    input_world_tensor = world_tensor_raw.clone()
+
+    final_world_tensor = input_world_tensor
+    context_vector, attention_weights, engagement_scores = run_cognitive_cycle(
+        active_society.config,
+        final_world_tensor,
+        urgency,
+        is_personal,
+        active_society.exposures,
+        active_society.personalities,
+        active_society.affinities,
+        memory=memory,
+        adjacency_matrix=active_society.adjacency_matrix,
+    )
+
+    if getattr(active_society.config, "use_algorithmic_amplification", False):
+        sample_size = max(
+            1,
+            int(
+                len(active_society.exposures)
+                * getattr(active_society.config, "algo_sample_size", 0.1)
+            ),
+        )
+        _, ab_attention, ab_engagement = run_cognitive_cycle(
+            active_society.config,
+            input_world_tensor,
+            urgency,
+            is_personal,
+            active_society.exposures[:sample_size],
+            active_society.personalities[:sample_size],
+            active_society.affinities[:sample_size],
+            memory=memory[:sample_size],
+            adjacency_matrix=subset_adjacency(
+                active_society.adjacency_matrix,
+                torch.arange(sample_size, device=active_society.exposures.device),
+            ),
+        )
+
+        engagement_weighted_attention = ab_attention * ab_engagement.unsqueeze(1)
+        avg_attention_per_dim = engagement_weighted_attention.mean(dim=0)
+        top_dims = torch.topk(avg_attention_per_dim, k=2).indices
+
+        final_world_tensor = input_world_tensor.clone()
+        exaggeration = getattr(active_society.config, "algo_exaggeration_factor", 1.5)
+        for dim_idx in top_dims:
+            current_val = final_world_tensor[0, dim_idx].item()
+            if abs(current_val) > 0.05:
+                final_world_tensor[0, dim_idx] *= exaggeration
+            else:
+                final_world_tensor[0, dim_idx] = -0.3
+
+        final_world_tensor = torch.clamp(final_world_tensor, -1.0, 1.0)
+        context_vector, attention_weights, engagement_scores = run_cognitive_cycle(
+            active_society.config,
+            final_world_tensor,
+            urgency,
+            is_personal,
+            active_society.exposures,
+            active_society.personalities,
+            active_society.affinities,
+            memory=memory,
+            adjacency_matrix=active_society.adjacency_matrix,
+        )
+
+    final_emotions = project_emotions(active_society.config, context_vector)
+    social_state = aggregate_social_state(
+        active_society.config,
+        final_emotions,
+        active_society.metadata["Influence"].to_numpy(dtype=np.float32),
+        engagement_scores=engagement_scores,
+        adjacency_matrix=active_society.adjacency_matrix,
+        personalities=active_society.personalities,
+        is_personal=is_personal,
+    )
+
+    if getattr(active_society.config, "use_agent_memory", False):
+        conf = float(social_state.get("confidence", 0.0))
+        act_ratio = float(social_state.get("acting_ratio", 0.0))
+        rehearsal_factor = (conf + act_ratio) / 2.0
+        active_society.memory = consolidate_agent_memory(
+            active_society.config,
+            memory,
+            context_vector,
+            social_rehearsal_factor=rehearsal_factor,
+        )
+
+    validation_result = None
+    if baseline_probs is not None:
+        validation_result = calculate_validation_metrics(
+            social_state["objective_center"], baseline_probs
+        )
+
+    return DebugSimulationResult(
+        society=active_society,
+        input_world_tensor=input_world_tensor,
+        final_world_tensor=final_world_tensor,
+        context_vector=context_vector,
+        attention_weights=attention_weights,
+        engagement_scores=engagement_scores,
+        final_emotions=final_emotions,
+        social_state=social_state,
+        validation_result=validation_result,
+    )
 
 
 @app.get("/health")

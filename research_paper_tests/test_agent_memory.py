@@ -1,89 +1,36 @@
 import torch
-import sys
-import os
 
-# Add parent directory to path to import schema, etc.
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from schema import SimConfig
-from generate_society import generate_society
-from cognitive_engine import CognitiveEngine
+from main import DIMENSION_INDICES, create_sim_config, prepare_society_for_debug, run_debug_simulation
 
 
-def test_agent_memory():
-    print(
-        "--- Testing Agent Memory (Extreme Desensitization & Trigger Stacking Loop) ---"
-    )
-
-    # Initialize engine with memory enabled
-    config = SimConfig(
-        num_agents=1000,
+def test_agent_memory_accumulates_and_stacks_new_threats(tmp_path):
+    config = create_sim_config(
+        num_agents=300,
         use_agent_memory=True,
-        memory_desensitization_gain=5.0,  # MASSIVE fatigue multiplier
-        memory_trigger_stacking_gain=15.0,  # MASSIVE stacking multiplier
+        memory_desensitization_gain=5.0,
+        memory_trigger_stacking_gain=15.0,
+        use_network_topology=False,
+        enable_evolution=False,
+    )
+    society = prepare_society_for_debug(
+        config, output_dir=str(tmp_path / "memory"), evolve=False
     )
 
-    df_meta, exposures, personalities, affinities, _ = generate_society(config)
-    cog_engine = CognitiveEngine(config)
+    repeated_wealth_threat = torch.zeros(1, 12)
+    repeated_wealth_threat[0, DIMENSION_INDICES["Wealth"]] = -0.8
 
-    # Event A: A massive wealth threat (The repeated shock)
-    world_tensor_threat = torch.zeros(1, 12)
-    world_tensor_threat[0, config.wealth_dim_idx] = -0.8  # -0.8 Wealth (Threat)
+    for _ in range(10):
+        run_debug_simulation(config, repeated_wealth_threat, society=society, urgency=0.5)
 
-    print("\n[ Running 50 Iterations of the Same Wealth Threat (-0.8) ]")
-    # Start with empty memory
-    agent_memory = torch.zeros_like(exposures)
+    assert torch.norm(society.memory).item() > 0.0
 
-    for i in range(50):
-        ctx, att, eng, agent_memory = cog_engine.run(
-            world_tensor_raw=world_tensor_threat,
-            urgency=0.5,
-            is_personal=False,
-            exposures=exposures,
-            personalities=personalities,
-            agent_affinities=affinities,
-            agent_memory=agent_memory,
-        )
-        if i == 0:
-            print(f"Iteration 1 (Fresh): Average Engagement = {eng.mean().item():.4f}")
-        elif i == 49:
-            print(
-                f"Iteration 50 (Fatigued): Average Engagement = {eng.mean().item():.4f}"
-            )
+    new_threat = torch.zeros(1, 12)
+    new_threat[0, DIMENSION_INDICES["Physical_Safety"]] = -0.2
 
-    print(
-        "\n[ Society is now heavily desensitized to Wealth Threats but carries massive internal stress ]"
+    stacked = run_debug_simulation(config, new_threat, society=society, urgency=0.5)
+    fresh_society = prepare_society_for_debug(
+        config, output_dir=str(tmp_path / "fresh"), evolve=False
     )
+    fresh = run_debug_simulation(config, new_threat, society=fresh_society, urgency=0.5)
 
-    print("\n[ The Spark: A Minor New Threat (Physical Safety -0.2) ]")
-    # Because they are already stressed from 50 iterations of wealth loss, a minor new threat might explode
-    world_tensor_new_threat = torch.zeros(1, 12)
-    world_tensor_new_threat[0, 1] = -0.2  # -0.2 Safety (Minor Threat)
-
-    ctx_stacked, att_stacked, eng_stacked, mem_stacked = cog_engine.run(
-        world_tensor_raw=world_tensor_new_threat,
-        urgency=0.5,
-        is_personal=False,
-        exposures=exposures,
-        personalities=personalities,
-        agent_affinities=affinities,
-        agent_memory=agent_memory,  # Pass the accumulated stress from 50 iterations
-    )
-    print(f"Average Engagement (Trigger Stacked): {eng_stacked.mean().item():.4f}")
-
-    # Let's run the exact same Minor Threat on a FRESH society without memory to prove it was stacked
-    print("\n[ Baseline: Same Minor Safety Threat on FRESH Society (No Memory) ]")
-    ctx_base, att_base, eng_base, _ = cog_engine.run(
-        world_tensor_raw=world_tensor_new_threat,
-        urgency=0.5,
-        is_personal=False,
-        exposures=exposures,
-        personalities=personalities,
-        agent_affinities=affinities,
-        agent_memory=torch.zeros_like(exposures),
-    )
-    print(f"Average Engagement (Baseline / Calm): {eng_base.mean().item():.4f}")
-
-
-if __name__ == "__main__":
-    test_agent_memory()
+    assert stacked.engagement_scores.mean().item() > fresh.engagement_scores.mean().item()

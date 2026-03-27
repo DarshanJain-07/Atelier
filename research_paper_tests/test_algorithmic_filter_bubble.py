@@ -1,107 +1,47 @@
 import torch
-import sys
-import os
 
-# Add parent directory to path to import schema, etc.
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from schema import SimConfig, DIMENSIONS
-from generate_society import generate_society
-from cognitive_engine import CognitiveEngine
+from main import DIMENSION_INDICES, build_debug_society, clone_sim_config, create_sim_config, prepare_society_for_debug, run_debug_simulation
 
 
-def test_algorithmic_filter_bubble():
-    print("--- Testing Algorithmic 2-Pass Filter Bubble ---")
-
-    # Initialize engine with algorithmic amplification ENABLED
-    config_algo = SimConfig(
-        num_agents=2000,
+def test_algorithmic_filter_bubble_mutates_feed_and_boosts_engagement(tmp_path):
+    config = create_sim_config(
+        num_agents=500,
         use_algorithmic_amplification=True,
-        algo_sample_size=0.1,  # 10% A/B Test
-        algo_exaggeration_factor=2.0,  # 2x Amplification for testing visibility
+        algo_sample_size=0.1,
+        algo_exaggeration_factor=2.0,
+        use_network_topology=False,
+        enable_evolution=False,
+    )
+    society = prepare_society_for_debug(
+        config, output_dir=str(tmp_path / "algo"), evolve=False
     )
 
-    df_meta, exposures, personalities, affinities, _ = generate_society(config_algo)
+    boring_world = torch.zeros(1, 12)
+    boring_world[0, DIMENSION_INDICES["Innovation"]] = 0.2
+    boring_world[0, DIMENSION_INDICES["Freedom"]] = -0.1
 
-    # A seemingly "boring" event.
-    # Let's say it's a minor tech update that slightly touches Innovation and slightly touches Freedom.
-    # Most people wouldn't care.
-    world_tensor_boring = torch.zeros(1, 12)
-    world_tensor_boring[0, 6] = 0.2  # Innovation
-    world_tensor_boring[0, 7] = -0.1  # Freedom (slight threat)
+    baseline_config = clone_sim_config(config, use_algorithmic_amplification=False)
+    baseline_society = build_debug_society(
+        baseline_config,
+        society.exposures,
+        society.personalities,
+        society.affinities,
+        society.metadata["Influence"].to_numpy(),
+        society.adjacency_matrix,
+        society.memory.clone(),
+        society.metadata.copy(),
+    )
 
-    print("\n[ Scenario: Broadcasting a 'Boring' Tech Update ]")
-    print("Original Tensor: Innovation: 0.2, Freedom: -0.1")
-
-    # We simulate what would happen WITHOUT the algorithm first to get a baseline
-    cog_engine = CognitiveEngine(config_algo)
-    _, _, eng_baseline, _ = cog_engine.run(
-        world_tensor_raw=world_tensor_boring,
+    baseline = run_debug_simulation(
+        baseline_config,
+        boring_world,
+        society=baseline_society,
         urgency=0.5,
-        is_personal=False,
-        exposures=exposures,
-        personalities=personalities,
-        agent_affinities=affinities,
-        agent_memory=None,
     )
+    amplified = run_debug_simulation(config, boring_world, society=society, urgency=0.5)
 
-    # Now we simulate WITH the algorithm (Pass 1 -> Algorithm -> Pass 2)
-    sample_size = int(config_algo.num_agents * config_algo.algo_sample_size)
-
-    # PASS 1: The A/B Test
-    _, ab_attention, ab_engagement, _ = cog_engine.run(
-        world_tensor_raw=world_tensor_boring,
-        urgency=0.5,
-        is_personal=False,
-        exposures=exposures[:sample_size],
-        personalities=personalities[:sample_size],
-        agent_affinities=affinities[:sample_size],
-        agent_memory=None,
+    assert not torch.allclose(amplified.final_world_tensor, boring_world)
+    assert (
+        amplified.engagement_scores.mean().item()
+        > baseline.engagement_scores.mean().item()
     )
-
-    # The Algorithm's Intervention
-    engagement_weighted_attention = ab_attention * ab_engagement.unsqueeze(1)
-    avg_attention_per_dim = engagement_weighted_attention.mean(dim=0)
-    top_dims = torch.topk(avg_attention_per_dim, k=2).indices
-
-    mutated_world_tensor = world_tensor_boring.clone()
-    for dim_idx in top_dims:
-        current_val = mutated_world_tensor[0, dim_idx].item()
-        if abs(current_val) > 0.05:
-            mutated_world_tensor[0, dim_idx] *= config_algo.algo_exaggeration_factor
-        else:
-            mutated_world_tensor[0, dim_idx] = -0.3  # Algorithm injects a threat
-
-    mutated_world_tensor = torch.clamp(mutated_world_tensor, -1.0, 1.0)
-
-    # PASS 2: Viral Broadcast
-    _, _, eng_algo, _ = cog_engine.run(
-        world_tensor_raw=mutated_world_tensor,
-        urgency=0.5,
-        is_personal=False,
-        exposures=exposures,
-        personalities=personalities,
-        agent_affinities=affinities,
-        agent_memory=None,
-    )
-
-    print("\n[ The Algorithm's Decision ]")
-    print("The algorithm noticed high engagement in these dimensions:")
-    for dim_idx in top_dims:
-        print(f" - {DIMENSIONS[dim_idx]}")
-
-    print("\n[ Final Mutated Event Broadcast to Society ]")
-    print(
-        f"Mutated Tensor: Innovation: {mutated_world_tensor[0, 6].item():.2f}, Freedom: {mutated_world_tensor[0, 7].item():.2f}"
-    )
-
-    print("\n[ Results ]")
-    print(f"Average Engagement (Without Algorithm): {eng_baseline.mean().item():.4f}")
-    print(f"Average Engagement (With Algorithm):    {eng_algo.mean().item():.4f}")
-    print(
-        f"Total Engagement Increase:              {((eng_algo.mean().item() / eng_baseline.mean().item()) - 1) * 100:.1f}%"
-    )
-
-
-if __name__ == "__main__":
-    test_algorithmic_filter_bubble()

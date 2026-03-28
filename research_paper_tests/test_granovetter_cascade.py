@@ -1,26 +1,31 @@
 import torch
 
-from main import aggregate_social_state, clone_sim_config, create_sim_config, prepare_society_for_debug
+from main import aggregate_social_state, clone_sim_config, prepare_society_for_debug
+from research_paper_tests.config_schema import (
+    fraction_count,
+    get_test_scenario,
+    set_emotions,
+    zero_emotions,
+)
 
 
 def test_granovetter_thresholds_increase_collective_action(tmp_path):
-    config = create_sim_config(
-        num_agents=500,
-        use_network_topology=True,
-        use_granovetter_thresholds=True,
-        granovetter_threshold_mean=0.2,
-        dominant_emotion_threshold=0.1,
-        enable_evolution=False,
-    )
+    scenario = get_test_scenario("granovetter_cascade")
+    config = scenario.sim_config()
+    settings = scenario.settings()
     society = prepare_society_for_debug(
         config, output_dir=str(tmp_path / "gran"), evolve=False
     )
 
-    emotions = torch.zeros(config.num_agents, 8)
-    instigators = int(config.num_agents * 0.05)
-    sympathizers = int(config.num_agents * 0.4)
-    emotions[:instigators, 6] = 0.8
-    emotions[instigators : instigators + sympathizers, 6] = 0.2
+    emotions = zero_emotions(config.num_agents)
+    instigators = fraction_count(config.num_agents, settings["instigator_share"])
+    sympathizers = fraction_count(config.num_agents, settings["sympathizer_share"])
+    set_emotions(emotions, settings["instigator_emotion"], rows=slice(None, instigators))
+    set_emotions(
+        emotions,
+        settings["sympathizer_emotion"],
+        rows=slice(instigators, instigators + sympathizers),
+    )
 
     base_config = clone_sim_config(config, use_granovetter_thresholds=False)
     baseline = aggregate_social_state(

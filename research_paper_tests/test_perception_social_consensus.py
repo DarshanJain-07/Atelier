@@ -1,34 +1,22 @@
 import torch
 
-from main import DIMENSION_INDICES, create_sim_config, distort_world_signal, prepare_society_for_debug
+from main import distort_world_signal, prepare_society_for_debug
 from research_paper_tests._metrics import average_neighbor_distance
+from research_paper_tests.config_schema import build_world, get_test_scenario
 
 
 def test_social_consensus_aligns_neighbor_perceptions(tmp_path):
-    config = create_sim_config(
-        num_agents=500,
-        use_signal_distortion=True,
-        distortion_max_noise=0.6,
-        distortion_neurotic_gain=1.0,
-        use_network_topology=True,
-        perception_social_consensus_gain=0.3,
-        enable_evolution=False,
-    )
+    scenario = get_test_scenario("perception_social_consensus")
+    config = scenario.sim_config()
+    settings = scenario.settings()
     society = prepare_society_for_debug(
         config, output_dir=str(tmp_path / "consensus"), evolve=False
     )
 
-    world = torch.zeros(1, 12)
-    world[0, DIMENSION_INDICES["Physical_Safety"]] = -0.5
+    world = build_world(settings["world"])
 
-    baseline_config = create_sim_config(
-        num_agents=config.num_agents,
-        use_signal_distortion=True,
-        distortion_max_noise=0.6,
-        distortion_neurotic_gain=1.0,
-        use_network_topology=True,
-        perception_social_consensus_gain=0.0,
-        enable_evolution=False,
+    baseline_config = get_test_scenario("perception_social_consensus_baseline").sim_config(
+        num_agents=config.num_agents
     )
     baseline = distort_world_signal(
         baseline_config,

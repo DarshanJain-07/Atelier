@@ -1,0 +1,953 @@
+from __future__ import annotations
+
+from copy import deepcopy
+from dataclasses import dataclass, field, fields
+from typing import Any, Mapping
+
+import torch
+
+from schema import DIMENSIONS, DIMENSION_INDICES, EMOTION_LABELS, SimConfig
+
+
+PERSONALITY_LABELS = (
+    "Openness",
+    "Conscientiousness",
+    "Extraversion",
+    "Agreeableness",
+    "Neuroticism",
+)
+SENTIMENT_LABELS = ("Negative", "Neutral", "Positive")
+PERSONALITY_INDICES = {
+    label: index for index, label in enumerate(PERSONALITY_LABELS)
+}
+EMOTION_INDICES = {label: index for index, label in enumerate(EMOTION_LABELS)}
+SENTIMENT_INDICES = {label: index for index, label in enumerate(SENTIMENT_LABELS)}
+
+WORLD_DIMENSION_COUNT = len(DIMENSIONS)
+EMOTION_DIMENSION_COUNT = len(EMOTION_LABELS)
+PERSONALITY_TRAIT_COUNT = len(PERSONALITY_LABELS)
+
+
+def _merge(*mappings: Mapping[str, Any]) -> dict[str, Any]:
+    merged: dict[str, Any] = {}
+    for mapping in mappings:
+        merged.update(mapping)
+    return merged
+
+
+def live_sim_config_defaults() -> dict[str, Any]:
+    base_config = SimConfig()
+    return {
+        config_field.name: deepcopy(getattr(base_config, config_field.name))
+        for config_field in fields(SimConfig)
+        if config_field.init
+    }
+
+
+SIM_CONFIG_DEFAULTS = live_sim_config_defaults()
+SIM_CONFIG_FIELDS = frozenset(SIM_CONFIG_DEFAULTS)
+
+
+def live_run_profile_defaults() -> dict[str, Any]:
+    from main import RunProfile
+
+    sim_defaults = live_sim_config_defaults()
+    defaults = RunProfile().model_dump()
+    defaults.update(
+        {
+            "seed": sim_defaults["seed"],
+            "temperature": sim_defaults["mutation_temperature"],
+            "agent_count": sim_defaults["num_agents"],
+            "use_distortion": sim_defaults["use_signal_distortion"],
+            "use_pressure": sim_defaults["use_time_pressure"],
+            "use_maslow": sim_defaults["use_maslow_gating"],
+            "use_power_law": sim_defaults["use_power_law_influence"],
+            "emotion_temperature": sim_defaults["emotion_temperature"],
+            "panic_threshold": sim_defaults["panic_threshold"],
+            "stewing_ticks": sim_defaults["stewing_ticks"],
+            "stewing_self_retention": sim_defaults["stewing_self_retention"],
+            "stewing_local_influence": sim_defaults["stewing_local_influence"],
+            "stewing_viral_influence": sim_defaults["stewing_viral_influence"],
+            "use_algorithmic_amplification": sim_defaults[
+                "use_algorithmic_amplification"
+            ],
+            "algo_sample_size": sim_defaults["algo_sample_size"],
+            "algo_exaggeration_factor": sim_defaults["algo_exaggeration_factor"],
+            "use_agent_memory": sim_defaults["use_agent_memory"],
+            "memory_decay_rate": sim_defaults["memory_decay_rate"],
+            "memory_desensitization_gain": sim_defaults[
+                "memory_desensitization_gain"
+            ],
+            "memory_trigger_stacking_gain": sim_defaults[
+                "memory_trigger_stacking_gain"
+            ],
+            "memory_social_rehearsal_gain": sim_defaults[
+                "memory_social_rehearsal_gain"
+            ],
+            "use_network_topology": sim_defaults["use_network_topology"],
+            "homophily_strength": sim_defaults["homophily_strength"],
+            "influence_bias_exp": sim_defaults["influence_bias_exp"],
+            "triadic_closure_prob": sim_defaults["triadic_closure_prob"],
+            "triadic_closure_iterations": sim_defaults[
+                "triadic_closure_iterations"
+            ],
+            "triadic_closure_homophily_threshold": sim_defaults[
+                "triadic_closure_homophily_threshold"
+            ],
+            "use_granovetter_thresholds": sim_defaults[
+                "use_granovetter_thresholds"
+            ],
+            "granovetter_threshold_mean": sim_defaults[
+                "granovetter_threshold_mean"
+            ],
+            "granovetter_threshold_std": sim_defaults["granovetter_threshold_std"],
+            "personality_socialization_gain": sim_defaults[
+                "personality_socialization_gain"
+            ],
+            "enable_evolution": sim_defaults["enable_evolution"],
+            "cross_dim_interaction_strength": sim_defaults[
+                "cross_dim_interaction_strength"
+            ],
+            "threat_sensitivity_gain": sim_defaults["threat_sensitivity_gain"],
+            "k_processing_tanh_gain": sim_defaults["k_processing_tanh_gain"],
+            "relevance_importance_weight": sim_defaults[
+                "relevance_importance_weight"
+            ],
+            "relevance_base_weight": sim_defaults["relevance_base_weight"],
+            "threat_amplifier_gain": sim_defaults["threat_amplifier_gain"],
+            "stress_neurotic_amplification": sim_defaults[
+                "stress_neurotic_amplification"
+            ],
+            "stress_openness_reduction": sim_defaults["stress_openness_reduction"],
+            "stress_extraversion_boost": sim_defaults[
+                "stress_extraversion_boost"
+            ],
+            "outrage_gain": sim_defaults["outrage_gain"],
+            "max_viral_multiplier": sim_defaults["max_viral_multiplier"],
+            "saturation_midpoint": sim_defaults["saturation_midpoint"],
+            "distortion_max_noise": sim_defaults["distortion_max_noise"],
+            "distortion_neurotic_gain": sim_defaults["distortion_neurotic_gain"],
+            "perception_social_consensus_gain": sim_defaults[
+                "perception_social_consensus_gain"
+            ],
+            "evolution_generations": sim_defaults["evolution_generations"],
+            "inheritance_fraction": sim_defaults["inheritance_fraction"],
+            "shock_frequency": sim_defaults["shock_frequency"],
+            "shock_magnitude": sim_defaults["shock_magnitude"],
+        }
+    )
+    return defaults
+
+
+def apply_config_attrs(
+    config: SimConfig, extra_attrs: Mapping[str, Any] | None = None
+) -> SimConfig:
+    for attr_name, attr_value in (extra_attrs or {}).items():
+        setattr(config, attr_name, deepcopy(attr_value))
+    return config
+
+
+def fraction_count(total: int, fraction: float) -> int:
+    return int(total * fraction)
+
+
+def zero_world(rows: int = 1) -> torch.Tensor:
+    return torch.zeros(rows, WORLD_DIMENSION_COUNT, dtype=torch.float32)
+
+
+def zero_emotions(rows: int) -> torch.Tensor:
+    return torch.zeros(rows, EMOTION_DIMENSION_COUNT, dtype=torch.float32)
+
+
+def zero_personalities(rows: int, fill: float = 0.0) -> torch.Tensor:
+    return torch.full(
+        (rows, PERSONALITY_TRAIT_COUNT),
+        float(fill),
+        dtype=torch.float32,
+    )
+
+
+def set_dimensions(
+    tensor: torch.Tensor,
+    values: Mapping[str, float],
+    rows: slice | int | None = None,
+) -> torch.Tensor:
+    target_rows: slice | int = slice(None) if rows is None else rows
+    for dimension_name, dimension_value in values.items():
+        tensor[target_rows, DIMENSION_INDICES[dimension_name]] = dimension_value
+    return tensor
+
+
+def set_emotions(
+    tensor: torch.Tensor,
+    values: Mapping[str, float],
+    rows: slice | int | None = None,
+) -> torch.Tensor:
+    target_rows: slice | int = slice(None) if rows is None else rows
+    for emotion_name, emotion_value in values.items():
+        tensor[target_rows, EMOTION_INDICES[emotion_name]] = emotion_value
+    return tensor
+
+
+def set_traits(
+    tensor: torch.Tensor,
+    values: Mapping[str, float],
+    rows: slice | int | None = None,
+) -> torch.Tensor:
+    target_rows: slice | int = slice(None) if rows is None else rows
+    for trait_name, trait_value in values.items():
+        tensor[target_rows, PERSONALITY_INDICES[trait_name]] = trait_value
+    return tensor
+
+
+def build_world(values: Mapping[str, float]) -> torch.Tensor:
+    return set_dimensions(zero_world(), values)
+
+
+@dataclass(frozen=True)
+class ResearchPaperTestScenario:
+    config_overrides: Mapping[str, Any] = field(default_factory=dict)
+    run_profile_overrides: Mapping[str, Any] = field(default_factory=dict)
+    extra_config_attrs: Mapping[str, Any] = field(default_factory=dict)
+    values: Mapping[str, Any] = field(default_factory=dict)
+
+    def sim_config(self, **overrides: Any) -> SimConfig:
+        from main import create_sim_config
+
+        config = create_sim_config(
+            **_merge(self.config_overrides, overrides),
+        )
+        return apply_config_attrs(config, self.extra_config_attrs)
+
+    def run_profile(self, **overrides: Any):
+        from main import RunProfile
+
+        profile_kwargs = live_run_profile_defaults()
+        profile_kwargs.update(deepcopy(dict(self.run_profile_overrides)))
+        profile_kwargs.update(overrides)
+        return RunProfile(**profile_kwargs)
+
+    def settings(self) -> dict[str, Any]:
+        return deepcopy(dict(self.values))
+
+
+NO_NETWORK_NO_EVOLUTION = {
+    "use_network_topology": False,
+    "enable_evolution": False,
+}
+NETWORK_NO_EVOLUTION = {
+    "use_network_topology": True,
+    "enable_evolution": False,
+}
+CALM_NO_NETWORK = _merge(
+    NO_NETWORK_NO_EVOLUTION,
+    {"use_signal_distortion": False, "use_time_pressure": False},
+)
+
+
+TEST_SCENARIOS: dict[str, ResearchPaperTestScenario] = {
+    "accuracy_metrics": ResearchPaperTestScenario(
+        config_overrides=_merge(
+            NO_NETWORK_NO_EVOLUTION,
+            {"num_agents": 256, "use_signal_distortion": False},
+        ),
+        values={
+            "world": {"Physical_Safety": -0.8},
+            "urgency": 0.5,
+            "matching_baseline": [0.9, 0.05, 0.05],
+            "mismatched_baseline": [0.05, 0.05, 0.9],
+        },
+    ),
+    "agent_memory": ResearchPaperTestScenario(
+        config_overrides=_merge(
+            NO_NETWORK_NO_EVOLUTION,
+            {
+                "num_agents": 300,
+                "use_agent_memory": True,
+                "memory_desensitization_gain": 5.0,
+                "memory_trigger_stacking_gain": 15.0,
+            },
+        ),
+        values={
+            "repeat_count": 10,
+            "repeat_threat": {"Wealth": -0.8},
+            "new_threat": {"Physical_Safety": -0.2},
+            "urgency": 0.5,
+        },
+    ),
+    "algorithmic_filter_bubble": ResearchPaperTestScenario(
+        config_overrides=_merge(
+            NO_NETWORK_NO_EVOLUTION,
+            {
+                "num_agents": 500,
+                "use_algorithmic_amplification": True,
+                "algo_sample_size": 0.1,
+                "algo_exaggeration_factor": 2.0,
+            },
+        ),
+        values={
+            "world": {"Innovation": 0.2, "Freedom": -0.1},
+            "urgency": 0.5,
+        },
+    ),
+    "bimodality_polarization": ResearchPaperTestScenario(
+        config_overrides=_merge(
+            NO_NETWORK_NO_EVOLUTION,
+            {"num_agents": 1500},
+        ),
+        values={
+            "rng_seed": SIM_CONFIG_DEFAULTS["seed"],
+            "polarized_mean_negative": -0.8,
+            "polarized_mean_positive": 0.8,
+            "polarized_std": 0.1,
+            "polarized_count_per_mode": 750,
+            "normal_mean": 0.0,
+            "normal_std": 1.0,
+            "min_polarized_bc": 0.555,
+        },
+    ),
+    "cascade_power_law_flat": ResearchPaperTestScenario(
+        config_overrides=_merge(
+            NO_NETWORK_NO_EVOLUTION,
+            {"num_agents": 2000, "use_power_law_influence": False},
+        ),
+    ),
+    "cascade_power_law_power": ResearchPaperTestScenario(
+        config_overrides=_merge(
+            NO_NETWORK_NO_EVOLUTION,
+            {"num_agents": 2000, "use_power_law_influence": True},
+        ),
+    ),
+    "clusters": ResearchPaperTestScenario(
+        config_overrides=_merge(
+            NO_NETWORK_NO_EVOLUTION,
+            {"num_agents": 1200},
+        ),
+        values={
+            "cluster_count": 8,
+            "cluster_seed": SIM_CONFIG_DEFAULTS["seed"],
+            "cluster_initializations": 10,
+            "min_neuroticism_spread": 0.02,
+        },
+    ),
+    "cognitive_gate": ResearchPaperTestScenario(
+        config_overrides=_merge(
+            NO_NETWORK_NO_EVOLUTION,
+            {"num_agents": 400, "use_signal_distortion": False},
+        ),
+        extra_config_attrs={
+            "use_selective_exposure": True,
+            "selective_exposure_base_tolerance": -0.3,
+            "selective_exposure_openness_factor": 0.4,
+        },
+        values={
+            "trait_fill": 0.5,
+            "low_openness": 0.1,
+            "high_openness": 0.9,
+            "aligned_worldview": {
+                "Innovation": 1.0,
+                "Fairness": 1.0,
+                "Sanctity": -1.0,
+                "In_Group": -1.0,
+            },
+            "world": {
+                "Innovation": 0.8,
+                "Fairness": 0.7,
+                "Sanctity": -0.9,
+                "In_Group": -0.5,
+            },
+            "urgency": 0.2,
+        },
+    ),
+    "divergence": ResearchPaperTestScenario(
+        config_overrides=_merge(
+            NO_NETWORK_NO_EVOLUTION,
+            {"num_agents": 2, "use_signal_distortion": False},
+        ),
+        values={
+            "personalities": [
+                [0.5, 0.5, 0.5, 0.5, 0.5],
+                [0.5, 0.5, 0.5, 0.5, 0.95],
+            ],
+            "world": {"Physical_Safety": -0.4},
+            "urgency": 0.5,
+        },
+    ),
+    "echo_chambers_high": ResearchPaperTestScenario(
+        config_overrides=_merge(
+            NETWORK_NO_EVOLUTION,
+            {
+                "num_agents": 500,
+                "homophily_strength": 8.0,
+                "influence_bias_exp": 0.1,
+                "personality_socialization_gain": 0.0,
+            },
+        ),
+    ),
+    "echo_chambers_low": ResearchPaperTestScenario(
+        config_overrides=_merge(
+            NETWORK_NO_EVOLUTION,
+            {
+                "num_agents": 500,
+                "homophily_strength": 0.1,
+                "influence_bias_exp": 1.0,
+                "personality_socialization_gain": 0.0,
+            },
+        ),
+    ),
+    "endogenous_events": ResearchPaperTestScenario(
+        config_overrides={
+            "num_agents": 1000,
+            "elite_divergence_threshold": 0.3,
+            "polarization_threshold": 0.3,
+            "stewing_ticks": 1,
+        },
+        values={
+            "acting_population": 10,
+            "stable_emotion": {"Joy": 0.5},
+            "polarized_group_a": {"Anger": 1.0},
+            "polarized_group_b": {"Joy": 1.0},
+            "allowed_actions": {
+                "Civil Protest",
+                "Populist Uprising",
+                "Elite Policy Shift",
+            },
+        },
+    ),
+    "figure_algorithmic_filter_bubble": ResearchPaperTestScenario(
+        config_overrides=_merge(
+            NO_NETWORK_NO_EVOLUTION,
+            {
+                "num_agents": 400,
+                "use_algorithmic_amplification": True,
+                "algo_sample_size": 0.1,
+                "algo_exaggeration_factor": 2.0,
+            },
+        ),
+        values={
+            "world": {"Innovation": 0.2, "Freedom": -0.1},
+            "urgency": 0.5,
+        },
+    ),
+    "figure_cognitive_gate": ResearchPaperTestScenario(
+        config_overrides=_merge(
+            NO_NETWORK_NO_EVOLUTION,
+            {"num_agents": 400, "use_signal_distortion": False},
+        ),
+        extra_config_attrs={
+            "use_selective_exposure": True,
+            "selective_exposure_base_tolerance": -0.3,
+            "selective_exposure_openness_factor": 0.4,
+        },
+        values={
+            "trait_fill": 0.5,
+            "aligned_worldview": {
+                "Innovation": 1.0,
+                "Fairness": 1.0,
+                "Sanctity": -1.0,
+                "In_Group": -1.0,
+            },
+            "world": {
+                "Innovation": 0.8,
+                "Fairness": 0.7,
+                "Sanctity": -0.9,
+                "In_Group": -0.5,
+            },
+            "urgency": 0.2,
+            "openness_start": 0.02,
+            "openness_end": 0.98,
+            "worldview_min_scale": 0.85,
+            "worldview_max_scale": 1.15,
+        },
+    ),
+    "figure_echo_chambers_high": ResearchPaperTestScenario(
+        config_overrides=_merge(
+            NETWORK_NO_EVOLUTION,
+            {
+                "num_agents": 400,
+                "homophily_strength": 8.0,
+                "influence_bias_exp": 0.0,
+                "base_connections": 2,
+                "triadic_closure_prob": 0.8,
+            },
+        ),
+        values={"partition_seed": SIM_CONFIG_DEFAULTS["seed"]},
+    ),
+    "figure_echo_chambers_low": ResearchPaperTestScenario(
+        config_overrides=_merge(
+            NETWORK_NO_EVOLUTION,
+            {"num_agents": 400, "homophily_strength": 1.0},
+        ),
+        values={"partition_seed": SIM_CONFIG_DEFAULTS["seed"]},
+    ),
+    "figure_granovetter_cascade": ResearchPaperTestScenario(
+        config_overrides=_merge(
+            NETWORK_NO_EVOLUTION,
+            {
+                "num_agents": 400,
+                "use_granovetter_thresholds": True,
+                "granovetter_threshold_mean": 0.2,
+                "dominant_emotion_threshold": 0.1,
+            },
+        ),
+        values={
+            "instigator_share": 0.05,
+            "sympathizer_share": 0.4,
+            "instigator_emotion": {"Anger": 0.8},
+            "sympathizer_emotion": {"Anger": 0.2},
+        },
+    ),
+    "figure_memory_rehearsal": ResearchPaperTestScenario(
+        config_overrides=_merge(
+            NO_NETWORK_NO_EVOLUTION,
+            {
+                "num_agents": 80,
+                "use_agent_memory": True,
+                "memory_decay_rate": 0.5,
+                "memory_social_rehearsal_gain": 0.8,
+            },
+        ),
+        values={
+            "context": {"Physical_Safety": -1.0},
+            "decay_steps": 5,
+            "isolated_rehearsal": 0.0,
+            "shared_rehearsal": 1.0,
+        },
+    ),
+    "figure_personality_correlations": ResearchPaperTestScenario(
+        config_overrides=_merge(
+            NO_NETWORK_NO_EVOLUTION,
+            {"num_agents": 1200, "mutation_temperature": 0.0},
+        ),
+    ),
+    "figure_semantic_alignment": ResearchPaperTestScenario(
+        config_overrides=_merge(
+            NO_NETWORK_NO_EVOLUTION,
+            {"num_agents": 256, "use_signal_distortion": False},
+        ),
+        values={
+            "positive_world": {"Wealth": 0.8, "Innovation": 0.6},
+            "negative_world": {"Physical_Safety": -0.8, "Fairness": -0.6},
+            "urgency": 0.5,
+            "positive_sentiment_profile": [0.05, 0.1, 0.85],
+            "negative_sentiment_profile": [0.85, 0.1, 0.05],
+        },
+    ),
+    "figure_signal_distortion": ResearchPaperTestScenario(
+        config_overrides=_merge(
+            NO_NETWORK_NO_EVOLUTION,
+            {
+                "num_agents": 400,
+                "use_signal_distortion": True,
+                "distortion_max_noise": 0.8,
+                "distortion_neurotic_gain": 1.5,
+            },
+        ),
+        values={
+            "world": {"Physical_Safety": -0.4},
+        },
+    ),
+    "figure_social_consensus": ResearchPaperTestScenario(
+        config_overrides=_merge(
+            NETWORK_NO_EVOLUTION,
+            {
+                "num_agents": 400,
+                "use_signal_distortion": True,
+                "distortion_max_noise": 0.6,
+                "distortion_neurotic_gain": 1.0,
+                "perception_social_consensus_gain": 0.3,
+            },
+        ),
+        values={"world": {"Physical_Safety": -0.5}},
+    ),
+    "figure_wealth_baseline": ResearchPaperTestScenario(
+        config_overrides=_merge(
+            NO_NETWORK_NO_EVOLUTION,
+            {"num_agents": 800},
+        ),
+    ),
+    "figure_wealth_evolved": ResearchPaperTestScenario(
+        config_overrides=_merge(
+            NO_NETWORK_NO_EVOLUTION,
+            {"num_agents": 800, "evolution_generations": 20, "enable_evolution": True},
+        ),
+    ),
+    "granovetter_cascade": ResearchPaperTestScenario(
+        config_overrides=_merge(
+            NETWORK_NO_EVOLUTION,
+            {
+                "num_agents": 500,
+                "use_granovetter_thresholds": True,
+                "granovetter_threshold_mean": 0.2,
+                "dominant_emotion_threshold": 0.1,
+            },
+        ),
+        values={
+            "instigator_share": 0.05,
+            "sympathizer_share": 0.4,
+            "instigator_emotion": {"Anger": 0.8},
+            "sympathizer_emotion": {"Anger": 0.2},
+        },
+    ),
+    "ideological_influence_power": ResearchPaperTestScenario(
+        config_overrides=_merge(
+            NO_NETWORK_NO_EVOLUTION,
+            {"num_agents": 3000, "use_power_law_influence": True},
+        ),
+    ),
+    "ideological_influence_standard": ResearchPaperTestScenario(
+        config_overrides=_merge(
+            NO_NETWORK_NO_EVOLUTION,
+            {"num_agents": 3000, "use_power_law_influence": False},
+        ),
+    ),
+    "influence_susceptibility": ResearchPaperTestScenario(
+        config_overrides=_merge(
+            NO_NETWORK_NO_EVOLUTION,
+            {"num_agents": 800, "use_power_law_influence": True},
+        ),
+        values={
+            "rng_seed": SIM_CONFIG_DEFAULTS["seed"],
+            "sample_size": 120,
+            "urgency": 0.5,
+            "reach_probability_base": 0.10,
+            "reach_probability_gain": 0.10,
+            "engagement_threshold": 0.18,
+            "reach_top_percentile": 75,
+        },
+    ),
+    "louvain_high": ResearchPaperTestScenario(
+        config_overrides=_merge(
+            NETWORK_NO_EVOLUTION,
+            {
+                "num_agents": 500,
+                "homophily_strength": 8.0,
+                "influence_bias_exp": 0.0,
+                "base_connections": 2,
+                "triadic_closure_prob": 0.8,
+            },
+        ),
+        values={"partition_seed": SIM_CONFIG_DEFAULTS["seed"]},
+    ),
+    "louvain_low": ResearchPaperTestScenario(
+        config_overrides=_merge(
+            NETWORK_NO_EVOLUTION,
+            {"num_agents": 500, "homophily_strength": 1.0},
+        ),
+        values={"partition_seed": SIM_CONFIG_DEFAULTS["seed"]},
+    ),
+    "maximum_virality": ResearchPaperTestScenario(
+        config_overrides={"num_agents": 1000},
+        values={
+            "consensus_emotion": {"Joy": 1.0},
+            "outlier_mainstream_count": 950,
+            "outlier_mainstream_emotion": {"Joy": 0.2},
+            "outlier_count": 50,
+            "outlier_emotions": {"Anger": 1.0, "Disgust": 1.0},
+            "boosted_engagement": 2.0,
+            "max_multiplier_tolerance": 1e-3,
+        },
+    ),
+    "memory_rehearsal": ResearchPaperTestScenario(
+        config_overrides=_merge(
+            NO_NETWORK_NO_EVOLUTION,
+            {
+                "num_agents": 100,
+                "use_agent_memory": True,
+                "memory_decay_rate": 0.5,
+                "memory_social_rehearsal_gain": 0.8,
+            },
+        ),
+        values={
+            "context": {"Physical_Safety": -1.0},
+            "decay_steps": 5,
+            "isolated_rehearsal": 0.0,
+            "shared_rehearsal": 1.0,
+        },
+    ),
+    "network_clustering_backbone": ResearchPaperTestScenario(
+        config_overrides=_merge(
+            NETWORK_NO_EVOLUTION,
+            {
+                "num_agents": 400,
+                "base_connections": 10,
+                "triadic_closure_prob": 0.0,
+            },
+        ),
+    ),
+    "network_clustering_closure": ResearchPaperTestScenario(
+        config_overrides=_merge(
+            NETWORK_NO_EVOLUTION,
+            {
+                "num_agents": 400,
+                "base_connections": 10,
+                "triadic_closure_prob": 0.3,
+            },
+        ),
+        values={
+            "torch_seed": SIM_CONFIG_DEFAULTS["seed"],
+            "numpy_seed": SIM_CONFIG_DEFAULTS["seed"],
+            "influence_mean": 1.0,
+            "influence_std": 0.5,
+        },
+    ),
+    "network_topology": ResearchPaperTestScenario(
+        config_overrides=_merge(
+            NETWORK_NO_EVOLUTION,
+            {"num_agents": 400, "base_connections": 20, "homophily_strength": 3.0},
+        ),
+        values={"row_sum_tolerance": 1e-5, "min_edge_similarity": 0.05},
+    ),
+    "perception_social_consensus": ResearchPaperTestScenario(
+        config_overrides=_merge(
+            NETWORK_NO_EVOLUTION,
+            {
+                "num_agents": 500,
+                "use_signal_distortion": True,
+                "distortion_max_noise": 0.6,
+                "distortion_neurotic_gain": 1.0,
+                "perception_social_consensus_gain": 0.3,
+            },
+        ),
+        values={"world": {"Physical_Safety": -0.5}},
+    ),
+    "perception_social_consensus_baseline": ResearchPaperTestScenario(
+        config_overrides=_merge(
+            NETWORK_NO_EVOLUTION,
+            {
+                "num_agents": 500,
+                "use_signal_distortion": True,
+                "distortion_max_noise": 0.6,
+                "distortion_neurotic_gain": 1.0,
+                "perception_social_consensus_gain": 0.0,
+            },
+        ),
+    ),
+    "personal": ResearchPaperTestScenario(
+        config_overrides=_merge(CALM_NO_NETWORK, {"num_agents": 200}),
+        values={"world": {"Care": -0.8}, "urgency": 0.2},
+    ),
+    "personalities_for_clustering": ResearchPaperTestScenario(
+        config_overrides=_merge(
+            NO_NETWORK_NO_EVOLUTION,
+            {"num_agents": 3000},
+        ),
+        values={
+            "high_threshold": 0.8,
+            "low_threshold": 0.2,
+            "min_tail_share": 0.01,
+        },
+    ),
+    "personality_correlations": ResearchPaperTestScenario(
+        config_overrides=_merge(
+            NO_NETWORK_NO_EVOLUTION,
+            {"num_agents": 4000, "mutation_temperature": 0.0},
+        ),
+        values={"max_rmse": 0.2},
+    ),
+    "personality_socialization_base": ResearchPaperTestScenario(
+        config_overrides=_merge(
+            NETWORK_NO_EVOLUTION,
+            {"num_agents": 500, "personality_socialization_gain": 0.0},
+        ),
+    ),
+    "personality_socialization_socialized": ResearchPaperTestScenario(
+        config_overrides=_merge(
+            NETWORK_NO_EVOLUTION,
+            {"num_agents": 500, "personality_socialization_gain": 0.4},
+        ),
+    ),
+    "r0_basic_reproduction": ResearchPaperTestScenario(
+        config_overrides=_merge(
+            NO_NETWORK_NO_EVOLUTION,
+            {"num_agents": 400},
+        ),
+        values={
+            "rng_seed": SIM_CONFIG_DEFAULTS["seed"],
+            "seed_sample_count": 20,
+            "urgency": 0.5,
+        },
+    ),
+    "ram_usage": ResearchPaperTestScenario(
+        config_overrides=_merge(
+            NETWORK_NO_EVOLUTION,
+            {"num_agents": 300, "use_agent_memory": True},
+        ),
+        values={
+            "world": {"Wealth": -0.6, "Fairness": -0.4},
+            "urgency": 0.5,
+            "max_memory_bytes": 256 * 1024 * 1024,
+        },
+    ),
+    "relative_deprivation": ResearchPaperTestScenario(
+        config_overrides=_merge(
+            CALM_NO_NETWORK,
+            {"num_agents": 200},
+        ),
+        values={
+            "group_size": 100,
+            "trait_fill": 0.5,
+            "marginalized_exposures": {"Wealth": -0.8, "Fairness": -0.8},
+            "marginalized_traits": {"Agreeableness": 0.1, "Neuroticism": 0.9},
+            "elite_exposures": {"Wealth": 0.8, "Fairness": 0.8},
+            "elite_traits": {"Agreeableness": 0.9, "Neuroticism": 0.1},
+            "world": {"Wealth": 0.5, "Fairness": -1.0},
+            "urgency": 0.0,
+        },
+    ),
+    "runtime_acting_ratio": ResearchPaperTestScenario(
+        config_overrides={
+            "num_agents": 1000,
+            "use_granovetter_thresholds": False,
+            "dominant_emotion_threshold": 0.1,
+        },
+        values={
+            "acting_population": 10,
+            "acting_emotion": {"Anger": 1.0},
+            "expected_acting_ratio": 1.0,
+        },
+    ),
+    "runtime_profile_evolution": ResearchPaperTestScenario(
+        run_profile_overrides={
+            "seed": 7,
+            "temperature": 0.4,
+            "agent_count": 96,
+            "use_power_law": False,
+            "use_network_topology": False,
+            "enable_evolution": True,
+            "evolution_generations": 2,
+        },
+        values={"baseline_enable_evolution": False},
+    ),
+    "runtime_profile_memory": ResearchPaperTestScenario(
+        run_profile_overrides={
+            "seed": 99,
+            "temperature": 0.1,
+            "agent_count": 64,
+            "use_power_law": False,
+            "use_network_topology": False,
+            "enable_evolution": False,
+            "use_agent_memory": True,
+        },
+        values={"memory_marker": 123.0, "empty_memory_value": 0.0},
+    ),
+    "runtime_profile_topology": ResearchPaperTestScenario(
+        run_profile_overrides={
+            "seed": SIM_CONFIG_DEFAULTS["seed"],
+            "temperature": SIM_CONFIG_DEFAULTS["mutation_temperature"],
+            "agent_count": 128,
+            "use_power_law": False,
+            "use_network_topology": True,
+            "enable_evolution": False,
+        },
+        values={"flat_use_network_topology": False},
+    ),
+    "runtime_small_populations": ResearchPaperTestScenario(
+        config_overrides=_merge(
+            NETWORK_NO_EVOLUTION,
+            {"use_network_topology": True},
+        ),
+        values={
+            "population_sizes": [10, 50, 200],
+            "row_sum_tolerance": 1e-5,
+        },
+    ),
+    "semantic_alignment": ResearchPaperTestScenario(
+        config_overrides=_merge(
+            NO_NETWORK_NO_EVOLUTION,
+            {"num_agents": 256, "use_signal_distortion": False},
+        ),
+        values={
+            "positive_world": {"Wealth": 0.8, "Innovation": 0.6},
+            "negative_world": {"Physical_Safety": -0.8, "Fairness": -0.6},
+            "urgency": 0.5,
+            "positive_sentiment_profile": [0.05, 0.1, 0.85],
+            "negative_sentiment_profile": [0.85, 0.1, 0.05],
+        },
+    ),
+    "signal_distortion": ResearchPaperTestScenario(
+        config_overrides=_merge(
+            NO_NETWORK_NO_EVOLUTION,
+            {
+                "num_agents": 500,
+                "use_signal_distortion": True,
+                "distortion_max_noise": 0.8,
+                "distortion_neurotic_gain": 1.5,
+            },
+        ),
+        values={
+            "world": {"Physical_Safety": -0.4},
+            "min_correlation": 0.1,
+        },
+    ),
+    "temp_wealth_analysis": ResearchPaperTestScenario(
+        config_overrides={"num_agents": 5000},
+        values={
+            "wealth_threshold": 10000,
+            "scatter_alpha": 0.5,
+            "hist_bins": 50,
+            "x_axis_percentile": 99.5,
+            "output_template": "network_synergy_verification_seed_{seed}.png",
+        },
+    ),
+    "trait_distribution": ResearchPaperTestScenario(
+        config_overrides=_merge(
+            NO_NETWORK_NO_EVOLUTION,
+            {"num_agents": 1200},
+        ),
+    ),
+    "truth_refinement": ResearchPaperTestScenario(
+        config_overrides=_merge(
+            NO_NETWORK_NO_EVOLUTION,
+            {
+                "num_agents": 2,
+                "use_signal_distortion": False,
+                "use_time_pressure": False,
+            },
+        ),
+        values={
+            "skepticism_gain": 4.0,
+            "logic_gap_threshold": 0.4,
+            "world": {
+                "Wealth": 0.8,
+                "Stability": -0.9,
+                "Short_Term": 0.9,
+                "Long_Term": -0.9,
+            },
+            "personalities": [
+                [0.1, 0.1, 0.5, 0.5, 0.5],
+                [0.9, 0.9, 0.5, 0.5, 0.5],
+            ],
+        },
+    ),
+    "wealth_gini_baseline": ResearchPaperTestScenario(
+        config_overrides=_merge(
+            NO_NETWORK_NO_EVOLUTION,
+            {"num_agents": 1500, "evolution_generations": 20, "enable_evolution": False},
+        ),
+        values={"min_absolute_delta": 0.02},
+    ),
+    "wealth_gini_evolved": ResearchPaperTestScenario(
+        config_overrides=_merge(
+            NO_NETWORK_NO_EVOLUTION,
+            {"num_agents": 1500, "evolution_generations": 20, "enable_evolution": True},
+        ),
+    ),
+}
+
+
+def get_test_scenario(name: str) -> ResearchPaperTestScenario:
+    return TEST_SCENARIOS[name]
+
+
+def _validate_schema() -> None:
+    invalid_overrides: dict[str, list[str]] = {}
+    for scenario_name, scenario in TEST_SCENARIOS.items():
+        unknown_fields = sorted(set(scenario.config_overrides) - SIM_CONFIG_FIELDS)
+        if unknown_fields:
+            invalid_overrides[scenario_name] = unknown_fields
+    if invalid_overrides:
+        raise ValueError(f"Invalid SimConfig overrides: {invalid_overrides}")
+
+
+_validate_schema()

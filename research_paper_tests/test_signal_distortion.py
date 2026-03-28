@@ -1,28 +1,27 @@
 import numpy as np
-import torch
 
-from main import create_sim_config, distort_world_signal, prepare_society_for_debug
+from main import DIMENSION_INDICES, distort_world_signal, prepare_society_for_debug
+from research_paper_tests.config_schema import (
+    PERSONALITY_INDICES,
+    build_world,
+    get_test_scenario,
+)
 
 
 def test_signal_distortion_scales_with_neuroticism(tmp_path):
-    config = create_sim_config(
-        num_agents=500,
-        use_signal_distortion=True,
-        distortion_max_noise=0.8,
-        distortion_neurotic_gain=1.5,
-        use_network_topology=False,
-        enable_evolution=False,
-    )
+    scenario = get_test_scenario("signal_distortion")
+    config = scenario.sim_config()
+    settings = scenario.settings()
     society = prepare_society_for_debug(
         config, output_dir=str(tmp_path / "distortion"), evolve=False
     )
 
-    world = torch.zeros(1, 12)
-    world[0, 1] = -0.4
+    world = build_world(settings["world"])
     perceived = distort_world_signal(config, world, society.personalities)
 
-    neuroticism = society.personalities[:, 4].numpy()
-    distortion = np.abs(perceived[:, 1].numpy() - world[0, 1].item())
+    safety_index = DIMENSION_INDICES["Physical_Safety"]
+    neuroticism = society.personalities[:, PERSONALITY_INDICES["Neuroticism"]].numpy()
+    distortion = np.abs(perceived[:, safety_index].numpy() - world[0, safety_index].item())
     correlation = float(np.corrcoef(neuroticism, distortion)[0, 1])
 
-    assert correlation > 0.1
+    assert correlation > settings["min_correlation"]

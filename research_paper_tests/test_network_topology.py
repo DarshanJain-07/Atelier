@@ -1,17 +1,14 @@
 import torch
 
-from main import create_sim_config, prepare_society_for_debug
+from main import prepare_society_for_debug
 from research_paper_tests._metrics import mean_edge_cosine_similarity
+from research_paper_tests.config_schema import get_test_scenario
 
 
 def test_network_topology_is_normalized_and_homophilous(tmp_path):
-    config = create_sim_config(
-        num_agents=400,
-        use_network_topology=True,
-        base_connections=20,
-        homophily_strength=3.0,
-        enable_evolution=False,
-    )
+    scenario = get_test_scenario("network_topology")
+    config = scenario.sim_config()
+    settings = scenario.settings()
     society = prepare_society_for_debug(
         config, output_dir=str(tmp_path / "topology"), evolve=False
     )
@@ -20,7 +17,11 @@ def test_network_topology_is_normalized_and_homophilous(tmp_path):
     assert adjacency is not None
 
     row_sums = torch.sparse.sum(adjacency, dim=1).to_dense()
-    assert torch.allclose(row_sums, torch.ones_like(row_sums), atol=1e-5)
+    assert torch.allclose(
+        row_sums,
+        torch.ones_like(row_sums),
+        atol=settings["row_sum_tolerance"],
+    )
 
     edge_similarity = mean_edge_cosine_similarity(society.exposures, adjacency)
-    assert edge_similarity > 0.05
+    assert edge_similarity > settings["min_edge_similarity"]

@@ -1,33 +1,27 @@
 import torch
 
-from main import build_debug_society, create_sim_config, run_cognitive_cycle
+from main import build_debug_society, run_cognitive_cycle
+from research_paper_tests.config_schema import (
+    WORLD_DIMENSION_COUNT,
+    build_world,
+    get_test_scenario,
+)
 
 
 def test_truth_refinement_prioritizes_long_term_for_skeptical_agents():
-    config = create_sim_config(
-        num_agents=2,
-        use_signal_distortion=False,
-        use_time_pressure=False,
-        use_network_topology=False,
-        enable_evolution=False,
-    )
-    config.skepticism_gain = 4.0
-    config.logic_gap_threshold = 0.4
+    scenario = get_test_scenario("truth_refinement")
+    config = scenario.sim_config()
+    settings = scenario.settings()
+    config.skepticism_gain = settings["skepticism_gain"]
+    config.logic_gap_threshold = settings["logic_gap_threshold"]
 
-    world = torch.zeros(1, 12)
-    world[0, 0] = 0.8
-    world[0, 2] = -0.9
-    world[0, 10] = 0.9
-    world[0, 11] = -0.9
-
-    personalities = torch.tensor(
-        [
-            [0.1, 0.1, 0.5, 0.5, 0.5],
-            [0.9, 0.9, 0.5, 0.5, 0.5],
-        ],
-        dtype=torch.float32,
+    world = build_world(settings["world"])
+    personalities = torch.tensor(settings["personalities"], dtype=torch.float32)
+    society = build_debug_society(
+        config,
+        torch.zeros(config.num_agents, WORLD_DIMENSION_COUNT),
+        personalities,
     )
-    society = build_debug_society(config, torch.zeros(2, 12), personalities)
 
     _, attention, _ = run_cognitive_cycle(
         config,

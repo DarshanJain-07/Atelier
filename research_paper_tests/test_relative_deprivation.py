@@ -1,32 +1,39 @@
 import torch
 
-from main import DIMENSION_INDICES, build_debug_society, create_sim_config, run_debug_simulation
+from main import build_debug_society, run_debug_simulation
+from research_paper_tests.config_schema import (
+    EMOTION_INDICES,
+    WORLD_DIMENSION_COUNT,
+    build_world,
+    get_test_scenario,
+    set_dimensions,
+    set_traits,
+    zero_personalities,
+)
 
 
 def test_relative_deprivation_hits_marginalized_agents_harder():
-    config = create_sim_config(
-        num_agents=200,
-        use_signal_distortion=False,
-        use_time_pressure=False,
-        use_network_topology=False,
-        enable_evolution=False,
+    scenario = get_test_scenario("relative_deprivation")
+    config = scenario.sim_config()
+    settings = scenario.settings()
+
+    exposures_marginalized = torch.zeros(settings["group_size"], WORLD_DIMENSION_COUNT)
+    set_dimensions(exposures_marginalized, settings["marginalized_exposures"])
+
+    personalities_marginalized = zero_personalities(
+        settings["group_size"],
+        fill=settings["trait_fill"],
     )
+    set_traits(personalities_marginalized, settings["marginalized_traits"])
 
-    exposures_marginalized = torch.zeros(100, 12)
-    exposures_marginalized[:, DIMENSION_INDICES["Wealth"]] = -0.8
-    exposures_marginalized[:, DIMENSION_INDICES["Fairness"]] = -0.8
+    exposures_elites = torch.zeros(settings["group_size"], WORLD_DIMENSION_COUNT)
+    set_dimensions(exposures_elites, settings["elite_exposures"])
 
-    personalities_marginalized = torch.ones(100, 5) * 0.5
-    personalities_marginalized[:, 3] = 0.1
-    personalities_marginalized[:, 4] = 0.9
-
-    exposures_elites = torch.zeros(100, 12)
-    exposures_elites[:, DIMENSION_INDICES["Wealth"]] = 0.8
-    exposures_elites[:, DIMENSION_INDICES["Fairness"]] = 0.8
-
-    personalities_elites = torch.ones(100, 5) * 0.5
-    personalities_elites[:, 3] = 0.9
-    personalities_elites[:, 4] = 0.1
+    personalities_elites = zero_personalities(
+        settings["group_size"],
+        fill=settings["trait_fill"],
+    )
+    set_traits(personalities_elites, settings["elite_traits"])
 
     society = build_debug_society(
         config,
@@ -34,11 +41,16 @@ def test_relative_deprivation_hits_marginalized_agents_harder():
         torch.cat([personalities_marginalized, personalities_elites], dim=0),
     )
 
-    world = torch.zeros(1, 12)
-    world[0, DIMENSION_INDICES["Wealth"]] = 0.5
-    world[0, DIMENSION_INDICES["Fairness"]] = -1.0
+    world = build_world(settings["world"])
 
-    result = run_debug_simulation(config, world, society=society, urgency=0.0)
-    anger = result.final_emotions[:, 6]
+    result = run_debug_simulation(
+        config,
+        world,
+        society=society,
+        urgency=settings["urgency"],
+    )
+    anger = result.final_emotions[:, EMOTION_INDICES["Anger"]]
 
-    assert anger[:100].mean().item() > anger[100:].mean().item()
+    assert anger[: settings["group_size"]].mean().item() > anger[
+        settings["group_size"] :
+    ].mean().item()

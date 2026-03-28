@@ -1,20 +1,11 @@
-from main import create_sim_config, prepare_society_for_debug
+from main import prepare_society_for_debug
 from research_paper_tests._metrics import gini
+from research_paper_tests.config_schema import get_test_scenario
 
 
 def test_power_law_influence_creates_heavier_tail_than_lognormal(tmp_path):
-    flat_config = create_sim_config(
-        num_agents=2000,
-        use_power_law_influence=False,
-        use_network_topology=False,
-        enable_evolution=False,
-    )
-    power_config = create_sim_config(
-        num_agents=2000,
-        use_power_law_influence=True,
-        use_network_topology=False,
-        enable_evolution=False,
-    )
+    flat_config = get_test_scenario("cascade_power_law_flat").sim_config()
+    power_config = get_test_scenario("cascade_power_law_power").sim_config()
 
     flat = prepare_society_for_debug(
         flat_config, output_dir=str(tmp_path / "flat"), evolve=False

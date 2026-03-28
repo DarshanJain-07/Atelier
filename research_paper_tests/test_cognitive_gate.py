@@ -1,43 +1,52 @@
 import torch
 
-from main import DIMENSION_INDICES, build_debug_society, create_sim_config, run_debug_simulation
+from main import build_debug_society, run_debug_simulation
+from research_paper_tests.config_schema import (
+    WORLD_DIMENSION_COUNT,
+    build_world,
+    get_test_scenario,
+    set_dimensions,
+    set_traits,
+    zero_personalities,
+)
 
 
 def test_cognitive_gate_blocks_misaligned_low_openness_agents():
-    config = create_sim_config(
-        num_agents=400,
-        use_signal_distortion=False,
-        use_network_topology=False,
-        enable_evolution=False,
-    )
-    setattr(config, "use_selective_exposure", True)
-    setattr(config, "selective_exposure_base_tolerance", -0.3)
-    setattr(config, "selective_exposure_openness_factor", 0.4)
+    scenario = get_test_scenario("cognitive_gate")
+    config = scenario.sim_config()
+    settings = scenario.settings()
 
     half = config.num_agents // 2
-    exposures = torch.zeros(config.num_agents, 12)
-    personalities = torch.ones(config.num_agents, 5) * 0.5
-    personalities[:half, 0] = 0.1
-    personalities[half:, 0] = 0.9
+    exposures = torch.zeros(config.num_agents, WORLD_DIMENSION_COUNT)
+    personalities = zero_personalities(config.num_agents, fill=settings["trait_fill"])
+    set_traits(
+        personalities,
+        {"Openness": settings["low_openness"]},
+        rows=slice(None, half),
+    )
+    set_traits(
+        personalities,
+        {"Openness": settings["high_openness"]},
+        rows=slice(half, None),
+    )
 
-    for idx, value in [
-        (DIMENSION_INDICES["Innovation"], 1.0),
-        (DIMENSION_INDICES["Fairness"], 1.0),
-        (DIMENSION_INDICES["Sanctity"], -1.0),
-        (DIMENSION_INDICES["In_Group"], -1.0),
-    ]:
-        exposures[half:, idx] = value
-        exposures[:half, idx] = -value
+    set_dimensions(exposures, settings["aligned_worldview"], rows=slice(half, None))
+    set_dimensions(
+        exposures,
+        {name: -value for name, value in settings["aligned_worldview"].items()},
+        rows=slice(None, half),
+    )
 
     society = build_debug_society(config, exposures, personalities)
 
-    world = torch.zeros(1, 12)
-    world[0, DIMENSION_INDICES["Innovation"]] = 0.8
-    world[0, DIMENSION_INDICES["Fairness"]] = 0.7
-    world[0, DIMENSION_INDICES["Sanctity"]] = -0.9
-    world[0, DIMENSION_INDICES["In_Group"]] = -0.5
+    world = build_world(settings["world"])
 
-    result = run_debug_simulation(config, world, society=society, urgency=0.2)
+    result = run_debug_simulation(
+        config,
+        world,
+        society=society,
+        urgency=settings["urgency"],
+    )
     engagement = result.engagement_scores.numpy()
 
     assert engagement[:half].mean() < engagement[half:].mean()

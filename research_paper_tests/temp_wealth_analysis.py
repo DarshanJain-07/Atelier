@@ -7,14 +7,16 @@ import torch
 from scipy.stats import spearmanr
 
 from generate_society import generate_society
-from schema import SimConfig
+from research_paper_tests.config_schema import get_test_scenario
 
 
 def visualize(seed=42):
-    print("--- VERIFYING NETWORK SYNERGY WEALTH [Seed: {seed}] ---")
+    print(f"--- VERIFYING NETWORK SYNERGY WEALTH [Seed: {seed}] ---")
+    scenario = get_test_scenario("temp_wealth_analysis")
+    settings = scenario.settings()
     
     # 1. Generate Society
-    config = SimConfig(num_agents=5000, seed=seed)
+    config = scenario.sim_config(seed=seed)
     df_meta, exposures, personalities, affinities, adjacency_matrix = generate_society(config)
 
     # 2. Extract Data
@@ -31,8 +33,8 @@ def visualize(seed=42):
     corr_deg, _ = spearmanr(raw_wealth, in_degrees)
     
     print("\n[CORRELATION ANALYSIS]")
-    print("Wealth vs Influence: {corr_inf:.4f}")
-    print("Wealth vs In-Degree (Social Capital): {corr_deg:.4f}")
+    print(f"Wealth vs Influence: {corr_inf:.4f}")
+    print(f"Wealth vs In-Degree (Social Capital): {corr_deg:.4f}")
 
     # 4. Distribution Stats
     print("\n[WEALTH STATS]")
@@ -43,8 +45,11 @@ def visualize(seed=42):
     print(f"Max Wealth: {np.max(raw_wealth):.2f}")
     print(f"Min Wealth: {np.min(raw_wealth):.2f}")
     
-    wealth_over_10000 = np.sum(raw_wealth > 10000)
-    print(f"Agents with Wealth > 10,000: {wealth_over_10000} ({wealth_over_10000/len(raw_wealth)*100:.2f}%)")
+    wealth_over_threshold = np.sum(raw_wealth > settings["wealth_threshold"])
+    print(
+        f"Agents with Wealth > {settings['wealth_threshold']:,}: "
+        f"{wealth_over_threshold} ({wealth_over_threshold / len(raw_wealth) * 100:.2f}%)"
+    )
 
     # 5. Plotting
     sns.set_theme(style="whitegrid")
@@ -54,7 +59,7 @@ def visualize(seed=42):
     sns.scatterplot(
         x=raw_wealth,
         y=influence,
-        alpha=0.5,
+        alpha=settings["scatter_alpha"],
         color="teal",
         ax=axes[0],
         edgecolor=None
@@ -64,11 +69,17 @@ def visualize(seed=42):
     axes[0].set_ylabel("Influence Score", fontsize=12)
 
     # Plot 2: Wealth Density Distribution
-    sns.histplot(raw_wealth, kde=True, ax=axes[1], color="purple", bins=50)
+    sns.histplot(
+        raw_wealth,
+        kde=True,
+        ax=axes[1],
+        color="purple",
+        bins=settings["hist_bins"],
+    )
     axes[1].set_title("Wealth Distribution (Network Clustered)", fontsize=14, fontweight="bold")
     axes[1].set_xlabel("Raw Wealth", fontsize=12)
     axes[1].set_ylabel("Frequency", fontsize=12)
-    axes[1].set_xlim(0, np.percentile(raw_wealth, 99.5)) # Focus on the bulk
+    axes[1].set_xlim(0, np.percentile(raw_wealth, settings["x_axis_percentile"])) # Focus on the bulk
 
     # Plot 3: Box Plot (Outliers)
     sns.boxplot(x=raw_wealth, ax=axes[2], color="gold", fliersize=2)
@@ -77,7 +88,7 @@ def visualize(seed=42):
     # ax2.set_xscale('log') # Optional: log scale to see billionaires better
 
     plt.tight_layout()
-    output_filename = f"network_synergy_verification_seed_{seed}.png"
+    output_filename = settings["output_template"].format(seed=seed)
     plt.savefig(output_filename, dpi=300, bbox_inches="tight")
     plt.close()
 

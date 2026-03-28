@@ -1,12 +1,9 @@
-from main import DIMENSION_INDICES, create_sim_config, prepare_society_for_debug
+from main import DIMENSION_INDICES, prepare_society_for_debug
+from research_paper_tests.config_schema import get_test_scenario
 
 
 def test_generated_trait_distributions_are_well_formed(tmp_path):
-    config = create_sim_config(
-        num_agents=1200,
-        use_network_topology=False,
-        enable_evolution=False,
-    )
+    config = get_test_scenario("trait_distribution").sim_config()
     society = prepare_society_for_debug(
         config, output_dir=str(tmp_path / "traits"), evolve=False
     )

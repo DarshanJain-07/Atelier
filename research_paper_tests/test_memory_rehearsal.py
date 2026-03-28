@@ -1,37 +1,47 @@
 import torch
 
-from main import consolidate_agent_memory, create_sim_config
+from main import consolidate_agent_memory
+from research_paper_tests.config_schema import (
+    WORLD_DIMENSION_COUNT,
+    get_test_scenario,
+    set_dimensions,
+)
 
 
 def test_memory_rehearsal_slows_decay():
-    config = create_sim_config(
-        num_agents=100,
-        use_agent_memory=True,
-        memory_decay_rate=0.5,
-        memory_social_rehearsal_gain=0.8,
-        use_network_topology=False,
-        enable_evolution=False,
+    scenario = get_test_scenario("memory_rehearsal")
+    config = scenario.sim_config()
+    settings = scenario.settings()
+
+    memory = torch.zeros(config.num_agents, WORLD_DIMENSION_COUNT)
+    context = torch.zeros(config.num_agents, WORLD_DIMENSION_COUNT)
+    set_dimensions(context, settings["context"])
+
+    isolated = consolidate_agent_memory(
+        config,
+        memory,
+        context,
+        social_rehearsal_factor=settings["isolated_rehearsal"],
+    )
+    rehearsed = consolidate_agent_memory(
+        config,
+        memory,
+        context,
+        social_rehearsal_factor=settings["shared_rehearsal"],
     )
 
-    memory = torch.zeros(config.num_agents, 12)
-    context = torch.zeros(config.num_agents, 12)
-    context[:, 1] = -1.0
-
-    isolated = consolidate_agent_memory(config, memory, context, social_rehearsal_factor=0.0)
-    rehearsed = consolidate_agent_memory(config, memory, context, social_rehearsal_factor=1.0)
-
-    for _ in range(5):
+    for _ in range(settings["decay_steps"]):
         isolated = consolidate_agent_memory(
             config,
             isolated,
             torch.zeros_like(context),
-            social_rehearsal_factor=0.0,
+            social_rehearsal_factor=settings["isolated_rehearsal"],
         )
         rehearsed = consolidate_agent_memory(
             config,
             rehearsed,
             torch.zeros_like(context),
-            social_rehearsal_factor=1.0,
+            social_rehearsal_factor=settings["shared_rehearsal"],
         )
 
     assert torch.norm(rehearsed).item() > torch.norm(isolated).item()

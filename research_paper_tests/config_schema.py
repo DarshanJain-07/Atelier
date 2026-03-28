@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from dataclasses import dataclass, field, fields
+from pathlib import Path
 from typing import Any, Mapping
 
 import torch
@@ -46,6 +47,12 @@ def live_sim_config_defaults() -> dict[str, Any]:
 
 SIM_CONFIG_DEFAULTS = live_sim_config_defaults()
 SIM_CONFIG_FIELDS = frozenset(SIM_CONFIG_DEFAULTS)
+DEFAULT_SMOKE_NUM_AGENTS = 128
+DEFAULT_SMOKE_EVOLUTION_GENERATIONS = 2
+EVOLUTION_VARIANT_LABELS = {
+    False: "without_evolution",
+    True: "with_evolution",
+}
 
 
 def live_run_profile_defaults() -> dict[str, Any]:
@@ -211,19 +218,77 @@ class ResearchPaperTestScenario:
     extra_config_attrs: Mapping[str, Any] = field(default_factory=dict)
     values: Mapping[str, Any] = field(default_factory=dict)
 
-    def sim_config(self, **overrides: Any) -> SimConfig:
+    def _resolved_config_overrides(
+        self,
+        *,
+        enable_evolution: bool | None = None,
+        smoke: bool = False,
+        overrides: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        resolved = _merge(self.config_overrides, overrides or {})
+        if smoke:
+            resolved["num_agents"] = min(
+                int(resolved.get("num_agents", SIM_CONFIG_DEFAULTS["num_agents"])),
+                DEFAULT_SMOKE_NUM_AGENTS,
+            )
+            resolved["evolution_generations"] = min(
+                int(
+                    resolved.get(
+                        "evolution_generations",
+                        SIM_CONFIG_DEFAULTS["evolution_generations"],
+                    )
+                ),
+                DEFAULT_SMOKE_EVOLUTION_GENERATIONS,
+            )
+        if enable_evolution is not None:
+            resolved["enable_evolution"] = enable_evolution
+        return resolved
+
+    def sim_config(
+        self,
+        *,
+        enable_evolution: bool | None = None,
+        smoke: bool = False,
+        **overrides: Any,
+    ) -> SimConfig:
         from main import create_sim_config
 
         config = create_sim_config(
-            **_merge(self.config_overrides, overrides),
+            **self._resolved_config_overrides(
+                enable_evolution=enable_evolution,
+                smoke=smoke,
+                overrides=overrides,
+            ),
         )
         return apply_config_attrs(config, self.extra_config_attrs)
 
-    def run_profile(self, **overrides: Any):
+    def run_profile(
+        self,
+        *,
+        enable_evolution: bool | None = None,
+        smoke: bool = False,
+        **overrides: Any,
+    ):
         from main import RunProfile
 
         profile_kwargs = live_run_profile_defaults()
         profile_kwargs.update(deepcopy(dict(self.run_profile_overrides)))
+        if smoke:
+            profile_kwargs["agent_count"] = min(
+                int(profile_kwargs.get("agent_count", SIM_CONFIG_DEFAULTS["num_agents"])),
+                DEFAULT_SMOKE_NUM_AGENTS,
+            )
+            profile_kwargs["evolution_generations"] = min(
+                int(
+                    profile_kwargs.get(
+                        "evolution_generations",
+                        SIM_CONFIG_DEFAULTS["evolution_generations"],
+                    )
+                ),
+                DEFAULT_SMOKE_EVOLUTION_GENERATIONS,
+            )
+        if enable_evolution is not None:
+            profile_kwargs["enable_evolution"] = enable_evolution
         profile_kwargs.update(overrides)
         return RunProfile(**profile_kwargs)
 
@@ -935,9 +1000,91 @@ TEST_SCENARIOS: dict[str, ResearchPaperTestScenario] = {
     ),
 }
 
+SOCIETY_EVOLUTION_CASES: tuple[str, ...] = (
+    "accuracy_metrics",
+    "agent_memory",
+    "algorithmic_filter_bubble",
+    "bimodality_polarization",
+    "cascade_power_law_flat",
+    "cascade_power_law_power",
+    "clusters",
+    "echo_chambers_high",
+    "echo_chambers_low",
+    "figure_algorithmic_filter_bubble",
+    "figure_echo_chambers_high",
+    "figure_echo_chambers_low",
+    "figure_granovetter_cascade",
+    "figure_personality_correlations",
+    "figure_semantic_alignment",
+    "figure_signal_distortion",
+    "figure_social_consensus",
+    "figure_wealth_evolved",
+    "granovetter_cascade",
+    "ideological_influence_power",
+    "ideological_influence_standard",
+    "influence_susceptibility",
+    "louvain_high",
+    "louvain_low",
+    "network_topology",
+    "perception_social_consensus",
+    "personal",
+    "personalities_for_clustering",
+    "personality_correlations",
+    "personality_socialization_base",
+    "personality_socialization_socialized",
+    "r0_basic_reproduction",
+    "ram_usage",
+    "runtime_small_populations",
+    "semantic_alignment",
+    "signal_distortion",
+    "trait_distribution",
+    "wealth_gini_evolved",
+)
+
 
 def get_test_scenario(name: str) -> ResearchPaperTestScenario:
     return TEST_SCENARIOS[name]
+
+
+def evolution_variants(mode: str = "both") -> tuple[bool, ...]:
+    normalized = mode.strip().lower()
+    if normalized == "both":
+        return (False, True)
+    if normalized in {"without", "off", "false"}:
+        return (False,)
+    if normalized in {"with", "on", "true"}:
+        return (True,)
+    raise ValueError(
+        "evolution mode must be one of: both, with, without, on, off, true, false"
+    )
+
+
+def prepare_scenario_society(
+    scenario_name: str,
+    root_dir: str | Path,
+    *,
+    enable_evolution: bool,
+    smoke: bool = False,
+    output_name: str | None = None,
+    **config_overrides: Any,
+):
+    from main import prepare_society_for_debug
+
+    scenario = get_test_scenario(scenario_name)
+    config = scenario.sim_config(
+        enable_evolution=enable_evolution,
+        smoke=smoke,
+        **config_overrides,
+    )
+    output_root = Path(root_dir)
+    case_name = output_name or scenario_name
+    variant_label = EVOLUTION_VARIANT_LABELS[enable_evolution]
+    output_dir = output_root / f"{case_name}_{variant_label}"
+    return prepare_society_for_debug(
+        config,
+        output_dir=str(output_dir),
+        evolve=enable_evolution,
+    )
 
 
 def _validate_schema() -> None:
@@ -948,6 +1095,15 @@ def _validate_schema() -> None:
             invalid_overrides[scenario_name] = unknown_fields
     if invalid_overrides:
         raise ValueError(f"Invalid SimConfig overrides: {invalid_overrides}")
+    missing_society_cases = sorted(
+        scenario_name
+        for scenario_name in SOCIETY_EVOLUTION_CASES
+        if scenario_name not in TEST_SCENARIOS
+    )
+    if missing_society_cases:
+        raise ValueError(
+            f"Unknown society evolution cases declared: {missing_society_cases}"
+        )
 
 
 _validate_schema()

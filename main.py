@@ -87,6 +87,12 @@ class RunProfile(BaseModel):
     algo_sample_size: float = 0.1
     algo_exaggeration_factor: float = 1.5
 
+    use_selective_exposure: bool = True
+    selective_exposure_base_tolerance: float = -0.3
+    selective_exposure_openness_factor: float = 0.4
+    selective_exposure_gain: float = 8.0
+    selective_exposure_max_suppression: float = 0.85
+
     use_agent_memory: bool = False
     memory_decay_rate: float = 0.7
     memory_desensitization_gain: float = 0.5
@@ -559,6 +565,11 @@ def prepare_society_sync(run: RunProfile, run_output_dir: str):
         use_algorithmic_amplification=run.use_algorithmic_amplification,
         algo_sample_size=run.algo_sample_size,
         algo_exaggeration_factor=run.algo_exaggeration_factor,
+        use_selective_exposure=run.use_selective_exposure,
+        selective_exposure_base_tolerance=run.selective_exposure_base_tolerance,
+        selective_exposure_openness_factor=run.selective_exposure_openness_factor,
+        selective_exposure_gain=run.selective_exposure_gain,
+        selective_exposure_max_suppression=run.selective_exposure_max_suppression,
         use_agent_memory=run.use_agent_memory,
         memory_decay_rate=run.memory_decay_rate,
         memory_desensitization_gain=run.memory_desensitization_gain,

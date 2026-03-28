@@ -171,7 +171,7 @@ class AttentionContext:
         """
         The 'Triple-Filter-Bubble' Cognitive Gate.
         If the event fundamentally contradicts the agent's core values, and they have low Openness,
-        they will completely ignore it (Confirmation Bias).
+        they will strongly suppress it (Confirmation Bias).
         """
         if getattr(self.config, "use_selective_exposure", True) is False:
             return self
@@ -193,18 +193,38 @@ class AttentionContext:
         
         # Agents with low Openness are more likely to filter out opposing views
         openness = self.personalities[:, 0:1]
-        
-        # Calculate tolerance threshold
-        # We need a robust system: Low openness (0) should block even slightly opposing views (e.g., < 0.2)
-        # High openness (1) should tolerate anything (tolerance < -1.0)
-        # We ignore config base thresholds to enforce this mathematically guaranteed curve
-        tolerance = 0.2 - torch.sigmoid(10.0 * (openness - 0.5))
-        
-        # If alignment is below the agent's tolerance, they block the information (Filter Bubble activates)
-        is_blocked = (alignment < tolerance).float()
-        
-        # Force Q to near zero for blocked agents
-        self.Q = self.Q * (1.0 - is_blocked)
+
+        base_tolerance = getattr(
+            self.config, "selective_exposure_base_tolerance", -0.3
+        )
+        openness_factor = getattr(
+            self.config, "selective_exposure_openness_factor", 0.4
+        )
+        gain = getattr(self.config, "selective_exposure_gain", 8.0)
+        max_suppression = torch.clamp(
+            torch.tensor(
+                getattr(self.config, "selective_exposure_max_suppression", 0.85),
+                dtype=self.Q.dtype,
+                device=self.Q.device,
+            ),
+            0.0,
+            1.0,
+        )
+
+        # High-openness agents should tolerate even strongly misaligned events,
+        # while low-openness agents still heavily suppress contradictory signals.
+        # Shift the midpoint slightly left so mid-openness agents are not treated
+        # almost like hard blockers in strongly misaligned scenarios.
+        openness_midpoint = 0.45
+        openness_curve = torch.sigmoid(gain * (openness - openness_midpoint))
+        tolerance = base_tolerance - (1.0 + openness_factor) * openness_curve
+
+        # Convert the gate into bounded suppression rather than an unconditional hard block.
+        # This preserves a meaningful openness gradient for the figure and the live model.
+        suppression_pressure = tolerance - alignment
+        suppression = max_suppression * torch.sigmoid(gain * suppression_pressure)
+
+        self.Q = self.Q * (1.0 - suppression)
         
         return self
 

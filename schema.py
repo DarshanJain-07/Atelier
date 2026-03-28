@@ -133,6 +133,11 @@ class SimConfig:
         0.15  # Lowered from 0.25 to prevent dead zone for average agents
     )
     engagement_gain: float = 10.0  # Sharpness of transition
+    use_selective_exposure: bool = True
+    selective_exposure_base_tolerance: float = -0.3
+    selective_exposure_openness_factor: float = 0.4
+    selective_exposure_gain: float = 8.0
+    selective_exposure_max_suppression: float = 0.85
 
     use_time_pressure: bool = True  # Enable "Cognitive Tunneling" (Urgency)
     stress_activation_threshold: float = 0.3

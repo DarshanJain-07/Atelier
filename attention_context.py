@@ -198,7 +198,7 @@ class AttentionContext:
         # We need a robust system: Low openness (0) should block even slightly opposing views (e.g., < 0.2)
         # High openness (1) should tolerate anything (tolerance < -1.0)
         # We ignore config base thresholds to enforce this mathematically guaranteed curve
-        tolerance = 0.2 - (openness * 1.5)
+        tolerance = 0.2 - torch.sigmoid(10.0 * (openness - 0.5))
         
         # If alignment is below the agent's tolerance, they block the information (Filter Bubble activates)
         is_blocked = (alignment < tolerance).float()

@@ -295,7 +295,10 @@ def test_generate_research_paper_summary_figure(tmp_path):
     )
     high_homophily = create_sim_config(
         num_agents=400,
-        homophily_strength=4.0,
+        homophily_strength=8.0, # High homophily
+        influence_bias_exp=0.0, # Stop influencers from bridging clusters
+        base_connections=2,     # Lower density prevents giant component blob
+        triadic_closure_prob=0.8, # Tighten existing clusters
         use_network_topology=True,
         enable_evolution=False,
     )

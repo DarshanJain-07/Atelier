@@ -13,9 +13,12 @@ def test_homophily_raises_louvain_modularity(tmp_path):
     )
     high = create_sim_config(
         num_agents=500,
-        homophily_strength=4.0,
+        homophily_strength=8.0,
         use_network_topology=True,
         enable_evolution=False,
+        influence_bias_exp=0.0, # Stop influencers from bridging clusters
+        base_connections=2,     # Lower density prevents giant component blob
+        triadic_closure_prob=0.8, # Tighten existing clusters
     )
 
     low_society = prepare_society_for_debug(low, output_dir=str(tmp_path / "low"), evolve=False)

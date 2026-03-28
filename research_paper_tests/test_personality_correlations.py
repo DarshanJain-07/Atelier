@@ -1,16 +1,22 @@
 import numpy as np
 import pandas as pd
 
-from main import PERSONALITY_CORRELATIONS, prepare_society_for_debug
-from research_paper_tests.config_schema import get_test_scenario
+from main import PERSONALITY_CORRELATIONS
+from research_paper_tests.config_schema import (
+    get_test_scenario,
+    prepare_scenario_society,
+)
 
 
 def test_generated_personalities_follow_target_correlations(tmp_path):
     scenario = get_test_scenario("personality_correlations")
     config = scenario.sim_config()
     settings = scenario.settings()
-    society = prepare_society_for_debug(
-        config, output_dir=str(tmp_path / "correlations"), evolve=False
+    society = prepare_scenario_society(
+        "personality_correlations",
+        tmp_path,
+        enable_evolution=config.enable_evolution,
+        output_name="correlations",
     )
 
     observed = pd.DataFrame(

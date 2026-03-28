@@ -1,16 +1,23 @@
 import torch
 
-from main import distort_world_signal, prepare_society_for_debug
+from main import distort_world_signal
 from research_paper_tests._metrics import average_neighbor_distance
-from research_paper_tests.config_schema import build_world, get_test_scenario
+from research_paper_tests.config_schema import (
+    build_world,
+    get_test_scenario,
+    prepare_scenario_society,
+)
 
 
 def test_social_consensus_aligns_neighbor_perceptions(tmp_path):
     scenario = get_test_scenario("perception_social_consensus")
     config = scenario.sim_config()
     settings = scenario.settings()
-    society = prepare_society_for_debug(
-        config, output_dir=str(tmp_path / "consensus"), evolve=False
+    society = prepare_scenario_society(
+        "perception_social_consensus",
+        tmp_path,
+        enable_evolution=config.enable_evolution,
+        output_name="consensus",
     )
 
     world = build_world(settings["world"])

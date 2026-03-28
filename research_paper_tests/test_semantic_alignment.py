@@ -1,13 +1,13 @@
 from main import (
     calculate_validation_metrics,
     map_emotions_to_sentiment,
-    prepare_society_for_debug,
     run_debug_simulation,
 )
 from research_paper_tests.config_schema import (
     SENTIMENT_INDICES,
     build_world,
     get_test_scenario,
+    prepare_scenario_society,
 )
 
 
@@ -15,8 +15,11 @@ def test_semantic_alignment_rewards_matching_sentiment_baselines(tmp_path):
     scenario = get_test_scenario("semantic_alignment")
     config = scenario.sim_config()
     settings = scenario.settings()
-    society = prepare_society_for_debug(
-        config, output_dir=str(tmp_path / "semantic"), evolve=False
+    society = prepare_scenario_society(
+        "semantic_alignment",
+        tmp_path,
+        enable_evolution=config.enable_evolution,
+        output_name="semantic",
     )
 
     positive_world = build_world(settings["positive_world"])

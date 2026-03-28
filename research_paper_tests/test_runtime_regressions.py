@@ -7,11 +7,11 @@ from main import (
     SOCIETY_CACHE,
     SOCIETY_CACHE_LOCK,
     aggregate_social_state,
-    prepare_society_for_debug,
     prepare_society_sync,
 )
 from research_paper_tests.config_schema import (
     get_test_scenario,
+    prepare_scenario_society,
     set_emotions,
     zero_emotions,
 )
@@ -104,10 +104,13 @@ def test_prepare_society_returns_fresh_request_memory(tmp_path, isolated_society
 @pytest.mark.parametrize("num_agents", SMALL_POPULATION_SETTINGS["population_sizes"])
 def test_generated_topology_handles_small_populations(tmp_path, num_agents):
     scenario = get_test_scenario("runtime_small_populations")
-    society = prepare_society_for_debug(
-        config=scenario.sim_config(num_agents=num_agents),
-        output_dir=str(tmp_path / f"society_{num_agents}"),
-        evolve=False,
+    config = scenario.sim_config(num_agents=num_agents)
+    society = prepare_scenario_society(
+        "runtime_small_populations",
+        tmp_path,
+        enable_evolution=config.enable_evolution,
+        output_name=f"society_{num_agents}",
+        num_agents=num_agents,
     )
 
     adjacency = society.adjacency_matrix

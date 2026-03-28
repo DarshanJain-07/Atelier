@@ -1,15 +1,21 @@
 import numpy as np
 
-from main import prepare_society_for_debug, run_debug_simulation
-from research_paper_tests.config_schema import get_test_scenario
+from main import run_debug_simulation
+from research_paper_tests.config_schema import (
+    get_test_scenario,
+    prepare_scenario_society,
+)
 
 
 def test_structural_influence_improves_realized_reach(tmp_path):
     scenario = get_test_scenario("influence_susceptibility")
     config = scenario.sim_config()
     settings = scenario.settings()
-    society = prepare_society_for_debug(
-        config, output_dir=str(tmp_path / "reach"), evolve=False
+    society = prepare_scenario_society(
+        "influence_susceptibility",
+        tmp_path,
+        enable_evolution=config.enable_evolution,
+        output_name="reach",
     )
 
     influences = society.metadata["Influence"].to_numpy()

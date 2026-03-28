@@ -1,15 +1,22 @@
 import torch
 
-from main import prepare_society_for_debug, run_debug_simulation
-from research_paper_tests.config_schema import build_world, get_test_scenario
+from main import run_debug_simulation
+from research_paper_tests.config_schema import (
+    build_world,
+    get_test_scenario,
+    prepare_scenario_society,
+)
 
 
 def test_agent_memory_accumulates_and_stacks_new_threats(tmp_path):
     scenario = get_test_scenario("agent_memory")
     config = scenario.sim_config()
     settings = scenario.settings()
-    society = prepare_society_for_debug(
-        config, output_dir=str(tmp_path / "memory"), evolve=False
+    society = prepare_scenario_society(
+        "agent_memory",
+        tmp_path,
+        enable_evolution=config.enable_evolution,
+        output_name="memory",
     )
 
     repeated_wealth_threat = build_world(settings["repeat_threat"])
@@ -32,8 +39,11 @@ def test_agent_memory_accumulates_and_stacks_new_threats(tmp_path):
         society=society,
         urgency=settings["urgency"],
     )
-    fresh_society = prepare_society_for_debug(
-        config, output_dir=str(tmp_path / "fresh"), evolve=False
+    fresh_society = prepare_scenario_society(
+        "agent_memory",
+        tmp_path,
+        enable_evolution=config.enable_evolution,
+        output_name="fresh",
     )
     fresh = run_debug_simulation(
         config,

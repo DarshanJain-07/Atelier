@@ -1,6 +1,9 @@
-from main import DIMENSION_INDICES, prepare_society_for_debug
+from main import DIMENSION_INDICES
 from research_paper_tests._metrics import gini
-from research_paper_tests.config_schema import get_test_scenario
+from research_paper_tests.config_schema import (
+    get_test_scenario,
+    prepare_scenario_society,
+)
 
 
 def test_evolution_increases_wealth_inequality(tmp_path):
@@ -9,11 +12,17 @@ def test_evolution_increases_wealth_inequality(tmp_path):
     evolved = get_test_scenario("wealth_gini_evolved").sim_config()
     settings = baseline_scenario.settings()
 
-    baseline_society = prepare_society_for_debug(
-        baseline, output_dir=str(tmp_path / "baseline"), evolve=False
+    baseline_society = prepare_scenario_society(
+        "wealth_gini_baseline",
+        tmp_path,
+        enable_evolution=baseline.enable_evolution,
+        output_name="baseline",
     )
-    evolved_society = prepare_society_for_debug(
-        evolved, output_dir=str(tmp_path / "evolved"), evolve=True
+    evolved_society = prepare_scenario_society(
+        "wealth_gini_evolved",
+        tmp_path,
+        enable_evolution=evolved.enable_evolution,
+        output_name="evolved",
     )
 
     baseline_gini = gini(

@@ -1,15 +1,21 @@
 import numpy as np
 
-from main import prepare_society_for_debug, run_debug_simulation
-from research_paper_tests.config_schema import get_test_scenario
+from main import run_debug_simulation
+from research_paper_tests.config_schema import (
+    get_test_scenario,
+    prepare_scenario_society,
+)
 
 
 def test_r0_estimate_finds_nonzero_secondary_engagement(tmp_path):
     scenario = get_test_scenario("r0_basic_reproduction")
     config = scenario.sim_config()
     settings = scenario.settings()
-    society = prepare_society_for_debug(
-        config, output_dir=str(tmp_path / "r0"), evolve=False
+    society = prepare_scenario_society(
+        "r0_basic_reproduction",
+        tmp_path,
+        enable_evolution=config.enable_evolution,
+        output_name="r0",
     )
 
     rng = np.random.default_rng(settings["rng_seed"])

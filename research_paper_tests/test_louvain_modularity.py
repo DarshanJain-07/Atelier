@@ -1,8 +1,10 @@
 import community as community_louvain
 
-from main import prepare_society_for_debug
 from research_paper_tests._metrics import adjacency_to_graph
-from research_paper_tests.config_schema import get_test_scenario
+from research_paper_tests.config_schema import (
+    get_test_scenario,
+    prepare_scenario_society,
+)
 
 
 def test_homophily_raises_louvain_modularity(tmp_path):
@@ -11,8 +13,18 @@ def test_homophily_raises_louvain_modularity(tmp_path):
     high = get_test_scenario("louvain_high").sim_config()
     settings = low_scenario.settings()
 
-    low_society = prepare_society_for_debug(low, output_dir=str(tmp_path / "low"), evolve=False)
-    high_society = prepare_society_for_debug(high, output_dir=str(tmp_path / "high"), evolve=False)
+    low_society = prepare_scenario_society(
+        "louvain_low",
+        tmp_path,
+        enable_evolution=low.enable_evolution,
+        output_name="low",
+    )
+    high_society = prepare_scenario_society(
+        "louvain_high",
+        tmp_path,
+        enable_evolution=high.enable_evolution,
+        output_name="high",
+    )
 
     low_graph = adjacency_to_graph(low_society.adjacency_matrix)
     high_graph = adjacency_to_graph(high_society.adjacency_matrix)

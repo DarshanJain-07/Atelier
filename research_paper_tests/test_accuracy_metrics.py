@@ -3,13 +3,13 @@ import torch
 from main import (
     calculate_validation_metrics,
     map_emotions_to_sentiment,
-    prepare_society_for_debug,
     run_debug_simulation,
 )
 from research_paper_tests.config_schema import (
     SENTIMENT_INDICES,
     build_world,
     get_test_scenario,
+    prepare_scenario_society,
 )
 
 
@@ -17,8 +17,11 @@ def test_accuracy_metrics_prefer_matching_baseline(tmp_path):
     scenario = get_test_scenario("accuracy_metrics")
     config = scenario.sim_config()
     settings = scenario.settings()
-    society = prepare_society_for_debug(
-        config, output_dir=str(tmp_path / "accuracy"), evolve=False
+    society = prepare_scenario_society(
+        "accuracy_metrics",
+        tmp_path,
+        enable_evolution=config.enable_evolution,
+        output_name="accuracy",
     )
 
     negative_world = build_world(settings["world"])

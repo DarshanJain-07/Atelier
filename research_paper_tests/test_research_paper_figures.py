@@ -13,7 +13,6 @@ from main import (
     clone_sim_config,
     consolidate_agent_memory,
     distort_world_signal,
-    prepare_society_for_debug,
     run_debug_simulation,
 )
 from research_paper_tests._metrics import (
@@ -29,6 +28,7 @@ from research_paper_tests.config_schema import (
     build_world,
     fraction_count,
     get_test_scenario,
+    prepare_scenario_society,
     set_dimensions,
     set_emotions,
     set_traits,
@@ -78,8 +78,11 @@ def test_generate_research_paper_summary_figure(tmp_path):
     distortion_scenario = get_test_scenario("figure_signal_distortion")
     distortion_config = distortion_scenario.sim_config()
     distortion_settings = distortion_scenario.settings()
-    distortion_society = prepare_society_for_debug(
-        distortion_config, output_dir=str(tmp_path / "distortion"), evolve=False
+    distortion_society = prepare_scenario_society(
+        "figure_signal_distortion",
+        tmp_path,
+        enable_evolution=distortion_config.enable_evolution,
+        output_name="distortion",
     )
     distortion_world = build_world(distortion_settings["world"])
     perceived = distort_world_signal(
@@ -176,8 +179,11 @@ def test_generate_research_paper_summary_figure(tmp_path):
     algo_scenario = get_test_scenario("figure_algorithmic_filter_bubble")
     algo_config = algo_scenario.sim_config()
     algo_settings = algo_scenario.settings()
-    algo_society = prepare_society_for_debug(
-        algo_config, output_dir=str(tmp_path / "algo"), evolve=False
+    algo_society = prepare_scenario_society(
+        "figure_algorithmic_filter_bubble",
+        tmp_path,
+        enable_evolution=algo_config.enable_evolution,
+        output_name="algo",
     )
     boring_world = build_world(algo_settings["world"])
     baseline_config = clone_sim_config(algo_config, use_algorithmic_amplification=False)
@@ -218,8 +224,11 @@ def test_generate_research_paper_summary_figure(tmp_path):
     consensus_scenario = get_test_scenario("figure_social_consensus")
     consensus_config = consensus_scenario.sim_config()
     consensus_settings = consensus_scenario.settings()
-    consensus_society = prepare_society_for_debug(
-        consensus_config, output_dir=str(tmp_path / "consensus"), evolve=False
+    consensus_society = prepare_scenario_society(
+        "figure_social_consensus",
+        tmp_path,
+        enable_evolution=consensus_config.enable_evolution,
+        output_name="consensus",
     )
     assert consensus_society.adjacency_matrix is not None
     consensus_world = build_world(consensus_settings["world"])
@@ -258,8 +267,11 @@ def test_generate_research_paper_summary_figure(tmp_path):
     granovetter_scenario = get_test_scenario("figure_granovetter_cascade")
     granovetter_config = granovetter_scenario.sim_config()
     granovetter_settings = granovetter_scenario.settings()
-    granovetter_society = prepare_society_for_debug(
-        granovetter_config, output_dir=str(tmp_path / "gran"), evolve=False
+    granovetter_society = prepare_scenario_society(
+        "figure_granovetter_cascade",
+        tmp_path,
+        enable_evolution=granovetter_config.enable_evolution,
+        output_name="gran",
     )
     emotions = zero_emotions(granovetter_config.num_agents)
     instigators = fraction_count(
@@ -309,11 +321,17 @@ def test_generate_research_paper_summary_figure(tmp_path):
     low_homophily = low_homophily_scenario.sim_config()
     high_homophily = get_test_scenario("figure_echo_chambers_high").sim_config()
     homophily_settings = low_homophily_scenario.settings()
-    low_society = prepare_society_for_debug(
-        low_homophily, output_dir=str(tmp_path / "low_h"), evolve=False
+    low_society = prepare_scenario_society(
+        "figure_echo_chambers_low",
+        tmp_path,
+        enable_evolution=low_homophily.enable_evolution,
+        output_name="low_h",
     )
-    high_society = prepare_society_for_debug(
-        high_homophily, output_dir=str(tmp_path / "high_h"), evolve=False
+    high_society = prepare_scenario_society(
+        "figure_echo_chambers_high",
+        tmp_path,
+        enable_evolution=high_homophily.enable_evolution,
+        output_name="high_h",
     )
     assert low_society.adjacency_matrix is not None
     assert high_society.adjacency_matrix is not None
@@ -354,8 +372,11 @@ def test_generate_research_paper_summary_figure(tmp_path):
 
     # 9. Personality correlation heatmap
     corr_config = get_test_scenario("figure_personality_correlations").sim_config()
-    corr_society = prepare_society_for_debug(
-        corr_config, output_dir=str(tmp_path / "corr"), evolve=False
+    corr_society = prepare_scenario_society(
+        "figure_personality_correlations",
+        tmp_path,
+        enable_evolution=corr_config.enable_evolution,
+        output_name="corr",
     )
     observed_corr = np.corrcoef(corr_society.personalities.numpy().T)
     im = axes[8].imshow(observed_corr, vmin=-1.0, vmax=1.0, cmap="coolwarm")
@@ -367,11 +388,17 @@ def test_generate_research_paper_summary_figure(tmp_path):
     # 10. Wealth inequality
     base_wealth_config = get_test_scenario("figure_wealth_baseline").sim_config()
     evolved_wealth_config = get_test_scenario("figure_wealth_evolved").sim_config()
-    base_wealth = prepare_society_for_debug(
-        base_wealth_config, output_dir=str(tmp_path / "base_wealth"), evolve=False
+    base_wealth = prepare_scenario_society(
+        "figure_wealth_baseline",
+        tmp_path,
+        enable_evolution=base_wealth_config.enable_evolution,
+        output_name="base_wealth",
     )
-    evolved_wealth = prepare_society_for_debug(
-        evolved_wealth_config, output_dir=str(tmp_path / "evolved_wealth"), evolve=True
+    evolved_wealth = prepare_scenario_society(
+        "figure_wealth_evolved",
+        tmp_path,
+        enable_evolution=evolved_wealth_config.enable_evolution,
+        output_name="evolved_wealth",
     )
     axes[9].bar(
         ["Baseline", "Evolved"],
@@ -436,8 +463,11 @@ def test_generate_research_paper_summary_figure(tmp_path):
     semantic_scenario = get_test_scenario("figure_semantic_alignment")
     semantic_config = semantic_scenario.sim_config()
     semantic_settings = semantic_scenario.settings()
-    semantic_society = prepare_society_for_debug(
-        semantic_config, output_dir=str(tmp_path / "semantic"), evolve=False
+    semantic_society = prepare_scenario_society(
+        "figure_semantic_alignment",
+        tmp_path,
+        enable_evolution=semantic_config.enable_evolution,
+        output_name="semantic",
     )
     positive_world = build_world(semantic_settings["positive_world"])
     negative_world = build_world(semantic_settings["negative_world"])

@@ -1,17 +1,25 @@
-from main import prepare_society_for_debug
 from research_paper_tests._metrics import mean_edge_cosine_similarity
-from research_paper_tests.config_schema import get_test_scenario
+from research_paper_tests.config_schema import (
+    get_test_scenario,
+    prepare_scenario_society,
+)
 
 
 def test_homophilous_topology_forms_stronger_echo_chambers(tmp_path):
     low_homophily = get_test_scenario("echo_chambers_low").sim_config()
     high_homophily = get_test_scenario("echo_chambers_high").sim_config()
 
-    low_society = prepare_society_for_debug(
-        low_homophily, output_dir=str(tmp_path / "low"), evolve=False
+    low_society = prepare_scenario_society(
+        "echo_chambers_low",
+        tmp_path,
+        enable_evolution=low_homophily.enable_evolution,
+        output_name="low",
     )
-    high_society = prepare_society_for_debug(
-        high_homophily, output_dir=str(tmp_path / "high"), evolve=False
+    high_society = prepare_scenario_society(
+        "echo_chambers_high",
+        tmp_path,
+        enable_evolution=high_homophily.enable_evolution,
+        output_name="high",
     )
 
     low_similarity = mean_edge_cosine_similarity(

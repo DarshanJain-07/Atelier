@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from copy import deepcopy
 from dataclasses import dataclass, field, fields
 from pathlib import Path
@@ -49,6 +50,8 @@ SIM_CONFIG_DEFAULTS = live_sim_config_defaults()
 SIM_CONFIG_FIELDS = frozenset(SIM_CONFIG_DEFAULTS)
 DEFAULT_SMOKE_NUM_AGENTS = 128
 DEFAULT_SMOKE_EVOLUTION_GENERATIONS = 2
+SESSION_EVOLUTION_MODE_ENV = "RESEARCH_TEST_EVOLUTION_MODE"
+EVOLUTION_MATRIX_MODE_ENV = "RESEARCH_TEST_EVOLUTION_MATRIX"
 EVOLUTION_VARIANT_LABELS = {
     False: "without_evolution",
     True: "with_evolution",
@@ -211,12 +214,32 @@ def build_world(values: Mapping[str, float]) -> torch.Tensor:
     return set_dimensions(zero_world(), values)
 
 
+def requested_evolution_override() -> bool | None:
+    raw_mode = os.getenv(SESSION_EVOLUTION_MODE_ENV, "").strip()
+    if not raw_mode:
+        raw_mode = os.getenv(EVOLUTION_MATRIX_MODE_ENV, "").strip()
+    if not raw_mode:
+        return None
+
+    normalized = raw_mode.lower()
+    if normalized == "both":
+        return None
+    if normalized in {"with", "on", "true"}:
+        return True
+    if normalized in {"without", "off", "false"}:
+        return False
+    raise ValueError(
+        "evolution mode must be one of: both, with, without, on, off, true, false"
+    )
+
+
 @dataclass(frozen=True)
 class ResearchPaperTestScenario:
     config_overrides: Mapping[str, Any] = field(default_factory=dict)
     run_profile_overrides: Mapping[str, Any] = field(default_factory=dict)
     extra_config_attrs: Mapping[str, Any] = field(default_factory=dict)
     values: Mapping[str, Any] = field(default_factory=dict)
+    allow_session_evolution_override: bool = True
 
     def _resolved_config_overrides(
         self,
@@ -240,8 +263,11 @@ class ResearchPaperTestScenario:
                 ),
                 DEFAULT_SMOKE_EVOLUTION_GENERATIONS,
             )
-        if enable_evolution is not None:
-            resolved["enable_evolution"] = enable_evolution
+        selected_evolution = enable_evolution
+        if selected_evolution is None and self.allow_session_evolution_override:
+            selected_evolution = requested_evolution_override()
+        if selected_evolution is not None:
+            resolved["enable_evolution"] = selected_evolution
         return resolved
 
     def sim_config(
@@ -287,8 +313,11 @@ class ResearchPaperTestScenario:
                 ),
                 DEFAULT_SMOKE_EVOLUTION_GENERATIONS,
             )
-        if enable_evolution is not None:
-            profile_kwargs["enable_evolution"] = enable_evolution
+        selected_evolution = enable_evolution
+        if selected_evolution is None and self.allow_session_evolution_override:
+            selected_evolution = requested_evolution_override()
+        if selected_evolution is not None:
+            profile_kwargs["enable_evolution"] = selected_evolution
         profile_kwargs.update(overrides)
         return RunProfile(**profile_kwargs)
 
@@ -630,12 +659,14 @@ TEST_SCENARIOS: dict[str, ResearchPaperTestScenario] = {
             NO_NETWORK_NO_EVOLUTION,
             {"num_agents": 800},
         ),
+        allow_session_evolution_override=False,
     ),
     "figure_wealth_evolved": ResearchPaperTestScenario(
         config_overrides=_merge(
             NO_NETWORK_NO_EVOLUTION,
             {"num_agents": 800, "evolution_generations": 20, "enable_evolution": True},
         ),
+        allow_session_evolution_override=False,
     ),
     "granovetter_cascade": ResearchPaperTestScenario(
         config_overrides=_merge(
@@ -883,6 +914,7 @@ TEST_SCENARIOS: dict[str, ResearchPaperTestScenario] = {
             "evolution_generations": 2,
         },
         values={"baseline_enable_evolution": False},
+        allow_session_evolution_override=False,
     ),
     "runtime_profile_memory": ResearchPaperTestScenario(
         run_profile_overrides={
@@ -895,6 +927,7 @@ TEST_SCENARIOS: dict[str, ResearchPaperTestScenario] = {
             "use_agent_memory": True,
         },
         values={"memory_marker": 123.0, "empty_memory_value": 0.0},
+        allow_session_evolution_override=False,
     ),
     "runtime_profile_topology": ResearchPaperTestScenario(
         run_profile_overrides={
@@ -906,6 +939,7 @@ TEST_SCENARIOS: dict[str, ResearchPaperTestScenario] = {
             "enable_evolution": False,
         },
         values={"flat_use_network_topology": False},
+        allow_session_evolution_override=False,
     ),
     "runtime_small_populations": ResearchPaperTestScenario(
         config_overrides=_merge(
@@ -991,12 +1025,14 @@ TEST_SCENARIOS: dict[str, ResearchPaperTestScenario] = {
             {"num_agents": 1500, "evolution_generations": 20, "enable_evolution": False},
         ),
         values={"min_absolute_delta": 0.02},
+        allow_session_evolution_override=False,
     ),
     "wealth_gini_evolved": ResearchPaperTestScenario(
         config_overrides=_merge(
             NO_NETWORK_NO_EVOLUTION,
             {"num_agents": 1500, "evolution_generations": 20, "enable_evolution": True},
         ),
+        allow_session_evolution_override=False,
     ),
 }
 
@@ -1018,6 +1054,7 @@ SOCIETY_EVOLUTION_CASES: tuple[str, ...] = (
     "figure_semantic_alignment",
     "figure_signal_distortion",
     "figure_social_consensus",
+    "figure_wealth_baseline",
     "figure_wealth_evolved",
     "granovetter_cascade",
     "ideological_influence_power",

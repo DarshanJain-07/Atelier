@@ -1,10 +1,10 @@
 import numpy as np
 from sklearn.cluster import KMeans
 
-from main import prepare_society_for_debug
 from research_paper_tests.config_schema import (
     PERSONALITY_INDICES,
     get_test_scenario,
+    prepare_scenario_society,
 )
 
 
@@ -12,8 +12,11 @@ def test_personality_clusters_show_nontrivial_trait_spread(tmp_path):
     scenario = get_test_scenario("clusters")
     config = scenario.sim_config()
     settings = scenario.settings()
-    society = prepare_society_for_debug(
-        config, output_dir=str(tmp_path / "clusters"), evolve=False
+    society = prepare_scenario_society(
+        "clusters",
+        tmp_path,
+        enable_evolution=config.enable_evolution,
+        output_name="clusters",
     )
 
     personalities = society.personalities.numpy()

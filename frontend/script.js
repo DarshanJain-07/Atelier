@@ -193,7 +193,6 @@ function getResearcherSettings() {
     algo_sample_size: readFloat("res-algo-sample", 0.1),
     algo_top_k: readInt("res-algo-topk", 2),
     algo_min_active_value: readFloat("res-algo-active", 0.05),
-    algo_max_delta: readFloat("res-algo-max-delta", 0.2),
     algo_exaggeration_factor: readFloat("res-algo-exagg", 1.5),
     memory_decay_rate: readFloat("res-mem-decay", 0.7),
     memory_desensitization_gain: readFloat("res-mem-desens", 0.5),

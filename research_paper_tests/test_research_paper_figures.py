@@ -163,7 +163,6 @@ def test_generate_research_paper_summary_figure(tmp_path):
         use_algorithmic_amplification=True,
         algo_sample_size=0.1,
         algo_exaggeration_factor=2.0,
-        algo_max_delta=0.15,
         use_network_topology=False,
         enable_evolution=False,
     )

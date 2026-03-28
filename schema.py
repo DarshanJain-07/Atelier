@@ -49,119 +49,21 @@ VALENCE_WEIGHTS = torch.tensor(
 PSYCH_PROJECTION = torch.tensor(
     [
         # Joy, Tru, Fea, Sur, Sad, Dis, Ang, Ant
-        [
-            0.35,
-            0.05,
-            0.0,
-            0.0,
-            -0.35,
-            0.0,
-            -0.1,
-            0.15,
-        ],  # Wealth (+ = Joy, - = Sad)
-        [
-            0.05,
-            0.15,
-            -0.35,
-            0.15,
-            -0.15,
-            0.0,
-            -0.15,
-            0.0,
-        ],  # Safety (- = Fear)
-        [
-            0.1,
-            0.35,
-            -0.2,
-            0.0,
-            -0.1,
-            0.0,
-            -0.25,
-            0.0,
-        ],  # Stability
-        [
-            0.3,
-            0.2,
-            -0.1,
-            0.0,
-            -0.2,
-            -0.1,
-            -0.1,
-            0.0,
-        ],  # Reputation
-        [
-            0.05,
-            0.25,
-            0.0,
-            0.0,
-            -0.1,
-            -0.25,
-            -0.35,
-            0.0,
-        ],  # Fairness (- = Anger)
-        [
-            0.1,
-            0.45,
-            -0.15,
-            0.0,
-            -0.1,
-            -0.2,
-            0.0,
-            0.0,
-        ],  # In-Group
-        [
-            0.25,
-            0.05,
-            -0.05,
-            0.35,
-            0.0,
-            0.0,
-            0.0,
-            0.3,
-        ],  # Innovation (+ = Surprise/Anticipation)
-        [
-            0.35,
-            0.0,
-            -0.1,
-            0.0,
-            -0.15,
-            -0.1,
-            -0.3,
-            0.0,
-        ],  # Freedom
-        [
-            0.0,
-            0.25,
-            0.0,
-            0.0,
-            0.0,
-            -0.5,
-            -0.25,
-            0.0,
-        ],  # Sanctity (- = Disgust)
-        [
-            0.1,
-            0.35,
-            -0.1,
-            0.0,
-            -0.3,
-            -0.1,
-            -0.05,
-            0.0,
-        ],  # Care (- = Sadness)
-        [
-            0.0,
-            0.0,
-            0.15,
-            0.05,
-            0.0,
-            0.0,
-            0.1,
-            0.7,
-        ],  # Short Term
-        [0.0, 0.15, -0.15, 0.0, 0.0, 0.0, 0.0, 0.7],  # Long Term
-    ]
-).float()
+        [0.6, 0.2, 0.0, 0.0, -0.6, 0.0, -0.2, 0.1],  # Wealth
+        [0.1, 0.3, -0.8, 0.2, -0.2, 0.0, -0.2, 0.0],  # Safety
+        [0.1, 0.6, -0.3, 0.0, -0.2, 0.0, -0.3, 0.0],  # Stability
+        [0.5, 0.3, -0.1, 0.0, -0.3, -0.1, -0.2, 0.0],  # Reputation
+        [0.1, 0.4, 0.0, 0.0, -0.2, -0.4, -0.8, 0.0],  # Fairness
+        [0.1, 0.8, -0.2, 0.0, -0.2, -0.3, 0.0, 0.0],  # In-Group
+        [0.4, 0.1, -0.1, 0.6, 0.0, 0.0, 0.0, 0.5],  # Innovation
+        [0.6, 0.1, -0.2, 0.1, -0.2, -0.1, -0.5, 0.0],  # Freedom
+        [0.0, 0.4, 0.0, 0.0, 0.0, -0.8, -0.4, 0.0],  # Sanctity
+        [0.2, 0.5, -0.1, 0.0, -0.5, -0.1, -0.1, 0.0],  # Care
+        [0.0, 0.0, 0.0, 0.2, 0.0, 0.0, 0.0, 0.6],  # Short_Term
+        [0.0, 0.2, 0.0, 0.0, 0.0, 0.0, 0.0, 0.8],  # Long_Term
+    ],
+    dtype=torch.float32,
+)
 
 # Map the 5 Personality Traits to the 12 World Dimensions for the query layer
 PERSONALITY_QUERY_MATRIX = torch.tensor(
@@ -295,11 +197,13 @@ class SimConfig:
 
     # --- Network Topology Parameters ---
     use_network_topology: bool = True
-    base_connections: int = 15  # Average connections for a normal user
-    max_connections: int = 500  # Cap on connections for elite influencers
-    homophily_strength: float = 2.0  # How strongly they prefer similar agents
-    triadic_closure_prob: float = 0.2 # Stage 2: Community Cohesion
-    triadic_closure_iterations: int = 1
+    base_connections: int = 15
+    max_connections: int = 500
+    homophily_strength: float = 6.0  # Increased from 2.0 to ensure strong echo chambers
+    influence_bias_exp: float = 0.4  # Controls how much influencers bridge clusters
+    triadic_closure_prob: float = 0.2
+    triadic_closure_iterations: int = 2
+    triadic_closure_homophily_threshold: float = 0.5  # Only close friends of friends become friends
 
     # --- Society Evolution ---
     enable_evolution: bool = True

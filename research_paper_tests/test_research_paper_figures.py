@@ -214,6 +214,7 @@ def test_generate_research_paper_summary_figure(tmp_path):
     consensus_society = prepare_society_for_debug(
         consensus_config, output_dir=str(tmp_path / "consensus"), evolve=False
     )
+    assert consensus_society.adjacency_matrix is not None
     consensus_world = torch.zeros(1, 12)
     consensus_world[0, DIMENSION_INDICES["Physical_Safety"]] = -0.5
     baseline_consensus_config = clone_sim_config(
@@ -305,6 +306,8 @@ def test_generate_research_paper_summary_figure(tmp_path):
     high_society = prepare_society_for_debug(
         high_homophily, output_dir=str(tmp_path / "high_h"), evolve=False
     )
+    assert low_society.adjacency_matrix is not None
+    assert high_society.adjacency_matrix is not None
     axes[6].bar(
         ["Low", "High"],
         [

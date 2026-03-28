@@ -65,25 +65,28 @@ class Validator:
 
     def map_plutchik_to_sentiment(self, emotion_probs_8dim):
         e = dict(zip(EMOTION_LABELS, emotion_probs_8dim))
+
+        # --- FIX: Balanced Sentiment Mapping ---
+        # Average the probabilities to prevent bias from having more negative emotions than positive
         neg = (
             e.get("Fear", 0)
             + e.get("Sadness", 0)
             + e.get("Disgust", 0)
             + e.get("Anger", 0)
-        )
+        ) / 4.0
+
         neu = (
             e.get("Surprise", 0)
-            + (0.5 * e.get("Anticipation", 0))
-            + (0.2 * e.get("Trust", 0))
-        )
+            + e.get("Anticipation", 0)
+        ) / 2.0
+
         pos = (
             e.get("Joy", 0)
-            + (0.8 * e.get("Trust", 0))
-            + (0.5 * e.get("Anticipation", 0))
-        )
+            + e.get("Trust", 0)
+        ) / 2.0
+
         total = neg + neu + pos + 1e-9
         return np.array([neg / total, neu / total, pos / total])
-
     def calculate_divergence(self, system_probs_8dim, baseline_probs):
         q_baseline = np.array(baseline_probs)
         p_system = self.map_plutchik_to_sentiment(system_probs_8dim)

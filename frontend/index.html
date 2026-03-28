@@ -397,6 +397,16 @@
                                 </svg>
                             </button>
                         </div>
+                        <div class="toggle-grid margin-y-12">
+                            <button
+                                class="toggle-btn active"
+                                id="tog-selective-exposure"
+                                onclick="this.classList.toggle('active')"
+                                data-tooltip="Enable soft selective exposure instead of hard blocking."
+                            >
+                                Selective Exposure
+                            </button>
+                        </div>
                         <div class="sidebar-grid">
                             <div class="sidebar-field">
                                 <label data-tooltip="Interaction strength between different world dimensions.">Cross Dim</label
@@ -441,6 +451,84 @@
                                 />
                             </div>
                         </div>
+                        <div class="sidebar-grid">
+                            <div class="sidebar-field">
+                                <label data-tooltip="Base tolerance before contradictory information is suppressed.">Base Tol</label
+                                ><input
+                                    type="number"
+                                    id="res-selective-base"
+                                    step="0.05"
+                                    value="-0.3"
+                                    class="sidebar-input"
+                                />
+                            </div>
+                            <div class="sidebar-field">
+                                <label data-tooltip="How much openness increases tolerance for contradiction.">Open Tol</label
+                                ><input
+                                    type="number"
+                                    id="res-selective-open"
+                                    step="0.05"
+                                    value="0.4"
+                                    class="sidebar-input"
+                                />
+                            </div>
+                        </div>
+                        <div class="sidebar-grid">
+                            <div class="sidebar-field">
+                                <label data-tooltip="Soft-gate sharpness for selective exposure.">Filter Gain</label
+                                ><input
+                                    type="number"
+                                    id="res-selective-gain"
+                                    step="0.5"
+                                    value="8.0"
+                                    class="sidebar-input"
+                                />
+                            </div>
+                            <div class="sidebar-field">
+                                <label data-tooltip="Maximum suppression applied by selective exposure.">Max Supp</label
+                                ><input
+                                    type="number"
+                                    id="res-selective-max"
+                                    step="0.05"
+                                    value="0.85"
+                                    class="sidebar-input"
+                                />
+                            </div>
+                        </div>
+                        <div class="sidebar-grid">
+                            <div class="sidebar-field">
+                                <label data-tooltip="Smooth threshold sharpness for small relevance values.">Thresh Gain</label
+                                ><input
+                                    type="number"
+                                    id="res-threshold-gain"
+                                    step="1"
+                                    value="18.0"
+                                    class="sidebar-input"
+                                />
+                            </div>
+                            <div class="sidebar-field">
+                                <label data-tooltip="Minimum relevance energy required for engagement.">Engage Thresh</label
+                                ><input
+                                    type="number"
+                                    id="res-engagement-threshold"
+                                    step="0.01"
+                                    value="0.15"
+                                    class="sidebar-input"
+                                />
+                            </div>
+                        </div>
+                        <div class="sidebar-grid">
+                            <div class="sidebar-field">
+                                <label data-tooltip="Sharpness of the final engagement sigmoid.">Engage Gain</label
+                                ><input
+                                    type="number"
+                                    id="res-engagement-gain"
+                                    step="0.5"
+                                    value="10.0"
+                                    class="sidebar-input"
+                                />
+                            </div>
+                        </div>
                     </div>
 
                     <div class="config-section">
@@ -471,6 +559,18 @@
                                     id="res-triadic-iter"
                                     step="1"
                                     value="1"
+                                    class="sidebar-input"
+                                />
+                            </div>
+                        </div>
+                        <div class="sidebar-grid">
+                            <div class="sidebar-field">
+                                <label data-tooltip="How strongly worldview similarity shapes candidate selection.">Homophily</label
+                                ><input
+                                    type="number"
+                                    id="res-homophily"
+                                    step="0.1"
+                                    value="2.0"
                                     class="sidebar-input"
                                 />
                             </div>
@@ -693,6 +793,40 @@
                                 />
                             </div>
                         </div>
+                        <div class="sidebar-grid">
+                            <div class="sidebar-field">
+                                <label data-tooltip="Number of dimensions the algorithm can amplify per pass.">Top K</label
+                                ><input
+                                    type="number"
+                                    id="res-algo-topk"
+                                    step="1"
+                                    value="2"
+                                    class="sidebar-input"
+                                />
+                            </div>
+                            <div class="sidebar-field">
+                                <label data-tooltip="Minimum magnitude required before a dimension can be amplified.">Active Floor</label
+                                ><input
+                                    type="number"
+                                    id="res-algo-active"
+                                    step="0.01"
+                                    value="0.05"
+                                    class="sidebar-input"
+                                />
+                            </div>
+                        </div>
+                        <div class="sidebar-grid">
+                            <div class="sidebar-field">
+                                <label data-tooltip="Maximum per-dimension change applied by amplification.">Max Delta</label
+                                ><input
+                                    type="number"
+                                    id="res-algo-max-delta"
+                                    step="0.01"
+                                    value="0.2"
+                                    class="sidebar-input"
+                                />
+                            </div>
+                        </div>
                     </div>
                     <div class="config-section">
                         <div class="section-header">
@@ -724,6 +858,28 @@
                                     id="res-dist-neur"
                                     step="0.1"
                                     value="0.6"
+                                    class="sidebar-input"
+                                />
+                            </div>
+                        </div>
+                        <div class="sidebar-grid">
+                            <div class="sidebar-field">
+                                <label data-tooltip="Relative cap on per-dimension distortion.">Rel Cap</label
+                                ><input
+                                    type="number"
+                                    id="res-dist-rel-cap"
+                                    step="0.05"
+                                    value="1.1"
+                                    class="sidebar-input"
+                                />
+                            </div>
+                            <div class="sidebar-field">
+                                <label data-tooltip="Absolute cap on per-dimension distortion.">Abs Cap</label
+                                ><input
+                                    type="number"
+                                    id="res-dist-abs-cap"
+                                    step="0.05"
+                                    value="0.5"
                                     class="sidebar-input"
                                 />
                             </div>

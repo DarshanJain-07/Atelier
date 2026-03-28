@@ -156,6 +156,72 @@ window.updateRun = (id, field, value) => {
 
 window.debouncedUpdateRun = debounce(window.updateRun, 50);
 
+function readFloat(id, fallback) {
+  return parseFloat(document.getElementById(id)?.value || fallback);
+}
+
+function readInt(id, fallback) {
+  return parseInt(document.getElementById(id)?.value || fallback, 10);
+}
+
+function isToggleActive(id, fallback = false) {
+  return document.getElementById(id)?.classList.contains("active") ?? fallback;
+}
+
+function getResearcherSettings() {
+  return {
+    cross_dim_interaction_strength: readFloat("res-cross-dim", 0.3),
+    threat_sensitivity_gain: readFloat("res-threat-sens", 1.5),
+    k_processing_tanh_gain: readFloat("res-k-process", 1.5),
+    relevance_importance_weight: readFloat("res-rel-imp", 0.7),
+    relevance_base_weight: readFloat("res-rel-base", 0.3),
+    threat_amplifier_gain: readFloat("res-threat-amp", 1.5),
+    stress_neurotic_amplification: readFloat("res-stress-neur", 1.5),
+    stress_openness_reduction: readFloat("res-stress-open", 0.5),
+    stress_extraversion_boost: readFloat("res-stress-ext", 0.7),
+    outrage_gain: readFloat("res-outrage", 8.0),
+    max_viral_multiplier: readFloat("res-viral", 10.0),
+    saturation_midpoint: readFloat("res-sat", 0.5),
+    distortion_max_noise: readFloat("res-dist-max", 0.4),
+    distortion_neurotic_gain: readFloat("res-dist-neur", 0.6),
+    distortion_relative_cap: readFloat("res-dist-rel-cap", 1.1),
+    distortion_absolute_cap: readFloat("res-dist-abs-cap", 0.5),
+    evolution_generations: readInt("res-evo-gen", 10),
+    inheritance_fraction: readFloat("res-evo-inh", 0.7),
+    shock_frequency: readFloat("res-evo-shock-freq", 0.1),
+    shock_magnitude: readFloat("res-evo-shock-mag", 0.2),
+    algo_sample_size: readFloat("res-algo-sample", 0.1),
+    algo_top_k: readInt("res-algo-topk", 2),
+    algo_min_active_value: readFloat("res-algo-active", 0.05),
+    algo_max_delta: readFloat("res-algo-max-delta", 0.2),
+    algo_exaggeration_factor: readFloat("res-algo-exagg", 1.5),
+    memory_decay_rate: readFloat("res-mem-decay", 0.7),
+    memory_desensitization_gain: readFloat("res-mem-desens", 0.5),
+    memory_trigger_stacking_gain: readFloat("res-mem-trigger", 1.2),
+    stewing_ticks: readInt("res-stew-ticks", 5),
+    stewing_self_retention: readFloat("res-stew-self", 0.6),
+    stewing_local_influence: readFloat("res-stew-local", 0.3),
+    stewing_viral_influence: readFloat("res-stew-viral", 0.1),
+    perception_social_consensus_gain: readFloat("res-consensus", 0.25),
+    triadic_closure_prob: readFloat("res-triadic-prob", 0.2),
+    triadic_closure_iterations: readInt("res-triadic-iter", 1),
+    homophily_strength: readFloat("res-homophily", 2.0),
+    personality_socialization_gain: readFloat("res-socialize", 0.05),
+    use_granovetter_thresholds: isToggleActive("tog-granovetter", true),
+    granovetter_threshold_mean: readFloat("res-gran-mean", 0.25),
+    granovetter_threshold_std: readFloat("res-gran-std", 0.15),
+    memory_social_rehearsal_gain: readFloat("res-mem-rehearsal", 0.4),
+    use_selective_exposure: isToggleActive("tog-selective-exposure", true),
+    selective_exposure_base_tolerance: readFloat("res-selective-base", -0.3),
+    selective_exposure_openness_factor: readFloat("res-selective-open", 0.4),
+    selective_exposure_gain: readFloat("res-selective-gain", 8.0),
+    selective_exposure_max_suppression: readFloat("res-selective-max", 0.85),
+    threshold_gain: readFloat("res-threshold-gain", 18.0),
+    engagement_threshold: readFloat("res-engagement-threshold", 0.15),
+    engagement_gain: readFloat("res-engagement-gain", 10.0),
+  };
+}
+
 document.getElementById("btn-add-run").addEventListener("click", () => {
   if (batchRuns.length >= 6) return;
   
@@ -179,97 +245,14 @@ document.getElementById("btn-add-run").addEventListener("click", () => {
         use_algorithmic_amplification: document.getElementById("tog-algo-amp").classList.contains("active"),
         use_network_topology: document.getElementById("tog-network").classList.contains("active"),
         enable_evolution: document.getElementById("tog-evolution").classList.contains("active"),
-        // researcher defaults (can be expanded to read from UI if needed)
-        cross_dim_interaction_strength: parseFloat(document.getElementById("res-cross-dim")?.value || 0.3),
-        threat_sensitivity_gain: parseFloat(document.getElementById("res-threat-sens")?.value || 1.5),
-        k_processing_tanh_gain: parseFloat(document.getElementById("res-k-process")?.value || 1.5),
-        relevance_importance_weight: parseFloat(document.getElementById("res-rel-imp")?.value || 0.7),
-        relevance_base_weight: parseFloat(document.getElementById("res-rel-base")?.value || 0.3),
-        threat_amplifier_gain: parseFloat(document.getElementById("res-threat-amp")?.value || 1.5),
-        stress_neurotic_amplification: parseFloat(document.getElementById("res-stress-neur")?.value || 1.5),
-        stress_openness_reduction: parseFloat(document.getElementById("res-stress-open")?.value || 0.5),
-        stress_extraversion_boost: parseFloat(document.getElementById("res-stress-ext")?.value || 0.7),
-        outrage_gain: parseFloat(document.getElementById("res-outrage")?.value || 5.0),
-        max_viral_multiplier: parseFloat(document.getElementById("res-viral")?.value || 10.0),
-        saturation_midpoint: parseFloat(document.getElementById("res-sat")?.value || 0.5),
-        distortion_max_noise: parseFloat(document.getElementById("res-dist-max")?.value || 0.4),
-        distortion_neurotic_gain: parseFloat(document.getElementById("res-dist-neur")?.value || 0.6),
-        evolution_generations: parseInt(document.getElementById("res-evo-gen")?.value || 10),
-        inheritance_fraction: parseFloat(document.getElementById("res-evo-inh")?.value || 0.7),
-        shock_frequency: parseFloat(document.getElementById("res-evo-shock-freq")?.value || 0.1),
-        shock_magnitude: parseFloat(document.getElementById("res-evo-shock-mag")?.value || 0.2),
-        algo_sample_size: parseFloat(document.getElementById("res-algo-sample")?.value || 0.1),
-        algo_exaggeration_factor: parseFloat(document.getElementById("res-algo-exagg")?.value || 1.5),
-        memory_decay_rate: parseFloat(document.getElementById("res-mem-decay")?.value || 0.7),
-        memory_desensitization_gain: parseFloat(document.getElementById("res-mem-desens")?.value || 0.5),
-        memory_trigger_stacking_gain: parseFloat(document.getElementById("res-mem-trigger")?.value || 1.2),
-        stewing_ticks: parseInt(document.getElementById("res-stew-ticks")?.value || 5),
-        stewing_self_retention: parseFloat(document.getElementById("res-stew-self")?.value || 0.6),
-        stewing_local_influence: parseFloat(document.getElementById("res-stew-local")?.value || 0.3),
-        stewing_viral_influence: parseFloat(document.getElementById("res-stew-viral")?.value || 0.1),
-        perception_social_consensus_gain: parseFloat(document.getElementById("res-consensus")?.value || 0.25),
-        triadic_closure_prob: parseFloat(document.getElementById("res-triadic-prob")?.value || 0.2),
-        triadic_closure_iterations: parseInt(document.getElementById("res-triadic-iter")?.value || 1),
-        personality_socialization_gain: parseFloat(document.getElementById("res-socialize")?.value || 0.05),
-        use_granovetter_thresholds: document.getElementById("tog-granovetter")?.classList.contains("active"),
-        granovetter_threshold_mean: parseFloat(document.getElementById("res-gran-mean")?.value || 0.25),
-        granovetter_threshold_std: parseFloat(document.getElementById("res-gran-std")?.value || 0.15),
-        memory_social_rehearsal_gain: parseFloat(document.getElementById("res-mem-rehearsal")?.value || 0.4),
+        ...getResearcherSettings(),
     };
   }
 
   batchRuns.push({
     id: Date.now(),
+    ...defaults,
     seed: defaults.seed || 42,
-    temperature: defaults.temperature,
-    emotion_temperature: defaults.emotion_temperature,
-    panic_threshold: defaults.panic_threshold,
-    region: defaults.region,
-    social_class: defaults.social_class,
-    agent_count: defaults.agent_count,
-    use_distortion: defaults.use_distortion,
-    use_pressure: defaults.use_pressure,
-    use_maslow: defaults.use_maslow,
-    use_power_law: defaults.use_power_law,
-    use_agent_memory: defaults.use_agent_memory,
-    use_algorithmic_amplification: defaults.use_algorithmic_amplification,
-    use_network_topology: defaults.use_network_topology,
-    enable_evolution: defaults.enable_evolution,
-    algo_sample_size: defaults.algo_sample_size,
-    algo_exaggeration_factor: defaults.algo_exaggeration_factor,
-    memory_decay_rate: defaults.memory_decay_rate,
-    memory_desensitization_gain: defaults.memory_desensitization_gain,
-    memory_trigger_stacking_gain: defaults.memory_trigger_stacking_gain,
-    stewing_ticks: defaults.stewing_ticks,
-    stewing_self_retention: defaults.stewing_self_retention,
-    stewing_local_influence: defaults.stewing_local_influence,
-    stewing_viral_influence: defaults.stewing_viral_influence,
-    perception_social_consensus_gain: defaults.perception_social_consensus_gain,
-    triadic_closure_prob: defaults.triadic_closure_prob,
-    triadic_closure_iterations: defaults.triadic_closure_iterations,
-    personality_socialization_gain: defaults.personality_socialization_gain,
-    use_granovetter_thresholds: defaults.use_granovetter_thresholds,
-    granovetter_threshold_mean: defaults.granovetter_threshold_mean,
-    granovetter_threshold_std: defaults.granovetter_threshold_std,
-    memory_social_rehearsal_gain: defaults.memory_social_rehearsal_gain,
-    cross_dim_interaction_strength: defaults.cross_dim_interaction_strength,
-    threat_sensitivity_gain: defaults.threat_sensitivity_gain,
-    k_processing_tanh_gain: defaults.k_processing_tanh_gain,
-    relevance_importance_weight: defaults.relevance_importance_weight,
-    relevance_base_weight: defaults.relevance_base_weight,
-    threat_amplifier_gain: defaults.threat_amplifier_gain,
-    stress_neurotic_amplification: defaults.stress_neurotic_amplification,
-    stress_openness_reduction: defaults.stress_openness_reduction,
-    stress_extraversion_boost: defaults.stress_extraversion_boost,
-    outrage_gain: defaults.outrage_gain,
-    max_viral_multiplier: defaults.max_viral_multiplier,
-    saturation_midpoint: defaults.saturation_midpoint,
-    distortion_max_noise: defaults.distortion_max_noise,
-    distortion_neurotic_gain: defaults.distortion_neurotic_gain,
-    evolution_generations: defaults.evolution_generations,
-    inheritance_fraction: defaults.inheritance_fraction,
-    shock_frequency: defaults.shock_frequency,
-    shock_magnitude: defaults.shock_magnitude,
   });
   renderBatchUI();
 });
@@ -816,169 +799,17 @@ async function runSimulation() {
     enable_evolution: document
       .getElementById("tog-evolution")
       .classList.contains("active"),
-    algo_sample_size: parseFloat(
-      document.getElementById("res-algo-sample")?.value || 0.1,
-    ),
-    algo_exaggeration_factor: parseFloat(
-      document.getElementById("res-algo-exagg")?.value || 1.5,
-    ),
-    memory_decay_rate: parseFloat(
-      document.getElementById("res-mem-decay")?.value || 0.7,
-    ),
-    memory_desensitization_gain: parseFloat(
-      document.getElementById("res-mem-desens")?.value || 0.5,
-    ),
-    memory_trigger_stacking_gain: parseFloat(
-      document.getElementById("res-mem-trigger")?.value || 1.2,
-    ),
-    stewing_ticks: parseInt(
-      document.getElementById("res-stew-ticks")?.value || 5,
-    ),
-    stewing_self_retention: parseFloat(
-      document.getElementById("res-stew-self")?.value || 0.6,
-    ),
-    stewing_local_influence: parseFloat(
-      document.getElementById("res-stew-local")?.value || 0.3,
-    ),
-    stewing_viral_influence: parseFloat(
-      document.getElementById("res-stew-viral")?.value || 0.1,
-    ),
-    perception_social_consensus_gain: parseFloat(
-        document.getElementById("res-consensus")?.value || 0.25,
-    ),
-    triadic_closure_prob: parseFloat(
-        document.getElementById("res-triadic-prob")?.value || 0.2,
-    ),
-    triadic_closure_iterations: parseInt(
-        document.getElementById("res-triadic-iter")?.value || 1,
-    ),
-    personality_socialization_gain: parseFloat(
-        document.getElementById("res-socialize")?.value || 0.05,
-    ),
-    use_granovetter_thresholds: document
-        .getElementById("tog-granovetter")
-        .classList.contains("active"),
-    granovetter_threshold_mean: parseFloat(
-        document.getElementById("res-gran-mean")?.value || 0.25,
-    ),
-    granovetter_threshold_std: parseFloat(
-        document.getElementById("res-gran-std")?.value || 0.15,
-    ),
-    memory_social_rehearsal_gain: parseFloat(
-        document.getElementById("res-mem-rehearsal")?.value || 0.4,
-    ),
-    cross_dim_interaction_strength: parseFloat(
-      document.getElementById("res-cross-dim")?.value || 0.3,
-    ),
-    threat_sensitivity_gain: parseFloat(
-      document.getElementById("res-threat-sens")?.value || 1.5,
-    ),
-    k_processing_tanh_gain: parseFloat(
-      document.getElementById("res-k-process")?.value || 1.5,
-    ),
-    relevance_importance_weight: parseFloat(
-      document.getElementById("res-rel-imp")?.value || 0.7,
-    ),
-    relevance_base_weight: parseFloat(
-      document.getElementById("res-rel-base")?.value || 0.3,
-    ),
-    threat_amplifier_gain: parseFloat(
-      document.getElementById("res-threat-amp")?.value || 1.5,
-    ),
-    stress_neurotic_amplification: parseFloat(
-      document.getElementById("res-stress-neur")?.value || 1.5,
-    ),
-    stress_openness_reduction: parseFloat(
-      document.getElementById("res-stress-open")?.value || 0.5,
-    ),
-    stress_extraversion_boost: parseFloat(
-      document.getElementById("res-stress-ext")?.value || 0.7,
-    ),
-    outrage_gain: parseFloat(
-      document.getElementById("res-outrage")?.value || 8.0,
-    ),
-    max_viral_multiplier: parseFloat(
-      document.getElementById("res-viral")?.value || 10.0,
-    ),
-    saturation_midpoint: parseFloat(
-      document.getElementById("res-sat")?.value || 0.5,
-    ),
-    distortion_max_noise: parseFloat(
-      document.getElementById("res-dist-max")?.value || 0.4,
-    ),
-    distortion_neurotic_gain: parseFloat(
-      document.getElementById("res-dist-neur")?.value || 0.6,
-    ),
-    evolution_generations: parseInt(
-      document.getElementById("res-evo-gen")?.value || 10,
-    ),
-    inheritance_fraction: parseFloat(
-      document.getElementById("res-evo-inh")?.value || 0.7,
-    ),
-    shock_frequency: parseFloat(
-      document.getElementById("res-evo-shock-freq")?.value || 0.1,
-    ),
-    shock_magnitude: parseFloat(
-      document.getElementById("res-evo-shock-mag")?.value || 0.2,
-    ),
+    ...getResearcherSettings(),
   };
 
   const payload = {
     news_text: inputVal,
     runs: [
       mainRun,
-      ...batchRuns.map((run) => ({
-        seed: run.seed,
-        temperature: run.temperature,
-        emotion_temperature: run.emotion_temperature,
-        panic_threshold: run.panic_threshold,
-        region: run.region,
-        social_class: run.social_class,
-        agent_count: run.agent_count,
-        use_distortion: run.use_distortion,
-        use_pressure: run.use_pressure,
-        use_maslow: run.use_maslow,
-        use_power_law: run.use_power_law,
-        use_agent_memory: run.use_agent_memory,
-        use_algorithmic_amplification: run.use_algorithmic_amplification,
-        use_network_topology: run.use_network_topology,
-        enable_evolution: run.enable_evolution,
-        algo_sample_size: run.algo_sample_size,
-        algo_exaggeration_factor: run.algo_exaggeration_factor,
-        memory_decay_rate: run.memory_decay_rate,
-        memory_desensitization_gain: run.memory_desensitization_gain,
-        memory_trigger_stacking_gain: run.memory_trigger_stacking_gain,
-        stewing_ticks: run.stewing_ticks,
-        stewing_self_retention: run.stewing_self_retention,
-        stewing_local_influence: run.stewing_local_influence,
-        stewing_viral_influence: run.stewing_viral_influence,
-        perception_social_consensus_gain: run.perception_social_consensus_gain,
-        triadic_closure_prob: run.triadic_closure_prob,
-        triadic_closure_iterations: run.triadic_closure_iterations,
-        personality_socialization_gain: run.personality_socialization_gain,
-        use_granovetter_thresholds: run.use_granovetter_thresholds,
-        granovetter_threshold_mean: run.granovetter_threshold_mean,
-        granovetter_threshold_std: run.granovetter_threshold_std,
-        memory_social_rehearsal_gain: run.memory_social_rehearsal_gain,
-        cross_dim_interaction_strength: run.cross_dim_interaction_strength,
-        threat_sensitivity_gain: run.threat_sensitivity_gain,
-        k_processing_tanh_gain: run.k_processing_tanh_gain,
-        relevance_importance_weight: run.relevance_importance_weight,
-        relevance_base_weight: run.relevance_base_weight,
-        threat_amplifier_gain: run.threat_amplifier_gain,
-        stress_neurotic_amplification: run.stress_neurotic_amplification,
-        stress_openness_reduction: run.stress_openness_reduction,
-        stress_extraversion_boost: run.stress_extraversion_boost,
-        outrage_gain: run.outrage_gain,
-        max_viral_multiplier: run.max_viral_multiplier,
-        saturation_midpoint: run.saturation_midpoint,
-        distortion_max_noise: run.distortion_max_noise,
-        distortion_neurotic_gain: run.distortion_neurotic_gain,
-        evolution_generations: run.evolution_generations,
-        inheritance_fraction: run.inheritance_fraction,
-        shock_frequency: run.shock_frequency,
-        shock_magnitude: run.shock_magnitude,
-      })),
+      ...batchRuns.map((run) => {
+        const { id, ...runPayload } = run;
+        return runPayload;
+      }),
     ],
   };
 

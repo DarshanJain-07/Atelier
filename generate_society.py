@@ -139,7 +139,7 @@ def generate_network_wealth(
 # ================================
 # Main Generator (Topology-First)
 # ================================
-def apply_triadic_closure(config: SimConfig, adj: torch.Tensor):
+def apply_triadic_closure(config: SimConfig, adj: torch.Tensor, device: torch.device):
     """
     Stage 2: Community Cohesion via Iterative Triadic Closure.
     Forms new edges between neighbors-of-neighbors (A->B, B->C => A->C).
@@ -152,6 +152,11 @@ def apply_triadic_closure(config: SimConfig, adj: torch.Tensor):
     iterations = getattr(config, "triadic_closure_iterations", 1)
     
     current_adj = adj.coalesce()
+
+    # Get features for similarity filtering
+    # We need to reach into the exposures/personalities
+    # This is a bit hacky but efficient
+    features_norm = getattr(config, "_features_norm_cache", None)
 
     for _ in range(iterations):
         # 1. Find neighbors-of-neighbors using sparse matrix multiplication
@@ -171,31 +176,44 @@ def apply_triadic_closure(config: SimConfig, adj: torch.Tensor):
         # We only want NEW edges
         mask_self = p2_indices[0] != p2_indices[1]
         
-        # To check existing edges efficiently, we can use a temporary sparse mask
-        # or just combine and let coalesce() handle duplicates (but we want to exclude them)
-        # A better way: use a small random sample of paths_2
-        
         # Sample based on triadic_closure_prob
-        sample_mask = torch.rand(len(p2_values)) < prob
+        sample_mask = torch.rand(len(p2_values), device=device) < prob
         valid_mask = mask_self & sample_mask
         
         if not valid_mask.any():
             break
             
-        new_indices = p2_indices[:, valid_mask]
-        # Assign a base weight for these new 'social' connections
-        # We use the average weight of existing connections to keep it balanced
-        new_values = torch.full((new_indices.shape[1],), current_adj.values().mean())
+        candidate_indices = p2_indices[:, valid_mask]
+        
+        if features_norm is not None:
+            # Assign weights based on actual similarity
+            src_features = features_norm[candidate_indices[0]]
+            dst_features = features_norm[candidate_indices[1]]
+            new_similarities = (src_features * dst_features).sum(dim=1)
+            
+            # Filter: Only keep new edges that meet a minimum homophily threshold
+            homophily_threshold = getattr(config, "triadic_closure_homophily_threshold", 0.45)
+            homophily_filter = new_similarities > homophily_threshold
+            
+            final_valid_mask = homophily_filter
+            if not final_valid_mask.any():
+                continue
+                
+            final_new_indices = candidate_indices[:, final_valid_mask]
+            final_new_values = new_similarities[final_valid_mask]
+        else:
+            # Fallback if no features available
+            final_new_indices = candidate_indices
+            final_new_values = torch.full((final_new_indices.shape[1],), current_adj.values().mean(), device=device)
         
         # 3. Merge with original backbone
-        combined_indices = torch.cat([current_adj.indices(), new_indices], dim=1)
-        combined_values = torch.cat([current_adj.values(), new_values])
+        combined_indices = torch.cat([current_adj.indices(), final_new_indices], dim=1)
+        combined_values = torch.cat([current_adj.values(), final_new_values])
         
-        current_adj = torch.sparse_coo_tensor(combined_indices, combined_values, size=(N, N)).coalesce()
+        current_adj = torch.sparse_coo_tensor(combined_indices, combined_values, size=(N, N), device=device).coalesce()
         
         # Cap connections to prevent exploding density
-        # (Optional, but safe for performance)
-        if current_adj._nnz() > N * config.max_connections:
+        if current_adj._nnz() > N * getattr(config, "max_connections", 100):
             break
 
     return current_adj
@@ -241,9 +259,24 @@ def create_topology(
         end = min(i + batch_size, N)
         batch_size_actual = end - i
         batch_features = features_norm[i:end]
+        
+        # Calculate raw cosine similarity [-1, 1]
         sim = torch.mm(batch_features, features_norm.T)
-        sim = torch.pow((sim + 1.0) / 2.0, getattr(config, "homophily_strength", 2.0))
-        prob_matrix = sim * inf_tensor.unsqueeze(0)
+        
+        # --- FIX: Echo Chambers Logic ---
+        # Only form edges if people are really close. 
+        # Shift similarity to [0, 1] and apply steep power law based on homophily strength.
+        h_strength = getattr(config, "homophily_strength", 4.0)
+        # clamp at 0 to prevent any negative similarity from forming connections
+        sim_clamped = torch.clamp(sim, min=0.0)
+        # Power law makes it so only very high similarity values survive
+        sim_exp = torch.pow(sim_clamped, h_strength * 2.0)
+        
+        # --- FIX: Modularity vs Influence ---
+        # Dampen the influence bias (Power Law) for backbone connections.
+        # If influencers have too much weight here, they bridge all clusters and destroy modularity.
+        inf_bias = torch.pow(inf_tensor, getattr(config, "influence_bias_exp", 0.5))
+        prob_matrix = sim_exp * inf_bias.unsqueeze(0)
 
         batch_indices = torch.arange(batch_size_actual, device=device)
         global_indices = batch_indices + i
@@ -256,6 +289,8 @@ def create_topology(
 
         prob_matrix = prob_matrix + 1e-9
         sampled_indices = torch.multinomial(prob_matrix, max_k, replacement=False)
+        
+        # Note: we use 'sim' (original similarity) for weights, not the exponential probs
         sampled_vals = torch.gather(sim, 1, sampled_indices)
 
         range_tensor = torch.arange(max_k, device=device).unsqueeze(0)
@@ -273,11 +308,18 @@ def create_topology(
 
     indices_tensor = torch.cat(indices_list, dim=1)
     values_tensor = torch.cat(values_list)
-    backbone_adj = torch.sparse_coo_tensor(indices_tensor, values_tensor, size=(N, N)).to(device)
+    backbone_adj = torch.sparse_coo_tensor(indices_tensor, values_tensor, size=(N, N), device=device)
+
+    # Cache features for triadic closure similarity check
+    setattr(config, "_features_norm_cache", features_norm)
 
     # --- Stage 2: Community Cohesion (Triadic Closure) ---
     print(f"Applying Triadic Closure (Stage 2)...")
-    final_adj = apply_triadic_closure(config, backbone_adj)
+    final_adj = apply_triadic_closure(config, backbone_adj, device)
+    
+    # Cleanup cache
+    if hasattr(config, "_features_norm_cache"):
+        delattr(config, "_features_norm_cache")
 
     # --- Final Normalization ---
     final_adj = final_adj.coalesce()

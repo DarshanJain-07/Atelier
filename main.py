@@ -94,8 +94,11 @@ class RunProfile(BaseModel):
     memory_social_rehearsal_gain: float = 0.4
 
     use_network_topology: bool = True
+    homophily_strength: float = 6.0
+    influence_bias_exp: float = 0.4
     triadic_closure_prob: float = 0.2
-    triadic_closure_iterations: int = 1
+    triadic_closure_iterations: int = 2
+    triadic_closure_homophily_threshold: float = 0.5
     use_granovetter_thresholds: bool = True
     granovetter_threshold_mean: float = 0.25
     granovetter_threshold_std: float = 0.15
@@ -386,7 +389,7 @@ def create_topology_for_debug(
 
 
 def apply_triadic_closure_for_debug(config: SimConfig, adjacency_matrix: torch.Tensor):
-    return apply_triadic_closure(clone_sim_config(config), adjacency_matrix)
+    return apply_triadic_closure(clone_sim_config(config), adjacency_matrix, adjacency_matrix.device)
 
 
 def run_debug_simulation(
@@ -566,8 +569,11 @@ def prepare_society_sync(run: RunProfile, run_output_dir: str):
         stewing_local_influence=run.stewing_local_influence,
         stewing_viral_influence=run.stewing_viral_influence,
         use_network_topology=run.use_network_topology,
+        homophily_strength=run.homophily_strength,
+        influence_bias_exp=run.influence_bias_exp,
         triadic_closure_prob=run.triadic_closure_prob,
         triadic_closure_iterations=run.triadic_closure_iterations,
+        triadic_closure_homophily_threshold=run.triadic_closure_homophily_threshold,
         use_granovetter_thresholds=run.use_granovetter_thresholds,
         granovetter_threshold_mean=run.granovetter_threshold_mean,
         granovetter_threshold_std=run.granovetter_threshold_std,

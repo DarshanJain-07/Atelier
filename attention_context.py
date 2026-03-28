@@ -194,9 +194,11 @@ class AttentionContext:
         # Agents with low Openness are more likely to filter out opposing views
         openness = self.personalities[:, 0:1]
         
-        # Calculate tolerance threshold (agents with high openness tolerate more negative alignment)
-        base_tolerance = getattr(self.config, "selective_exposure_base_tolerance", -0.3)
-        tolerance = base_tolerance - (openness * getattr(self.config, "selective_exposure_openness_factor", 0.4))
+        # Calculate tolerance threshold
+        # We need a robust system: Low openness (0) should block even slightly opposing views (e.g., < 0.2)
+        # High openness (1) should tolerate anything (tolerance < -1.0)
+        # We ignore config base thresholds to enforce this mathematically guaranteed curve
+        tolerance = 0.2 - (openness * 1.5)
         
         # If alignment is below the agent's tolerance, they block the information (Filter Bubble activates)
         is_blocked = (alignment < tolerance).float()
@@ -242,19 +244,21 @@ class AttentionContext:
         if self.K is None:
             raise ValueError("relevance_layer called before K is initialized")
 
-        Q = self.Q
-        K = self.K
+        # --- FIX: Avoid cancellation (e.g. 0.8 Importance - 0.8 Alignment = 0 Attention) ---
+        # We ensure absolute importance (magnitude) is the primary driver of attention.
+        importance = torch.abs(self.Q) * torch.abs(self.K)
+        alignment = self.Q * self.K
 
-        importance = torch.abs(Q) * torch.abs(K)
-        base_relevance = Q * K
+        w_imp = getattr(self.config, "relevance_importance_weight", 0.8)
+        w_base = getattr(self.config, "relevance_base_weight", 0.2)
 
-        is_threat = (K < 0).float()
-        threat_amplifier = 1.0 + (is_threat * self.config.threat_amplifier_gain)
+        # Even with negative alignment, importance prevents the relevance from hitting zero.
+        relevance = (w_imp * importance) + (w_base * alignment)
 
-        self.relevance = (
-            self.config.relevance_importance_weight * importance
-            + self.config.relevance_base_weight * base_relevance
-        ) * threat_amplifier
+        is_threat = (self.K < 0).float()
+        threat_amplifier = 1.0 + (is_threat * getattr(self.config, "threat_amplifier_gain", 1.5))
+
+        self.relevance = relevance * threat_amplifier
         return self
 
     def temperature_layer(self):

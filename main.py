@@ -115,6 +115,8 @@ class RunProfile(BaseModel):
     cross_dim_interaction_strength: float = 0.3
     threat_sensitivity_gain: float = 1.5
     k_processing_tanh_gain: float = 1.5
+    attention_residual_gain: float = 0.35
+    attention_modulated_gain: float = 1.0
     relevance_importance_weight: float = 0.7
     relevance_base_weight: float = 0.3
     threat_amplifier_gain: float = 1.5
@@ -131,6 +133,8 @@ class RunProfile(BaseModel):
     distortion_max_noise: float = 0.4
     distortion_neurotic_gain: float = 0.6
     perception_social_consensus_gain: float = 0.25  # New 2-Stage Perception
+    affinity_min_strength: float = 0.01
+    normalize_affinities_by_mean: bool = True
 
     # Researcher (Evolution)
     evolution_generations: int = 10
@@ -546,6 +550,8 @@ def prepare_society_sync(run: RunProfile, run_output_dir: str):
         cross_dim_interaction_strength=run.cross_dim_interaction_strength,
         threat_sensitivity_gain=run.threat_sensitivity_gain,
         k_processing_tanh_gain=run.k_processing_tanh_gain,
+        attention_residual_gain=run.attention_residual_gain,
+        attention_modulated_gain=run.attention_modulated_gain,
         relevance_importance_weight=run.relevance_importance_weight,
         relevance_base_weight=run.relevance_base_weight,
         threat_amplifier_gain=run.threat_amplifier_gain,
@@ -558,6 +564,8 @@ def prepare_society_sync(run: RunProfile, run_output_dir: str):
         distortion_max_noise=run.distortion_max_noise,
         distortion_neurotic_gain=run.distortion_neurotic_gain,
         perception_social_consensus_gain=run.perception_social_consensus_gain,
+        affinity_min_strength=run.affinity_min_strength,
+        normalize_affinities_by_mean=run.normalize_affinities_by_mean,
         evolution_generations=run.evolution_generations,
         inheritance_fraction=run.inheritance_fraction,
         shock_frequency=run.shock_frequency,

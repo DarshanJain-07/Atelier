@@ -423,9 +423,19 @@ def generate_society(config: SimConfig):
     non_wealth_mask[wealth_idx] = False
     exposures[:, non_wealth_mask] = torch.tanh(exposures[:, non_wealth_mask])
     
-    cognitive_bandwidth = torch.clamp(torch.randn(config.num_agents, 1) * 0.2 + 0.55, min=0.1, max=1.0)
-    positive_affinities = torch.clamp(torch.abs(raw_affinities), min=0.01)
-    normalized_affinities = positive_affinities / positive_affinities.sum(dim=1, keepdim=True)
+    cognitive_bandwidth = torch.clamp(
+        torch.randn(config.num_agents, 1) * 0.2 + 0.55, min=0.1, max=1.0
+    )
+    positive_affinities = torch.clamp(
+        torch.abs(raw_affinities), min=config.affinity_min_strength
+    )
+    if getattr(config, "normalize_affinities_by_mean", True):
+        mean_affinity = positive_affinities.mean(dim=1, keepdim=True)
+        normalized_affinities = positive_affinities / torch.clamp(
+            mean_affinity, min=1e-6
+        )
+    else:
+        normalized_affinities = positive_affinities
     affinities = normalized_affinities * cognitive_bandwidth
 
     df_metadata = pd.DataFrame({

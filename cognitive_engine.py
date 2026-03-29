@@ -290,7 +290,10 @@ class CognitiveEngine:
         # ---------------------------------
         # 6. Context Construction
         # ---------------------------------
-        context_vector = perceived_world * attention_weights
+        residual_gain = getattr(self.config, "attention_residual_gain", 0.35)
+        modulated_gain = getattr(self.config, "attention_modulated_gain", 1.0)
+        context_scale = residual_gain + (attention_weights * modulated_gain)
+        context_vector = perceived_world * context_scale
         context_vector = torch.clamp(context_vector, -2.0, 2.0)
 
         return context_vector, attention_weights, engagement_scores

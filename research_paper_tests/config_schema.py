@@ -120,6 +120,8 @@ def live_run_profile_defaults() -> dict[str, Any]:
             ],
             "threat_sensitivity_gain": sim_defaults["threat_sensitivity_gain"],
             "k_processing_tanh_gain": sim_defaults["k_processing_tanh_gain"],
+            "attention_residual_gain": sim_defaults["attention_residual_gain"],
+            "attention_modulated_gain": sim_defaults["attention_modulated_gain"],
             "relevance_importance_weight": sim_defaults[
                 "relevance_importance_weight"
             ],
@@ -139,6 +141,10 @@ def live_run_profile_defaults() -> dict[str, Any]:
             "distortion_neurotic_gain": sim_defaults["distortion_neurotic_gain"],
             "perception_social_consensus_gain": sim_defaults[
                 "perception_social_consensus_gain"
+            ],
+            "affinity_min_strength": sim_defaults["affinity_min_strength"],
+            "normalize_affinities_by_mean": sim_defaults[
+                "normalize_affinities_by_mean"
             ],
             "evolution_generations": sim_defaults["evolution_generations"],
             "inheritance_fraction": sim_defaults["inheritance_fraction"],

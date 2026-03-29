@@ -127,6 +127,8 @@ class SimConfig:
     distortion_beta_b: float = 5.0
     distortion_neurotic_gain: float = 0.6
     distortion_min_alpha: float = 0.01
+    affinity_min_strength: float = 0.01
+    normalize_affinities_by_mean: bool = True
 
     use_engagement_gate: bool = True
     engagement_threshold: float = (
@@ -157,6 +159,8 @@ class SimConfig:
     cross_dim_interaction_strength: float = 0.3
     threat_sensitivity_gain: float = 1.5
     k_processing_tanh_gain: float = 1.5
+    attention_residual_gain: float = 0.35
+    attention_modulated_gain: float = 1.0
 
     relevance_importance_weight: float = 0.7
     relevance_base_weight: float = 0.3

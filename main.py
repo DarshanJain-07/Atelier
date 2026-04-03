@@ -13,7 +13,6 @@ from typing import Any, List, Tuple, cast
 import numpy as np
 import pandas as pd
 import torch
-import torch.nn.functional as F
 import uvicorn
 from dotenv import load_dotenv
 from fastapi import BackgroundTasks, FastAPI, HTTPException
@@ -33,7 +32,6 @@ from schema import (
     DIMENSION_INDICES,
     EMOTION_LABELS,
     PERSONALITY_CORRELATIONS,
-    PSYCH_PROJECTION,
     SimConfig,
 )
 from society_evolution import SocietyEvolution
@@ -292,19 +290,11 @@ def distort_world_signal(
     adjacency_matrix: Any | None = None,
 ) -> torch.Tensor:
     engine = CognitiveEngine(clone_sim_config(config))
-    distorted_world = engine.distort_signal(world_tensor_raw.squeeze(), personalities)
-
-    if (
-        adjacency_matrix is not None
-        and getattr(config, "perception_social_consensus_gain", 0.0) > 0
-    ):
-        local_consensus = torch.sparse.mm(
-            adjacency_matrix.coalesce().to(distorted_world.device), distorted_world
-        )
-        gain = config.perception_social_consensus_gain
-        distorted_world = (1.0 - gain) * distorted_world + gain * local_consensus
-
-    return distorted_world
+    return engine.perceive_world(
+        world_tensor_raw,
+        personalities,
+        adjacency_matrix=adjacency_matrix,
+    )
 
 
 def run_cognitive_cycle(
@@ -349,9 +339,8 @@ def project_emotions(
     config: SimConfig,
     context_vector: torch.Tensor,
 ) -> torch.Tensor:
-    projection_matrix = PSYCH_PROJECTION.to(context_vector.device)
-    logits = torch.matmul(context_vector, projection_matrix)
-    return F.softmax(logits / max(0.01, config.emotion_temperature), dim=1)
+    engine = CognitiveEngine(clone_sim_config(config))
+    return engine.project_emotions(context_vector)
 
 
 def aggregate_social_state(
@@ -413,19 +402,20 @@ def run_debug_simulation(
 ) -> DebugSimulationResult:
     effective_config = clone_sim_config(config)
     active_society = society or prepare_society_for_debug(effective_config)
+    cog_engine = CognitiveEngine(clone_sim_config(active_society.config))
+    phys_engine = SocialPhysicsEngine(clone_sim_config(active_society.config))
     memory = active_society.memory.clone()
     input_world_tensor = world_tensor_raw.clone()
 
     final_world_tensor = input_world_tensor
-    context_vector, attention_weights, engagement_scores = run_cognitive_cycle(
-        active_society.config,
-        final_world_tensor,
-        urgency,
-        is_personal,
-        active_society.exposures,
-        active_society.personalities,
-        active_society.affinities,
-        memory=memory,
+    context_vector, attention_weights, engagement_scores = cog_engine.run(
+        world_tensor_raw=final_world_tensor,
+        urgency=urgency,
+        is_personal=is_personal,
+        exposures=active_society.exposures,
+        personalities=active_society.personalities,
+        agent_affinities=active_society.affinities,
+        agent_memory=memory,
         adjacency_matrix=active_society.adjacency_matrix,
     )
 
@@ -437,15 +427,14 @@ def run_debug_simulation(
                 * getattr(active_society.config, "algo_sample_size", 0.1)
             ),
         )
-        _, ab_attention, ab_engagement = run_cognitive_cycle(
-            active_society.config,
-            input_world_tensor,
-            urgency,
-            is_personal,
-            active_society.exposures[:sample_size],
-            active_society.personalities[:sample_size],
-            active_society.affinities[:sample_size],
-            memory=memory[:sample_size],
+        _, ab_attention, ab_engagement = cog_engine.run(
+            world_tensor_raw=input_world_tensor,
+            urgency=urgency,
+            is_personal=is_personal,
+            exposures=active_society.exposures[:sample_size],
+            personalities=active_society.personalities[:sample_size],
+            agent_affinities=active_society.affinities[:sample_size],
+            agent_memory=memory[:sample_size],
             adjacency_matrix=subset_adjacency(
                 active_society.adjacency_matrix,
                 torch.arange(sample_size, device=active_society.exposures.device),
@@ -466,21 +455,19 @@ def run_debug_simulation(
                 final_world_tensor[0, dim_idx] = -0.3
 
         final_world_tensor = torch.clamp(final_world_tensor, -1.0, 1.0)
-        context_vector, attention_weights, engagement_scores = run_cognitive_cycle(
-            active_society.config,
-            final_world_tensor,
-            urgency,
-            is_personal,
-            active_society.exposures,
-            active_society.personalities,
-            active_society.affinities,
-            memory=memory,
+        context_vector, attention_weights, engagement_scores = cog_engine.run(
+            world_tensor_raw=final_world_tensor,
+            urgency=urgency,
+            is_personal=is_personal,
+            exposures=active_society.exposures,
+            personalities=active_society.personalities,
+            agent_affinities=active_society.affinities,
+            agent_memory=memory,
             adjacency_matrix=active_society.adjacency_matrix,
         )
 
-    final_emotions = project_emotions(active_society.config, context_vector)
-    social_state = aggregate_social_state(
-        active_society.config,
+    final_emotions = cog_engine.project_emotions(context_vector)
+    social_state = phys_engine.aggregate_society(
         final_emotions,
         active_society.metadata["Influence"].to_numpy(dtype=np.float32),
         engagement_scores=engagement_scores,
@@ -493,10 +480,9 @@ def run_debug_simulation(
         conf = float(social_state.get("confidence", 0.0))
         act_ratio = float(social_state.get("acting_ratio", 0.0))
         rehearsal_factor = (conf + act_ratio) / 2.0
-        active_society.memory = consolidate_agent_memory(
-            active_society.config,
-            memory,
-            context_vector,
+        active_society.memory = cog_engine.consolidate_memory(
+            agent_memory=memory,
+            context_vector=context_vector,
             social_rehearsal_factor=rehearsal_factor,
         )
 
@@ -1009,16 +995,7 @@ async def run_simulation(req: SimulationRequest, background_tasks: BackgroundTas
                 adjacency_matrix=adjacency_matrix,
             )
 
-            device = context_vector.device
-            projection_matrix = PSYCH_PROJECTION.to(device)
-            final_emotions = torch.matmul(context_vector, projection_matrix)
-
-            # --- SHARPENING ---
-            # Use Softmax with temperature to amplify the primary emotion of each agent.
-            # This ensures the Physics Engine detects a clear 'Dominant Emotion'.
-            final_emotions = F.softmax(
-                final_emotions / max(0.01, config.emotion_temperature), dim=1
-            )
+            final_emotions = cog_engine.project_emotions(context_vector)
 
             # 6. Social Physics
             phys_engine = SocialPhysicsEngine(config)
@@ -1059,10 +1036,7 @@ async def run_simulation(req: SimulationRequest, background_tasks: BackgroundTas
                     adjacency_matrix=adjacency_matrix,
                 )
 
-                final_emotions_2 = torch.matmul(context_vector_2, projection_matrix)
-                final_emotions_2 = F.softmax(
-                    final_emotions_2 / max(0.01, config.emotion_temperature), dim=1
-                )
+                final_emotions_2 = cog_engine.project_emotions(context_vector_2)
 
                 # Re-aggregate society with the new emotional state
                 social_state = phys_engine.aggregate_society(

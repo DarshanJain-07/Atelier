@@ -4,7 +4,7 @@ import torch
 import torch.nn.functional as F
 
 from attention_context import AttentionContext
-from schema import SimConfig
+from schema import PSYCH_PROJECTION, SimConfig
 
 
 class CognitiveEngine:
@@ -59,6 +59,42 @@ class CognitiveEngine:
         distorted = event_signal.unsqueeze(0) + alpha * noise
 
         return torch.clamp(distorted, -1.5, 1.5)
+
+    def apply_social_consensus(
+        self,
+        distorted_world: torch.Tensor,
+        adjacency_matrix: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
+        if (
+            adjacency_matrix is None
+            or getattr(self.config, "perception_social_consensus_gain", 0.0) <= 0
+        ):
+            return distorted_world
+
+        social_gain = self.config.perception_social_consensus_gain
+        topology = adjacency_matrix.coalesce().to(distorted_world.device)
+        local_consensus = torch.sparse.mm(topology, distorted_world)
+        return (1.0 - social_gain) * distorted_world + social_gain * local_consensus
+
+    def perceive_world(
+        self,
+        world_tensor_raw: torch.Tensor,
+        personalities: torch.Tensor,
+        adjacency_matrix: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
+        distorted_world = self.distort_signal(
+            world_tensor_raw.squeeze().to(personalities.device),
+            personalities,
+        )
+        return self.apply_social_consensus(distorted_world, adjacency_matrix)
+
+    def project_emotions(self, context_vector: torch.Tensor) -> torch.Tensor:
+        projection_matrix = PSYCH_PROJECTION.to(context_vector.device)
+        logits = torch.matmul(context_vector, projection_matrix)
+        return F.softmax(
+            logits / max(0.01, self.config.emotion_temperature),
+            dim=1,
+        )
 
     def calculate_attention(
         self,
@@ -204,25 +240,11 @@ class CognitiveEngine:
         # ---------------------------------
         # 1. Stage 1: Individual Signal Distortion
         # ---------------------------------
-        distorted_world = self.distort_signal(
-            world_tensor_raw.squeeze().to(device),
+        distorted_world = self.perceive_world(
+            world_tensor_raw,
             personalities,
+            adjacency_matrix=adjacency_matrix,
         )  # (N,12)
-
-        # ---------------------------------
-        # 2. Stage 2: Socially Constructed Reality (Consensus)
-        # ---------------------------------
-        # Agents align their misinterpretations with their neighbors.
-        # This simulates the "Telephone Game" reaching local consensus.
-        if adjacency_matrix is not None and getattr(self.config, "perception_social_consensus_gain", 0.0) > 0:
-            social_gain = self.config.perception_social_consensus_gain
-            
-            # Use the sparse adjacency matrix to calculate the local neighborhood mean distortion
-            # adjacency_matrix is expected to be row-normalized (row_sum = 1.0)
-            local_consensus = torch.sparse.mm(adjacency_matrix.to(device), distorted_world)
-            
-            # Blend: (1 - gain) * Individual + (gain) * Neighborhood
-            distorted_world = (1.0 - social_gain) * distorted_world + social_gain * local_consensus
 
         # ---------------------------------
         # 3. Memory Layer (Desensitization & Trigger Stacking)

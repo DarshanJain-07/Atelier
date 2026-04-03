@@ -39,6 +39,33 @@ VALENCE_WEIGHTS = torch.tensor(
     [1.0, 0.5, -0.8, 0.0, -1.0, -0.5, -0.8, 0.5], dtype=torch.float32
 )
 
+
+def emotions_to_valence(emotion_probs: torch.Tensor | list[float]) -> torch.Tensor:
+    emotion_tensor = torch.as_tensor(emotion_probs, dtype=torch.float32)
+    weights = VALENCE_WEIGHTS.to(
+        device=emotion_tensor.device,
+        dtype=emotion_tensor.dtype,
+    )
+    return torch.matmul(emotion_tensor, weights)
+
+
+def emotions_to_sentiment_distribution(
+    emotion_probs: torch.Tensor | list[float],
+) -> torch.Tensor:
+    emotion_tensor = torch.as_tensor(emotion_probs, dtype=torch.float32)
+    weights = VALENCE_WEIGHTS.to(
+        device=emotion_tensor.device,
+        dtype=emotion_tensor.dtype,
+    )
+
+    positive = torch.clamp(weights, min=0.0)
+    negative = torch.clamp(-weights, min=0.0)
+    neutral = 1.0 - positive - negative
+    bucket_matrix = torch.stack((negative, neutral, positive), dim=1)
+
+    sentiment = torch.matmul(emotion_tensor, bucket_matrix)
+    return sentiment / sentiment.sum(dim=-1, keepdim=True).clamp_min(1e-9)
+
 # --- CONSTANTS ---
 # Map the 12 Dimensions to 8 Plutchik Emotions
 # Shape: (12 Input Dims, 8 Output Emotions)

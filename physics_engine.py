@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 
-from schema import EMOTION_LABELS, VALENCE_WEIGHTS
+from schema import EMOTION_LABELS, emotions_to_valence
 
 
 class SocialPhysicsEngine:
@@ -148,7 +148,7 @@ class SocialPhysicsEngine:
             # ============================================================
             # Time-Series Stewing (Track area under curve for negative emotion)
             # ============================================================
-            valence_score = torch.dot(center_of_gravity, VALENCE_WEIGHTS).item()
+            valence_score = emotions_to_valence(center_of_gravity).item()
             if valence_score < 0:
                 negative_integral += abs(valence_score)
 
@@ -235,7 +235,7 @@ class SocialPhysicsEngine:
         entropy = -(cg_prob * torch.log(cg_prob)).sum().item()
 
         # 1D Sentiment/Valence
-        valence_score = torch.dot(center_of_gravity, VALENCE_WEIGHTS).item()
+        valence_score = emotions_to_valence(center_of_gravity).item()
 
         # Dominant Emotion (Viral State)
         max_val, dominant_idx = torch.max(viral_center, dim=0)

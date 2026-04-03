@@ -65,79 +65,123 @@ def apply_random_mutations(exposures, personality_logits, temperature, seed):
 
 
 # ================================
-# NETWORK SYNERGY WEALTH ENGINE
+# Wealth + Structure Helpers
 # ================================
-def generate_network_wealth(
+def percentile_ranks(values: np.ndarray) -> np.ndarray:
+    values = np.asarray(values, dtype=np.float32)
+    if values.size <= 1:
+        return np.zeros_like(values, dtype=np.float32)
+
+    order = np.argsort(values, kind="mergesort")
+    ranks = np.empty(values.size, dtype=np.float32)
+    ranks[order] = np.linspace(0.0, 1.0, num=values.size, dtype=np.float32)
+    return ranks
+
+
+def normalize_wealth_exposure(raw_wealth: np.ndarray) -> np.ndarray:
+    raw_wealth = np.asarray(raw_wealth, dtype=np.float32)
+    if raw_wealth.size == 0:
+        return raw_wealth
+
+    log_wealth = np.log1p(np.clip(raw_wealth, a_min=0.0, a_max=None))
+    min_w = float(np.min(log_wealth))
+    max_w = float(np.max(log_wealth))
+    if max_w <= min_w:
+        return np.zeros_like(log_wealth, dtype=np.float32)
+
+    normalized = 2.0 * ((log_wealth - min_w) / (max_w - min_w)) - 1.0
+    return normalized.astype(np.float32)
+
+
+def generate_structural_wealth(
     influence_scores,
     personality_logits,
-    adjacency_matrix,
     temperature,
     seed,
 ):
     """
-    2-Stage Network Synergy Model:
-    1. Latent Potential: Based on individual Influence + Merit (Conscientiousness).
-    2. Network Realization: Wealth diffuses via KNN topology (Clustered Lift) 
-       and is amplified by Social Capital (In-Degree).
+    Generate raw wealth before topology exists.
+
+    Wealth is driven by influence, productive traits, and a gated elite tail.
     """
     from scipy.stats import pareto
-    
+
     np.random.seed(seed + 123)
     n = len(influence_scores)
+    influence_scores = np.asarray(influence_scores, dtype=np.float32)
+    influence_percentile = percentile_ranks(influence_scores)
 
-    # --- Stage 1: Latent Individual Potential ---
-    # Conscientiousness (Index 1) drives base productivity
+    openness = torch.sigmoid(personality_logits[:, 0]).numpy()
     consc = torch.sigmoid(personality_logits[:, 1]).numpy()
-    
-    # Power Law for potential, but dampened (exponent 0.7) to allow network effect to dominate
-    # Base: 500 units + up to 2000 from Merit
-    seed_potential = 500.0 * (influence_scores ** 0.7) + (consc * 2000.0)
+    extraversion = torch.sigmoid(personality_logits[:, 2]).numpy()
+    stability = 1.0 - torch.sigmoid(personality_logits[:, 4]).numpy()
 
-    # --- Stage 2: Network Realization & Cluster Lift ---
-    if adjacency_matrix is not None:
-        w_seed_tensor = torch.tensor(seed_potential, dtype=torch.float32).unsqueeze(1)
-        
-        # A. Clustered Lift (Neighbor Average)
-        # Connected people pull each other up. If connected to a whale, you rise.
-        cluster_lift = torch.sparse.mm(adjacency_matrix, w_seed_tensor).squeeze().numpy()
-        
-        # B. Social Capital (In-Degree Multiplier)
-        adj_coalesced = adjacency_matrix.coalesce()
-        indices = adj_coalesced.indices()
-        in_degrees = torch.bincount(indices[1], minlength=n).float().numpy()
-        
-        # Non-linear boost for being 'followed' (Social Capital)
-        social_capital_mult = 1.0 + 0.4 * np.sqrt(in_degrees)
-        
-        # C. Synthesis: Blend Individual Potential (30%) with Network Cluster (70%)
-        # This creates 'Tangled Wealth' where organizations/echo-chambers rise together.
-        wealth = (seed_potential * 0.3 + cluster_lift * 0.7) * social_capital_mult
-    else:
-        wealth = seed_potential
+    merit = (
+        0.45 * consc
+        + 0.20 * stability
+        + 0.20 * extraversion
+        + 0.15 * openness
+    )
 
-    # --- Elite Cluster Synergy (Multiple Billionaires) ---
-    # Instead of one outlier, we inject Pareto wealth into the top 10% of the hierarchy.
-    # Because wealth is clustered, if one person in an elite cluster gets this, 
-    # the 'Lift' logic in the next generation or simulation cycle would spread it.
-    # Here we simulate the existing 'Legacy' wealth of clusters.
-    alpha = 2.0 - (temperature * 0.5)
-    legacy_injection = (pareto.rvs(alpha, size=n) + 1.0) * 10000.0 * temperature
-    
-    # Gate legacy by network position (Top 15% by current synergy wealth)
-    ranks = np.argsort(np.argsort(wealth)) / (n - 1)
-    legacy_gate = 1.0 / (1.0 + np.exp(-25.0 * (ranks - 0.85)))
-    
-    wealth += (legacy_injection * legacy_gate)
+    seed_potential = (
+        800.0
+        + 2800.0 * merit
+        + 1800.0 * np.power(np.maximum(influence_scores, 1e-6), 0.70)
+    )
+    realization_noise = np.random.lognormal(
+        mean=0.0,
+        sigma=0.18 + 0.22 * temperature,
+        size=n,
+    )
+    wealth = seed_potential * realization_noise
 
-    # Final Clamping & Subsistence Floor
+    alpha = max(1.2, 2.3 - (temperature * 0.5))
+    elite_gate = np.clip(0.55 * influence_percentile + 0.45 * merit, 0.0, 1.0)
+    legacy_injection = (
+        (pareto.rvs(alpha, size=n) + 1.0)
+        * 4500.0
+        * elite_gate
+        * (0.4 + 0.6 * temperature)
+    )
+    wealth += legacy_injection
+
     wealth = np.maximum(wealth, 500.0)
     wealth = np.nan_to_num(wealth, nan=500.0, posinf=1e8)
+    return wealth.astype(np.float32)
 
-    return wealth
+
+def _select_bridge_agents(
+    wealth_percentile: np.ndarray,
+    influence_percentile: np.ndarray,
+    openness: np.ndarray,
+) -> np.ndarray:
+    n = len(wealth_percentile)
+    bridge_mask = np.zeros(n, dtype=np.float32)
+    if n == 0:
+        return bridge_mask
+
+    wealthy_slots = min(max(1, n // 500), 2)
+    influence_slots = min(max(1, n // 500), 2)
+
+    wealthy_candidates = np.argsort(wealth_percentile)[-wealthy_slots:]
+    influence_candidates = np.argsort(influence_percentile)[-influence_slots:]
+    candidate_indices = np.unique(
+        np.concatenate([wealthy_candidates, influence_candidates], axis=0)
+    )
+
+    open_candidates = candidate_indices[openness[candidate_indices] >= 0.55]
+    if open_candidates.size == 0 and candidate_indices.size > 0:
+        open_candidates = np.array(
+            [candidate_indices[np.argmax(openness[candidate_indices])]],
+            dtype=np.int64,
+        )
+
+    bridge_mask[open_candidates] = 1.0
+    return bridge_mask
 
 
 # ================================
-# Main Generator (Topology-First)
+# Structure Builder (Wealth/Influence First)
 # ================================
 def apply_triadic_closure(config: SimConfig, adj: torch.Tensor, device: torch.device):
     """
@@ -223,11 +267,10 @@ def create_topology(
     exposures: torch.Tensor,
     personalities: torch.Tensor,
     influence_scores: np.ndarray,
+    raw_wealth: np.ndarray | None = None,
 ):
     """
-    2-Stage Topology Construction:
-    1. Structural Backbone: Preferential Attachment and Homophily.
-    2. Community Cohesion: Iterative Triadic Closure (Neighbors-of-Neighbors).
+    Wealth/influence-first echo chamber construction.
     """
     N = config.num_agents
     if N <= 1:
@@ -235,48 +278,117 @@ def create_topology(
 
     max_available_neighbors = N - 1
     max_connections = min(config.max_connections, max_available_neighbors)
-    inf_mean = np.mean(influence_scores)
+    wealth_idx = DIMENSION_INDICES["Wealth"]
+
+    if raw_wealth is None:
+        wealth_source = exposures[:, wealth_idx].detach().cpu().numpy()
+    else:
+        wealth_source = np.asarray(raw_wealth, dtype=np.float32)
+
+    influence_scores = np.asarray(influence_scores, dtype=np.float32)
+    influence_percentile = percentile_ranks(influence_scores)
+    wealth_percentile = percentile_ranks(wealth_source)
+    openness_np = personalities[:, 0].detach().cpu().numpy().astype(np.float32)
+    bridge_mask_np = _select_bridge_agents(
+        wealth_percentile, influence_percentile, openness_np
+    )
+
+    elite_strength = np.maximum(wealth_percentile, influence_percentile)
     k_array = np.clip(
-        (influence_scores / inf_mean) * config.base_connections,
+        np.rint(
+            config.base_connections
+            * (
+                0.45
+                + 1.15 * openness_np
+                + 0.35 * elite_strength
+                + 0.25 * bridge_mask_np
+            )
+        ),
         1,
         max_connections,
     ).astype(int)
 
-    features = torch.cat([exposures, personalities], dim=1)
+    topology_exposures = exposures.clone()
+    topology_exposures[:, wealth_idx] = 0.0
+    features = torch.cat([topology_exposures, personalities], dim=1)
     features_norm = features / (torch.norm(features, dim=1, keepdim=True) + 1e-8)
 
-    batch_size = 1000
+    batch_size = 512
     indices_list = []
     values_list = []
     device = exposures.device
     features_norm = features_norm.to(device)
 
-    inf_tensor = torch.tensor(influence_scores, dtype=torch.float32, device=device)
-    inf_tensor = inf_tensor / inf_tensor.mean()
+    influence_scale = influence_scores / max(float(np.mean(influence_scores)), 1e-6)
+    influence_scale_tensor = torch.tensor(
+        influence_scale, dtype=torch.float32, device=device
+    )
+    influence_tensor = torch.tensor(
+        influence_percentile, dtype=torch.float32, device=device
+    )
+    wealth_tensor = torch.tensor(wealth_percentile, dtype=torch.float32, device=device)
+    openness_tensor = torch.tensor(openness_np, dtype=torch.float32, device=device)
+    bridge_tensor = torch.tensor(bridge_mask_np, dtype=torch.float32, device=device)
+    target_influence_bias = torch.pow(
+        torch.clamp(influence_scale_tensor, min=0.25),
+        getattr(config, "influence_bias_exp", 0.4),
+    )
 
-    # --- Stage 1: Structural Backbone ---
     for i in range(0, N, batch_size):
         end = min(i + batch_size, N)
         batch_size_actual = end - i
         batch_features = features_norm[i:end]
-        
-        # Calculate raw cosine similarity [-1, 1]
+
         sim = torch.mm(batch_features, features_norm.T)
-        
-        # --- FIX: Echo Chambers Logic ---
-        # Only form edges if people are really close. 
-        # Shift similarity to [0, 1] and apply steep power law based on homophily strength.
-        h_strength = getattr(config, "homophily_strength", 4.0)
-        # clamp at 0 to prevent any negative similarity from forming connections
-        sim_clamped = torch.clamp(sim, min=0.0)
-        # Power law makes it so only very high similarity values survive
-        sim_exp = torch.pow(sim_clamped, h_strength * 2.0)
-        
-        # --- FIX: Modularity vs Influence ---
-        # Dampen the influence bias (Power Law) for backbone connections.
-        # If influencers have too much weight here, they bridge all clusters and destroy modularity.
-        inf_bias = torch.pow(inf_tensor, getattr(config, "influence_bias_exp", 0.5))
-        prob_matrix = sim_exp * inf_bias.unsqueeze(0)
+        h_strength = max(1.0, float(getattr(config, "homophily_strength", 6.0)))
+        trait_similarity = torch.pow(torch.clamp(sim, min=0.0), h_strength)
+
+        batch_influence = influence_tensor[i:end].unsqueeze(1)
+        batch_wealth = wealth_tensor[i:end].unsqueeze(1)
+        batch_openness = openness_tensor[i:end].unsqueeze(1)
+        batch_bridge = bridge_tensor[i:end].unsqueeze(1)
+
+        influence_gap = torch.abs(batch_influence - influence_tensor.unsqueeze(0))
+        wealth_gap = torch.abs(batch_wealth - wealth_tensor.unsqueeze(0))
+
+        influence_homophily = torch.exp(-4.0 * influence_gap)
+        wealth_homophily = torch.exp(-4.0 * wealth_gap)
+
+        influence_elite = torch.sqrt(
+            torch.clamp(batch_influence * influence_tensor.unsqueeze(0), min=0.0)
+        )
+        wealth_elite = torch.sqrt(
+            torch.clamp(batch_wealth * wealth_tensor.unsqueeze(0), min=0.0)
+        )
+        cross_elite = 0.5 * (
+            torch.sqrt(
+                torch.clamp(batch_wealth * influence_tensor.unsqueeze(0), min=0.0)
+            )
+            + torch.sqrt(
+                torch.clamp(batch_influence * wealth_tensor.unsqueeze(0), min=0.0)
+            )
+        )
+        pair_openness = 0.5 * (batch_openness + openness_tensor.unsqueeze(0))
+
+        prob_matrix = 0.28 * trait_similarity
+        prob_matrix += (
+            (0.18 + 0.24 * batch_influence)
+            * influence_homophily
+            * (0.25 + 0.75 * influence_elite)
+        )
+        prob_matrix += (
+            (0.18 + 0.24 * batch_wealth)
+            * wealth_homophily
+            * (0.25 + 0.75 * wealth_elite)
+        )
+        prob_matrix += (0.05 + 0.18 * batch_openness) * cross_elite
+        prob_matrix += (0.04 + 0.10 * pair_openness) * trait_similarity
+        prob_matrix += (
+            batch_bridge
+            * (0.08 + 0.18 * batch_openness)
+            * (0.35 + 0.65 * pair_openness)
+        )
+        prob_matrix = prob_matrix * target_influence_bias.unsqueeze(0)
 
         batch_indices = torch.arange(batch_size_actual, device=device)
         global_indices = batch_indices + i
@@ -290,8 +402,7 @@ def create_topology(
         prob_matrix = prob_matrix + 1e-9
         sampled_indices = torch.multinomial(prob_matrix, max_k, replacement=False)
         
-        # Note: we use 'sim' (original similarity) for weights, not the exponential probs
-        sampled_vals = torch.gather(sim, 1, sampled_indices)
+        sampled_vals = torch.gather(prob_matrix, 1, sampled_indices)
 
         range_tensor = torch.arange(max_k, device=device).unsqueeze(0)
         k_tensor = torch.tensor(batch_k, device=device).unsqueeze(1)
@@ -310,10 +421,8 @@ def create_topology(
     values_tensor = torch.cat(values_list)
     backbone_adj = torch.sparse_coo_tensor(indices_tensor, values_tensor, size=(N, N), device=device)
 
-    # Cache features for triadic closure similarity check
     setattr(config, "_features_norm_cache", features_norm)
 
-    # --- Stage 2: Community Cohesion (Triadic Closure) ---
     print(f"Applying Triadic Closure (Stage 2)...")
     final_adj = apply_triadic_closure(config, backbone_adj, device)
     
@@ -336,14 +445,134 @@ def create_topology(
     return normalized_sparse_adj
 
 
-def generate_society(config: SimConfig):
+def assign_classes_from_topology(
+    exposures: torch.Tensor,
+    personalities: torch.Tensor,
+    influence_scores: np.ndarray,
+    raw_wealth: np.ndarray,
+    adjacency_matrix: torch.Tensor | None,
+):
+    n = len(influence_scores)
+    if n == 0:
+        return [], {}
+
+    device = personalities.device
+    wealth_percentile = torch.tensor(
+        percentile_ranks(raw_wealth), dtype=torch.float32, device=device
+    )
+    influence_percentile = torch.tensor(
+        percentile_ranks(influence_scores), dtype=torch.float32, device=device
+    )
+    openness = personalities[:, 0]
+
+    if adjacency_matrix is not None:
+        topology = adjacency_matrix.coalesce().to(device)
+        local_wealth = torch.sparse.mm(topology, wealth_percentile.unsqueeze(1)).squeeze(1)
+        local_influence = torch.sparse.mm(
+            topology, influence_percentile.unsqueeze(1)
+        ).squeeze(1)
+        out_degree = torch.bincount(topology.indices()[0], minlength=n)
+        in_degree = torch.bincount(topology.indices()[1], minlength=n)
+        degree = (out_degree + in_degree).float()
+    else:
+        local_wealth = wealth_percentile
+        local_influence = influence_percentile
+        degree = torch.zeros(n, dtype=torch.float32, device=device)
+
+    degree_percentile = torch.tensor(
+        percentile_ranks(degree.detach().cpu().numpy()),
+        dtype=torch.float32,
+        device=device,
+    )
+
+    chamber_score = 0.5 * (local_wealth + local_influence)
+    structural_score = (
+        0.24 * wealth_percentile
+        + 0.16 * influence_percentile
+        + 0.22 * degree_percentile
+        + 0.20 * local_wealth
+        + 0.14 * local_influence
+        + 0.04 * openness
+    )
+
+    class_labels = np.empty(n, dtype=object)
+    elite_mask = (structural_score >= 0.86) | (
+        (wealth_percentile >= 0.92) & (degree_percentile >= 0.65)
+    )
+    upper_middle_mask = (structural_score >= 0.67) & ~elite_mask
+    middle_mask = (structural_score >= 0.44) & ~(elite_mask | upper_middle_mask)
+    working_mask = (structural_score >= 0.22) & ~(
+        elite_mask | upper_middle_mask | middle_mask
+    )
+
+    class_labels[:] = "Underclass"
+    class_labels[working_mask.detach().cpu().numpy()] = "Working Class"
+    class_labels[middle_mask.detach().cpu().numpy()] = "Middle Class"
+    class_labels[upper_middle_mask.detach().cpu().numpy()] = "Upper Middle"
+    class_labels[elite_mask.detach().cpu().numpy()] = "Elite"
+
+    metrics = {
+        "Topology_Degree": degree.detach().cpu().numpy(),
+        "Chamber_Wealth": local_wealth.detach().cpu().numpy(),
+        "Chamber_Influence": local_influence.detach().cpu().numpy(),
+        "Structural_Class_Score": structural_score.detach().cpu().numpy(),
+        "Chamber_Score": chamber_score.detach().cpu().numpy(),
+    }
+    return class_labels.tolist(), metrics
+
+
+def finalize_social_structure(
+    config: SimConfig,
+    metadata: pd.DataFrame,
+    exposures: torch.Tensor,
+    personalities: torch.Tensor,
+):
+    metadata = metadata.copy()
+    influence_scores = metadata["Influence"].to_numpy(dtype=np.float32)
+    raw_wealth = metadata["Raw_Wealth"].to_numpy(dtype=np.float32)
+
+    adjacency_matrix = None
+    if getattr(config, "use_network_topology", True):
+        print("Generating Network Topology...")
+        adjacency_matrix = create_topology(
+            config,
+            exposures,
+            personalities,
+            influence_scores,
+            raw_wealth=raw_wealth,
+        )
+
+    if adjacency_matrix is not None and getattr(
+        config, "personality_socialization_gain", 0.0
+    ) > 0:
+        gain = getattr(config, "personality_socialization_gain", 0.05)
+        print(f"Applying Personality Socialization (Stage 2, Gain={gain})...")
+        local_personality_mean = torch.sparse.mm(adjacency_matrix, personalities)
+        personalities = (1.0 - gain) * personalities + gain * local_personality_mean
+        personalities = torch.clamp(personalities, 0.001, 0.999)
+
+    classes, structure_metrics = assign_classes_from_topology(
+        exposures,
+        personalities,
+        influence_scores,
+        raw_wealth,
+        adjacency_matrix,
+    )
+    metadata["Class"] = classes
+    for metric_name, metric_values in structure_metrics.items():
+        metadata[metric_name] = np.round(metric_values, 3)
+
+    return metadata, personalities, adjacency_matrix
+
+
+def generate_society(config: SimConfig, defer_structure: bool = False):
     torch.manual_seed(config.seed)
     np.random.seed(config.seed)
 
     if not os.path.exists(config.output_dir):
         os.makedirs(config.output_dir)
 
-    print(f"Generating {config.num_agents} Agents via Clustered Synergy Model...")
+    print(f"Generating {config.num_agents} Agents via Wealth/Influence-First Model...")
 
     num_dims = len(DIMENSIONS)
     wealth_idx = DIMENSION_INDICES["Wealth"]
@@ -381,42 +610,17 @@ def generate_society(config: SimConfig):
         pareto_multiplier = (np.random.pareto(alpha, config.num_agents) + 1) * 2.0
         influence_scores *= pareto_multiplier
 
-    # 4. Topology Generation (Based on Traits + Influence)
-    adjacency_matrix = None
-    if getattr(config, "use_network_topology", True):
-        print("Generating Network Topology...")
-        adjacency_matrix = create_topology(config, exposures, personalities, influence_scores)
-
-    # 4.5 Stage 2: Personality Socialization (Nurture/Drift)
-    # Drift personalities slightly toward the local network mean
-    if adjacency_matrix is not None and getattr(config, "personality_socialization_gain", 0.0) > 0:
-        # Reduced default gain to prevent variance collapse
-        gain = getattr(config, "personality_socialization_gain", 0.05)
-        print(f"Applying Personality Socialization (Stage 2, Gain={gain})...")
-        # Use row-normalized adjacency to get local means
-        local_personality_mean = torch.sparse.mm(adjacency_matrix, personalities)
-        # Drift toward mean
-        personalities = (1.0 - gain) * personalities + gain * local_personality_mean
-        # Ensure sigmoid range is preserved
-        personalities = torch.clamp(personalities, 0.001, 0.999)
-
-    # 5. Clustered Wealth Generation (Stage 2 Synergy)
-    wealth_values = generate_network_wealth(
+    # 4. Raw Wealth (before topology/evolution)
+    wealth_values = generate_structural_wealth(
         influence_scores,
         raw_personalities,
-        adjacency_matrix,
         config.mutation_temperature,
         config.seed,
     )
 
-    # 6. Normalize Wealth for Exposures
-    log_wealth = np.log1p(wealth_values)
-    min_w, max_w = np.min(log_wealth), np.max(log_wealth)
-    if max_w > min_w:
-        wealth_normalized = 2.0 * ((log_wealth - min_w) / (max_w - min_w)) - 1.0
-    else:
-        wealth_normalized = np.zeros_like(log_wealth)
-    exposures[:, wealth_idx] = torch.tensor(wealth_normalized).float()
+    # 5. Normalize wealth only for exposure-space cognition
+    wealth_normalized = normalize_wealth_exposure(wealth_values)
+    exposures[:, wealth_idx] = torch.tensor(wealth_normalized, dtype=torch.float32)
 
     # Final Touches
     non_wealth_mask = torch.ones(num_dims, dtype=torch.bool)
@@ -438,14 +642,25 @@ def generate_society(config: SimConfig):
         normalized_affinities = positive_affinities
     affinities = normalized_affinities * cognitive_bandwidth
 
-    df_metadata = pd.DataFrame({
-        "Agent_ID": range(config.num_agents),
-        "Class": ["Agent"] * config.num_agents,
-        "Region": ["Global"] * config.num_agents,
-        "Influence": np.round(influence_scores, 3),
-        "Raw_Wealth": np.round(wealth_values, 3),
-        "Cognitive_Bandwidth": np.round(cognitive_bandwidth.squeeze().numpy(), 3),
-    })
+    df_metadata = pd.DataFrame(
+        {
+            "Agent_ID": range(config.num_agents),
+            "Class": ["Agent"] * config.num_agents,
+            "Region": ["Global"] * config.num_agents,
+            "Influence": np.round(influence_scores, 3),
+            "Raw_Wealth": np.round(wealth_values, 3),
+            "Cognitive_Bandwidth": np.round(cognitive_bandwidth.squeeze().numpy(), 3),
+        }
+    )
+
+    adjacency_matrix = None
+    if not defer_structure:
+        df_metadata, personalities, adjacency_matrix = finalize_social_structure(
+            config,
+            df_metadata,
+            exposures,
+            personalities,
+        )
 
     df_metadata.to_parquet(f"{config.output_dir}/metadata.parquet")
     torch.save(exposures, f"{config.output_dir}/exposures.pt")
@@ -454,17 +669,26 @@ def generate_society(config: SimConfig):
     if adjacency_matrix is not None:
         torch.save(adjacency_matrix, f"{config.output_dir}/adjacency.pt")
 
-    print(f"Society Generated in '{config.output_dir}' (Network Synergy Model)")
+    print(f"Society Generated in '{config.output_dir}' (Wealth/Influence-First Model)")
     return df_metadata, exposures, personalities, affinities, adjacency_matrix
 
 
 def main():
     conf = SimConfig(num_agents=10000, seed=69)
     conf.wealth_dim_idx = DIMENSION_INDICES["Wealth"]
-    df_meta, exposures, personalities, affinities, adjacency_matrix = generate_society(conf)
+    df_meta, exposures, personalities, affinities, adjacency_matrix = generate_society(
+        conf,
+        defer_structure=conf.enable_evolution,
+    )
     if conf.enable_evolution:
         evolver = SocietyEvolution(conf, df_meta, exposures, personalities)
         df_meta, exposures, personalities = evolver.evolve()
+        df_meta, personalities, adjacency_matrix = finalize_social_structure(
+            conf,
+            df_meta,
+            exposures,
+            personalities,
+        )
 
 
 if __name__ == "__main__":

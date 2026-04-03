@@ -22,7 +22,12 @@ from pydantic import BaseModel, Field
 
 from cognitive_engine import CognitiveEngine
 from explainability import ExplainabilityEngine
-from generate_society import apply_triadic_closure, create_topology, generate_society
+from generate_society import (
+    apply_triadic_closure,
+    create_topology,
+    finalize_social_structure,
+    generate_society,
+)
 from input_layer import get_world_state
 from physics_engine import SocialPhysicsEngine
 
@@ -252,7 +257,8 @@ def prepare_society_for_debug(
     seed_everything(effective_config.seed)
 
     metadata, exposures, personalities, affinities, adjacency_matrix = generate_society(
-        effective_config
+        effective_config,
+        defer_structure=getattr(effective_config, "enable_evolution", True),
     )
 
     if getattr(effective_config, "enable_evolution", True):
@@ -260,6 +266,12 @@ def prepare_society_for_debug(
             effective_config, metadata, exposures, personalities
         )
         metadata, exposures, personalities = evolver.evolve()
+        metadata, personalities, adjacency_matrix = finalize_social_structure(
+            effective_config,
+            metadata,
+            exposures,
+            personalities,
+        )
 
     return build_debug_society(
         effective_config,
@@ -622,7 +634,10 @@ def prepare_society_sync(run: RunProfile, run_output_dir: str):
         personalities_full,
         affinities_full,
         adjacency_matrix,
-    ) = generate_society(config)
+    ) = generate_society(
+        config,
+        defer_structure=getattr(config, "enable_evolution", True),
+    )
 
     generation_warnings: list[str] = []
 
@@ -633,6 +648,12 @@ def prepare_society_sync(run: RunProfile, run_output_dir: str):
                 config, metadata_full, exposures_full, personalities_full
             )
             metadata_full, exposures_full, personalities_full = evolver.evolve()
+            metadata_full, personalities_full, adjacency_matrix = finalize_social_structure(
+                config,
+                metadata_full,
+                exposures_full,
+                personalities_full,
+            )
         except Exception as e:
             warning = f"Evolution failed; using base society instead: {e}"
             generation_warnings.append(warning)

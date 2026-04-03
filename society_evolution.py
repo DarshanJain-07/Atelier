@@ -22,14 +22,24 @@ class SocietyEvolution:
                 "Config must provide 'wealth_dim_idx' for wealth column index"
             )
 
+        if "Raw_Wealth" in self.metadata:
+            self.raw_wealth = torch.tensor(
+                self.metadata["Raw_Wealth"].values, dtype=torch.float32
+            )
+        else:
+            self.raw_wealth = torch.clamp(
+                self.exposures[:, self.wealth_idx].clone().float(), min=0.0
+            )
+
         # Initialize influence from metadata (or calculate if needed)
         self.influence = torch.tensor(
             self.metadata["Influence"].values, dtype=torch.float32
         )
+        self._sync_wealth_exposure()
 
         # Store history if requested
         self.history = {
-            "wealth": [self.exposures[:, self.wealth_idx].clone()],
+            "wealth": [self.raw_wealth.clone()],
             "influence": [self.influence.clone()],
         }
 
@@ -43,6 +53,20 @@ class SocietyEvolution:
         # Small std dev (0.01) results in factors like 0.99 or 1.01.
         # Over 10 generations, 1.02^10 = ~1.22 (+22%), creating meaningful outliers.
         self.idiosyncrasy_factors = torch.exp(torch.randn(self.num_agents, 5, generator=gen) * 0.015)
+
+    def _normalize_wealth_values(self, wealth_values: torch.Tensor) -> torch.Tensor:
+        wealth_values = torch.clamp(wealth_values.float(), min=0.0)
+        log_wealth = torch.log1p(wealth_values)
+        min_w = torch.min(log_wealth)
+        max_w = torch.max(log_wealth)
+        if torch.isclose(max_w, min_w):
+            return torch.zeros_like(log_wealth)
+        return 2.0 * ((log_wealth - min_w) / (max_w - min_w)) - 1.0
+
+    def _sync_wealth_exposure(self):
+        self.exposures[:, self.wealth_idx] = self._normalize_wealth_values(
+            self.raw_wealth
+        )
 
     def apply_idiosyncrasies(self):
         """
@@ -66,7 +90,7 @@ class SocietyEvolution:
         inherit_frac = self.config.inheritance_fraction  # e.g., 0.7
         noise_std = self.config.inheritance_noise_std  # e.g., 0.05
 
-        parent_wealth = self.exposures[:, self.wealth_idx]
+        parent_wealth = self.raw_wealth
 
         # 1. Tax / Loss Phase
         inherited_wealth = parent_wealth * inherit_frac
@@ -84,7 +108,7 @@ class SocietyEvolution:
         new_wealth = inherited_wealth + redistribution_per_capita + noise
         new_wealth = torch.clamp(new_wealth, min=0.0)  # No negative wealth
 
-        self.exposures[:, self.wealth_idx] = new_wealth
+        self.raw_wealth = new_wealth
 
     def apply_reinvestment(self):
         """
@@ -102,7 +126,7 @@ class SocietyEvolution:
         returns = returns + noise
         returns = torch.clamp(returns, min=-0.2, max=0.5)  # realistic return bounds
 
-        self.exposures[:, self.wealth_idx] *= 1 + returns
+        self.raw_wealth *= 1 + returns
 
     def apply_economic_shocks(self, generation):
         """
@@ -120,7 +144,7 @@ class SocietyEvolution:
             print(
                 f"Applying economic shock at generation {generation}, multiplier {shock_impact:.2f}"
             )
-            self.exposures[:, self.wealth_idx] *= shock_impact
+            self.raw_wealth *= shock_impact
 
     def apply_mobility(self):
         """
@@ -136,13 +160,13 @@ class SocietyEvolution:
         shuffled_indices = np.random.permutation(indices)
 
         new_influence = self.influence.clone()
-        new_wealth = self.exposures[:, self.wealth_idx].clone()
+        new_wealth = self.raw_wealth.clone()
 
         new_influence[indices] = self.influence[shuffled_indices]
-        new_wealth[indices] = self.exposures[shuffled_indices, self.wealth_idx]
+        new_wealth[indices] = self.raw_wealth[shuffled_indices]
 
         self.influence = new_influence
-        self.exposures[:, self.wealth_idx] = new_wealth
+        self.raw_wealth = new_wealth
 
     def apply_ideological_drift(self):
         """
@@ -171,12 +195,13 @@ class SocietyEvolution:
         if np.random.rand() < elite_chance and "Class" in self.metadata:
             # Cultural Hegemony: Society drifts toward the Elite class
             elite_mask = (self.metadata["Class"] == "Elite").values
+            elite_mask_tensor = torch.tensor(elite_mask.copy(), dtype=torch.bool)
             if elite_mask.sum() > 1:
-                target_exposures = self.exposures[torch.from_numpy(elite_mask)]
+                target_exposures = self.exposures[elite_mask_tensor]
                 target_mean = target_exposures.mean(dim=0)
                 target_var = target_exposures.var(dim=0, unbiased=False)
             elif elite_mask.sum() == 1:
-                target_exposures = self.exposures[torch.from_numpy(elite_mask)]
+                target_exposures = self.exposures[elite_mask_tensor]
                 target_mean = target_exposures.mean(dim=0)
                 target_var = torch.zeros_like(target_mean)
             else:
@@ -257,7 +282,7 @@ class SocietyEvolution:
 
     def reassign_classes(self):
 
-        wealth = self.exposures[:, self.wealth_idx]
+        wealth = self.raw_wealth
 
         # Normalize to percentiles (0–1)
         wealth_rank = torch.argsort(torch.argsort(wealth))
@@ -314,25 +339,20 @@ class SocietyEvolution:
             self.apply_mobility()
             self.apply_ideological_drift()
 
-            if self.config.use_dynamic_classes:
-                self.reassign_classes()
-
             # Apply idiosyncratic personality drift (creates outliers)
             self.apply_idiosyncrasies()
 
             # Clamp wealth to avoid negative values or extreme outliers
-            self.exposures[:, self.wealth_idx] = torch.clamp(
-                self.exposures[:, self.wealth_idx], min=0.0, max=1e6
-            )
+            self.raw_wealth = torch.clamp(self.raw_wealth, min=0.0, max=1e6)
+            self._sync_wealth_exposure()
 
             # Optionally record history
             if self.config.record_history:
-                self.history["wealth"].append(
-                    self.exposures[:, self.wealth_idx].clone()
-                )
+                self.history["wealth"].append(self.raw_wealth.clone())
                 self.history["influence"].append(self.influence.clone())
 
         # Update metadata influence for output consistency
         self.metadata["Influence"] = self.influence.numpy()
+        self.metadata["Raw_Wealth"] = self.raw_wealth.numpy()
 
         return self.metadata, self.exposures, self.personalities

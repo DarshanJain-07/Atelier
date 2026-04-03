@@ -42,7 +42,7 @@ class ExplainabilityEngine:
             social_state["elite_center"]
         )
 
-        elite_div = social_state.get("elite_divergence", 0.0)
+        elite_div = social_state.get("elite_divergence") or 0.0
 
         story_parts = []
 
@@ -75,10 +75,10 @@ class ExplainabilityEngine:
 
     def _generate_tug_of_war(self, social_state: Dict[str, Any]) -> str:
         """Explains the polarization, fragmentation, and sentiment of the society."""
-        polarization = social_state.get("polarization", 0.0)
-        entropy = social_state.get("entropy", 0.0)
-        bimodality = social_state.get("bimodality", 0.0)
-        sentiment = social_state.get("sentiment_valence", 0.0)
+        polarization = social_state.get("polarization") or 0.0
+        entropy = social_state.get("entropy") or 0.0
+        bimodality = social_state.get("bimodality") or 0.0
+        sentiment = social_state.get("sentiment_valence") or 0.0
 
         if (
             polarization > self.high_polarization_threshold
@@ -140,8 +140,8 @@ class ExplainabilityEngine:
 
     def _generate_viral_dynamics(self, social_state: Dict[str, Any]) -> str:
         """Translates the nonlinear outrage multiplier into a virality score proxy (R0 equivalent)."""
-        mean_multiplier = social_state.get("mean_outrage_multiplier", 1.0)
-        max_multiplier = social_state.get("max_outrage_multiplier", 1.0)
+        mean_multiplier = social_state.get("mean_outrage_multiplier") or 1.0
+        max_multiplier = social_state.get("max_outrage_multiplier") or 1.0
 
         desc = ""
         if mean_multiplier > self.high_virality_threshold:
@@ -280,12 +280,12 @@ class ExplainabilityEngine:
 
     def _generate_endogenous_event_explanation(self, social_state: Dict[str, Any]) -> str:
         """Explains if the societal tension triggered an autopoietic macro-event."""
-        action_name = social_state.get("action_name")
+        action_name = social_state.get("action_name") or ""
         if not action_name:
             return "Society remained stable enough that no macro-level endogenous events were triggered."
         
-        polarization = social_state.get("polarization", 0.0)
-        elite_divergence = social_state.get("elite_divergence", 0.0)
+        polarization = social_state.get("polarization") or 0.0
+        elite_divergence = social_state.get("elite_divergence") or 0.0
         
         reasons = []
         if elite_divergence > self.high_elite_divergence_threshold:

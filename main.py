@@ -1108,7 +1108,7 @@ async def run_simulation(req: SimulationRequest, background_tasks: BackgroundTas
                 social_state["objective_center"], baseline_result
             )
             validation_result["stewing_interpretation"] = validator.validate_stewing(
-                social_state.get("negative_integral", 0.0),
+                social_state.get("negative_integral") or 0.0,
                 getattr(config, "stewing_ticks", 5),
             )
 
@@ -1150,8 +1150,8 @@ async def run_simulation(req: SimulationRequest, background_tasks: BackgroundTas
                 {
                     "run_index": i,
                     "config": run.model_dump(),
-                    "dominant_emotion": social_state["dominant_emotion"],
-                    "polarization": round(social_state["polarization"], 3),
+                    "dominant_emotion": social_state.get("dominant_emotion", "Neutral"),
+                    "polarization": round(social_state.get("polarization") or 0.0, 3),
                     "divergence": validation_result[
                         "wasserstein_distance"
                     ],  # Keep key for UI compatibility
@@ -1165,7 +1165,7 @@ async def run_simulation(req: SimulationRequest, background_tasks: BackgroundTas
                     "endogenous_event": social_state.get("endogenous_event"),
                     "detected_biases": detected_biases,
                     "reasoning": reasoning,
-                    "negative_integral": social_state.get("negative_integral", 0.0),
+                    "negative_integral": social_state.get("negative_integral") or 0.0,
                     "acting_ratio": social_state.get("acting_ratio"),
                     "total_eligible": social_state.get("total_eligible"),
                     "population_size": social_state.get("population_size"),

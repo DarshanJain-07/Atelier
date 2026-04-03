@@ -6,7 +6,8 @@ import shutil
 import time
 import uuid
 from collections import OrderedDict
-from dataclasses import asdict, dataclass, replace
+from copy import deepcopy
+from dataclasses import asdict, dataclass, fields as dataclass_fields, replace
 from threading import Lock
 from typing import Any, List, Tuple, cast
 
@@ -18,7 +19,7 @@ from dotenv import load_dotenv
 from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from cognitive_engine import CognitiveEngine
 from explainability import ExplainabilityEngine
@@ -67,83 +68,171 @@ MAX_CACHE_SIZE = 7
 SOCIETY_CACHE: OrderedDict[str, Any] = OrderedDict()
 SOCIETY_CACHE_LOCK = Lock()
 
+_BASE_SIM_CONFIG = SimConfig()
+_SIM_CONFIG_DEFAULTS = {
+    config_field.name: deepcopy(getattr(_BASE_SIM_CONFIG, config_field.name))
+    for config_field in dataclass_fields(SimConfig)
+    if config_field.init
+}
+_RUN_PROFILE_TO_SIM_CONFIG_FIELD_MAP = {
+    "agent_count": "num_agents",
+    "temperature": "mutation_temperature",
+    "use_distortion": "use_signal_distortion",
+    "use_pressure": "use_time_pressure",
+    "use_maslow": "use_maslow_gating",
+    "use_power_law": "use_power_law_influence",
+}
+
+
+def _sim_config_default(field_name: str) -> Any:
+    return deepcopy(_SIM_CONFIG_DEFAULTS[field_name])
+
+
+def _sim_config_field(
+    sim_field_name: str,
+    *,
+    alias: str | None = None,
+    **field_kwargs: Any,
+) -> Any:
+    if alias is not None:
+        field_kwargs["alias"] = alias
+    return Field(
+        default_factory=lambda sim_field_name=sim_field_name: _sim_config_default(
+            sim_field_name
+        ),
+        **field_kwargs,
+    )
+
 
 class RunProfile(BaseModel):
-    seed: int = 42
-    temperature: float = Field(default=0.7, ge=0.0, le=1.0)
+    model_config = ConfigDict(populate_by_name=True)
+
+    seed: int = _sim_config_field("seed")
+    temperature: float = _sim_config_field(
+        "mutation_temperature",
+        alias="mutation_temperature",
+        ge=0.0,
+        le=1.0,
+    )
     social_class: str = "All"
-    agent_count: int = Field(default=1000, gt=0)
-    use_distortion: bool = True
-    use_pressure: bool = True
-    use_maslow: bool = True
-    use_power_law: bool = False
-    emotion_temperature: float = Field(default=0.2, ge=0.0, le=1.0)
-    panic_threshold: float = Field(default=-1.2, le=0.0)
+    agent_count: int = _sim_config_field("num_agents", alias="num_agents", gt=0)
+    use_distortion: bool = _sim_config_field(
+        "use_signal_distortion",
+        alias="use_signal_distortion",
+    )
+    use_pressure: bool = _sim_config_field(
+        "use_time_pressure",
+        alias="use_time_pressure",
+    )
+    use_maslow: bool = _sim_config_field(
+        "use_maslow_gating",
+        alias="use_maslow_gating",
+    )
+    use_power_law: bool = _sim_config_field(
+        "use_power_law_influence",
+        alias="use_power_law_influence",
+    )
+    emotion_temperature: float = _sim_config_field(
+        "emotion_temperature",
+        ge=0.0,
+        le=1.0,
+    )
+    panic_threshold: float = _sim_config_field("panic_threshold", le=0.0)
 
     # New Features
-    stewing_ticks: int = 5
-    stewing_self_retention: float = 0.6
-    stewing_local_influence: float = 0.3
-    stewing_viral_influence: float = 0.1
+    stewing_ticks: int = _sim_config_field("stewing_ticks")
+    stewing_self_retention: float = _sim_config_field("stewing_self_retention")
+    stewing_local_influence: float = _sim_config_field("stewing_local_influence")
+    stewing_viral_influence: float = _sim_config_field("stewing_viral_influence")
 
-    use_algorithmic_amplification: bool = False
-    algo_sample_size: float = 0.1
-    algo_exaggeration_factor: float = 1.5
+    use_algorithmic_amplification: bool = _sim_config_field(
+        "use_algorithmic_amplification"
+    )
+    algo_sample_size: float = _sim_config_field("algo_sample_size")
+    algo_exaggeration_factor: float = _sim_config_field("algo_exaggeration_factor")
 
-    use_selective_exposure: bool = True
-    selective_exposure_base_tolerance: float = -0.3
-    selective_exposure_openness_factor: float = 0.4
-    selective_exposure_gain: float = 8.0
-    selective_exposure_max_suppression: float = 0.85
+    use_selective_exposure: bool = _sim_config_field("use_selective_exposure")
+    selective_exposure_base_tolerance: float = _sim_config_field(
+        "selective_exposure_base_tolerance"
+    )
+    selective_exposure_openness_factor: float = _sim_config_field(
+        "selective_exposure_openness_factor"
+    )
+    selective_exposure_gain: float = _sim_config_field("selective_exposure_gain")
+    selective_exposure_max_suppression: float = _sim_config_field(
+        "selective_exposure_max_suppression"
+    )
 
-    use_agent_memory: bool = False
-    memory_decay_rate: float = 0.7
-    memory_desensitization_gain: float = 0.5
-    memory_trigger_stacking_gain: float = 1.2
-    memory_social_rehearsal_gain: float = 0.4
+    use_agent_memory: bool = _sim_config_field("use_agent_memory")
+    memory_decay_rate: float = _sim_config_field("memory_decay_rate")
+    memory_desensitization_gain: float = _sim_config_field(
+        "memory_desensitization_gain"
+    )
+    memory_trigger_stacking_gain: float = _sim_config_field(
+        "memory_trigger_stacking_gain"
+    )
+    memory_social_rehearsal_gain: float = _sim_config_field(
+        "memory_social_rehearsal_gain"
+    )
 
-    use_network_topology: bool = True
-    homophily_strength: float = 6.0
-    influence_bias_exp: float = 0.4
-    triadic_closure_prob: float = 0.2
-    triadic_closure_iterations: int = 2
-    triadic_closure_homophily_threshold: float = 0.5
-    use_granovetter_thresholds: bool = True
-    granovetter_threshold_mean: float = 0.25
-    granovetter_threshold_std: float = 0.15
-    personality_socialization_gain: float = 0.2
-    enable_evolution: bool = True
+    use_network_topology: bool = _sim_config_field("use_network_topology")
+    homophily_strength: float = _sim_config_field("homophily_strength")
+    influence_bias_exp: float = _sim_config_field("influence_bias_exp")
+    triadic_closure_prob: float = _sim_config_field("triadic_closure_prob")
+    triadic_closure_iterations: int = _sim_config_field("triadic_closure_iterations")
+    triadic_closure_homophily_threshold: float = _sim_config_field(
+        "triadic_closure_homophily_threshold"
+    )
+    use_granovetter_thresholds: bool = _sim_config_field("use_granovetter_thresholds")
+    granovetter_threshold_mean: float = _sim_config_field(
+        "granovetter_threshold_mean"
+    )
+    granovetter_threshold_std: float = _sim_config_field("granovetter_threshold_std")
+    personality_socialization_gain: float = _sim_config_field(
+        "personality_socialization_gain"
+    )
+    enable_evolution: bool = _sim_config_field("enable_evolution")
 
     # Researcher (Cognitive)
-    cross_dim_interaction_strength: float = 0.3
-    threat_sensitivity_gain: float = 1.5
-    k_processing_tanh_gain: float = 1.5
-    attention_residual_gain: float = 0.35
-    attention_modulated_gain: float = 1.0
-    relevance_importance_weight: float = 0.7
-    relevance_base_weight: float = 0.3
-    threat_amplifier_gain: float = 1.5
-    stress_neurotic_amplification: float = 1.5
-    stress_openness_reduction: float = 0.5
-    stress_extraversion_boost: float = 0.7
+    cross_dim_interaction_strength: float = _sim_config_field(
+        "cross_dim_interaction_strength"
+    )
+    threat_sensitivity_gain: float = _sim_config_field("threat_sensitivity_gain")
+    k_processing_tanh_gain: float = _sim_config_field("k_processing_tanh_gain")
+    attention_residual_gain: float = _sim_config_field("attention_residual_gain")
+    attention_modulated_gain: float = _sim_config_field("attention_modulated_gain")
+    relevance_importance_weight: float = _sim_config_field(
+        "relevance_importance_weight"
+    )
+    relevance_base_weight: float = _sim_config_field("relevance_base_weight")
+    threat_amplifier_gain: float = _sim_config_field("threat_amplifier_gain")
+    stress_neurotic_amplification: float = _sim_config_field(
+        "stress_neurotic_amplification"
+    )
+    stress_openness_reduction: float = _sim_config_field("stress_openness_reduction")
+    stress_extraversion_boost: float = _sim_config_field("stress_extraversion_boost")
 
     # Researcher (Physics)
-    outrage_gain: float = 5.0
-    max_viral_multiplier: float = 10.0
-    saturation_midpoint: float = 0.5
+    outrage_gain: float = _sim_config_field("outrage_gain")
+    max_viral_multiplier: float = _sim_config_field("max_viral_multiplier")
+    saturation_midpoint: float = _sim_config_field("saturation_midpoint")
 
     # Researcher (Distortion)
-    distortion_max_noise: float = 0.4
-    distortion_neurotic_gain: float = 0.6
-    perception_social_consensus_gain: float = 0.25  # New 2-Stage Perception
-    affinity_min_strength: float = 0.01
-    normalize_affinities_by_mean: bool = True
+    distortion_max_noise: float = _sim_config_field("distortion_max_noise")
+    distortion_neurotic_gain: float = _sim_config_field("distortion_neurotic_gain")
+    perception_social_consensus_gain: float = _sim_config_field(
+        "perception_social_consensus_gain"
+    )
+    affinity_min_strength: float = _sim_config_field("affinity_min_strength")
+    normalize_affinities_by_mean: bool = _sim_config_field(
+        "normalize_affinities_by_mean"
+    )
 
     # Researcher (Evolution)
-    evolution_generations: int = 10
-    inheritance_fraction: float = 0.7
-    shock_frequency: float = 0.1
-    shock_magnitude: float = 0.2
+    evolution_generations: int = _sim_config_field("evolution_generations")
+    inheritance_fraction: float = _sim_config_field("inheritance_fraction")
+    shock_frequency: float = _sim_config_field("shock_frequency")
+    shock_magnitude: float = _sim_config_field("shock_magnitude")
 
 
 class SimulationRequest(BaseModel):
@@ -190,6 +279,22 @@ def clone_sim_config(config: SimConfig, **overrides: Any) -> SimConfig:
     cloned = replace(config, **overrides)
     cloned.wealth_dim_idx = DIMENSION_INDICES["Wealth"]
     return cloned
+
+
+def run_profile_to_sim_config_kwargs(
+    run: RunProfile,
+    **overrides: Any,
+) -> dict[str, Any]:
+    config_kwargs: dict[str, Any] = {}
+    for field_name, field_value in run.model_dump().items():
+        sim_field_name = _RUN_PROFILE_TO_SIM_CONFIG_FIELD_MAP.get(
+            field_name,
+            field_name,
+        )
+        if sim_field_name in _SIM_CONFIG_DEFAULTS:
+            config_kwargs[sim_field_name] = deepcopy(field_value)
+    config_kwargs.update(overrides)
+    return config_kwargs
 
 
 def build_debug_society(
@@ -534,70 +639,12 @@ def build_society_cache_key(config: SimConfig) -> str:
 
 def prepare_society_sync(run: RunProfile, run_output_dir: str):
     """Generates and evolves society synchronously"""
-    config = SimConfig(
-        num_agents=run.agent_count,
-        seed=run.seed,
-        use_signal_distortion=run.use_distortion,
-        use_time_pressure=run.use_pressure,
-        use_maslow_gating=run.use_maslow,
-        use_power_law_influence=run.use_power_law,
-        mutation_temperature=run.temperature,
-        emotion_temperature=run.emotion_temperature,
-        panic_threshold=run.panic_threshold,
-        output_dir=run_output_dir,
-        cross_dim_interaction_strength=run.cross_dim_interaction_strength,
-        threat_sensitivity_gain=run.threat_sensitivity_gain,
-        k_processing_tanh_gain=run.k_processing_tanh_gain,
-        attention_residual_gain=run.attention_residual_gain,
-        attention_modulated_gain=run.attention_modulated_gain,
-        relevance_importance_weight=run.relevance_importance_weight,
-        relevance_base_weight=run.relevance_base_weight,
-        threat_amplifier_gain=run.threat_amplifier_gain,
-        stress_neurotic_amplification=run.stress_neurotic_amplification,
-        stress_openness_reduction=run.stress_openness_reduction,
-        stress_extraversion_boost=run.stress_extraversion_boost,
-        outrage_gain=run.outrage_gain,
-        max_viral_multiplier=run.max_viral_multiplier,
-        saturation_midpoint=run.saturation_midpoint,
-        distortion_max_noise=run.distortion_max_noise,
-        distortion_neurotic_gain=run.distortion_neurotic_gain,
-        perception_social_consensus_gain=run.perception_social_consensus_gain,
-        affinity_min_strength=run.affinity_min_strength,
-        normalize_affinities_by_mean=run.normalize_affinities_by_mean,
-        evolution_generations=run.evolution_generations,
-        inheritance_fraction=run.inheritance_fraction,
-        shock_frequency=run.shock_frequency,
-        shock_magnitude=run.shock_magnitude,
-        use_algorithmic_amplification=run.use_algorithmic_amplification,
-        algo_sample_size=run.algo_sample_size,
-        algo_exaggeration_factor=run.algo_exaggeration_factor,
-        use_selective_exposure=run.use_selective_exposure,
-        selective_exposure_base_tolerance=run.selective_exposure_base_tolerance,
-        selective_exposure_openness_factor=run.selective_exposure_openness_factor,
-        selective_exposure_gain=run.selective_exposure_gain,
-        selective_exposure_max_suppression=run.selective_exposure_max_suppression,
-        use_agent_memory=run.use_agent_memory,
-        memory_decay_rate=run.memory_decay_rate,
-        memory_desensitization_gain=run.memory_desensitization_gain,
-        memory_trigger_stacking_gain=run.memory_trigger_stacking_gain,
-        memory_social_rehearsal_gain=run.memory_social_rehearsal_gain,
-        stewing_ticks=run.stewing_ticks,
-        stewing_self_retention=run.stewing_self_retention,
-        stewing_local_influence=run.stewing_local_influence,
-        stewing_viral_influence=run.stewing_viral_influence,
-        use_network_topology=run.use_network_topology,
-        homophily_strength=run.homophily_strength,
-        influence_bias_exp=run.influence_bias_exp,
-        triadic_closure_prob=run.triadic_closure_prob,
-        triadic_closure_iterations=run.triadic_closure_iterations,
-        triadic_closure_homophily_threshold=run.triadic_closure_homophily_threshold,
-        use_granovetter_thresholds=run.use_granovetter_thresholds,
-        granovetter_threshold_mean=run.granovetter_threshold_mean,
-        granovetter_threshold_std=run.granovetter_threshold_std,
-        personality_socialization_gain=run.personality_socialization_gain,
-        enable_evolution=run.enable_evolution,
+    config = create_sim_config(
+        **run_profile_to_sim_config_kwargs(
+            run,
+            output_dir=run_output_dir,
+        )
     )
-    config.wealth_dim_idx = DIMENSION_INDICES["Wealth"]
     cache_key = build_society_cache_key(config)
 
     with SOCIETY_CACHE_LOCK:

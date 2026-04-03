@@ -9,21 +9,28 @@ import torch
 from main import (
     DIMENSION_INDICES,
     aggregate_social_state,
+    apply_triadic_closure_for_debug,
     build_debug_society,
     clone_sim_config,
     consolidate_agent_memory,
+    create_topology_for_debug,
     distort_world_signal,
+    map_emotions_to_sentiment,
+    run_cognitive_cycle,
     run_debug_simulation,
 )
 from research_paper_tests._metrics import (
     adjacency_to_graph,
+    average_clustering,
     average_neighbor_distance,
+    bimodality_coefficient,
     gini,
     mean_edge_cosine_similarity,
 )
 from research_paper_tests.config_schema import (
     EMOTION_INDICES,
     PERSONALITY_INDICES,
+    PERSONALITY_TRAIT_COUNT,
     WORLD_DIMENSION_COUNT,
     build_world,
     fraction_count,
@@ -44,6 +51,19 @@ def _line_of_best_fit(x: np.ndarray, y: np.ndarray) -> tuple[np.ndarray, np.ndar
     xs = np.linspace(float(x.min()), float(x.max()), 100)
     ys = slope * xs + intercept
     return xs, ys
+
+
+def _lorenz_curve(values: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    array = np.asarray(values, dtype=np.float64).flatten()
+    if array.size == 0:
+        return np.array([0.0, 1.0]), np.array([0.0, 1.0])
+
+    if np.min(array) < 0.0:
+        array = array - np.min(array)
+    array = np.sort(array + 1e-9)
+    cumulative = np.concatenate([[0.0], np.cumsum(array) / np.sum(array)])
+    population = np.linspace(0.0, 1.0, cumulative.size)
+    return population, cumulative
 
 
 def _build_gate_society(config, settings):
@@ -71,7 +91,7 @@ def test_generate_research_paper_summary_figure(tmp_path):
     output_dir.mkdir(exist_ok=True)
     output_path = output_dir / "research_paper_summary.png"
 
-    fig, axes = plt.subplots(4, 3, figsize=(18, 20))
+    fig, axes = plt.subplots(5, 4, figsize=(24, 28))
     axes = axes.flatten()
 
     # 1. Signal distortion scatter
@@ -485,7 +505,6 @@ def test_generate_research_paper_summary_figure(tmp_path):
     )
     positive_sentiment = semantic_positive.social_state["objective_center"]
     negative_sentiment = semantic_negative.social_state["objective_center"]
-    from main import map_emotions_to_sentiment
 
     pos = map_emotions_to_sentiment(positive_sentiment)
     neg = map_emotions_to_sentiment(negative_sentiment)
@@ -497,10 +516,408 @@ def test_generate_research_paper_summary_figure(tmp_path):
     axes[11].set_title("Semantic Sentiment Profile")
     axes[11].legend()
 
+    # 13. Triadic closure increases clustering
+    clustering_scenario = get_test_scenario("network_clustering_closure")
+    backbone_config = get_test_scenario("network_clustering_backbone").sim_config()
+    clustering_config = clustering_scenario.sim_config()
+    clustering_settings = clustering_scenario.settings()
+    torch_state = torch.get_rng_state()
+    numpy_state = np.random.get_state()
+    try:
+        torch.manual_seed(clustering_settings["torch_seed"])
+        np.random.seed(clustering_settings["numpy_seed"])
+        clustering_exposures = torch.randn(
+            backbone_config.num_agents,
+            WORLD_DIMENSION_COUNT,
+        )
+        clustering_personalities = torch.sigmoid(
+            torch.randn(backbone_config.num_agents, PERSONALITY_TRAIT_COUNT)
+        )
+        clustering_influence = np.random.lognormal(
+            mean=clustering_settings["influence_mean"],
+            sigma=clustering_settings["influence_std"],
+            size=backbone_config.num_agents,
+        )
+        backbone = create_topology_for_debug(
+            backbone_config,
+            clustering_exposures,
+            clustering_personalities,
+            clustering_influence,
+        )
+        refined = apply_triadic_closure_for_debug(clustering_config, backbone)
+    finally:
+        torch.set_rng_state(torch_state)
+        np.random.set_state(numpy_state)
+
+    axes[12].bar(
+        ["Backbone", "Closure"],
+        [average_clustering(backbone), average_clustering(refined)],
+        color=["#adb5bd", "#2a9d8f"],
+    )
+    axes[12].set_title("Network Clustering")
+    axes[12].set_ylabel("Average Clustering")
+
+    # 14. Personality socialization
+    base_social_config = get_test_scenario("personality_socialization_base").sim_config()
+    socialized_config = get_test_scenario(
+        "personality_socialization_socialized"
+    ).sim_config()
+    base_social_society = prepare_scenario_society(
+        "personality_socialization_base",
+        tmp_path,
+        enable_evolution=base_social_config.enable_evolution,
+        output_name="social_base",
+    )
+    socialized_society = prepare_scenario_society(
+        "personality_socialization_socialized",
+        tmp_path,
+        enable_evolution=socialized_config.enable_evolution,
+        output_name="socialized",
+    )
+    axes[13].bar(
+        ["Base", "Socialized"],
+        [
+            average_neighbor_distance(
+                base_social_society.personalities,
+                base_social_society.adjacency_matrix,
+            ),
+            average_neighbor_distance(
+                socialized_society.personalities,
+                socialized_society.adjacency_matrix,
+            ),
+        ],
+        color=["#f4a261", "#2a9d8f"],
+    )
+    axes[13].set_title("Personality Socialization")
+    axes[13].set_ylabel("Neighbor Trait Distance")
+
+    # 15. Influence concentration
+    flat_influence_config = get_test_scenario("cascade_power_law_flat").sim_config()
+    power_influence_config = get_test_scenario("cascade_power_law_power").sim_config()
+    flat_influence_society = prepare_scenario_society(
+        "cascade_power_law_flat",
+        tmp_path,
+        enable_evolution=flat_influence_config.enable_evolution,
+        output_name="flat_influence",
+    )
+    power_influence_society = prepare_scenario_society(
+        "cascade_power_law_power",
+        tmp_path,
+        enable_evolution=power_influence_config.enable_evolution,
+        output_name="power_influence",
+    )
+    flat_influence = flat_influence_society.metadata["Influence"].to_numpy()
+    power_influence = power_influence_society.metadata["Influence"].to_numpy()
+    flat_population, flat_cumulative = _lorenz_curve(flat_influence)
+    power_population, power_cumulative = _lorenz_curve(power_influence)
+    axes[14].plot(
+        [0.0, 1.0],
+        [0.0, 1.0],
+        linestyle="--",
+        color="#adb5bd",
+        linewidth=1.5,
+        label="Perfect equality",
+    )
+    axes[14].plot(
+        flat_population,
+        flat_cumulative,
+        linewidth=2,
+        color="#457b9d",
+        label=f"Flat (G={gini(flat_influence):.2f})",
+    )
+    axes[14].plot(
+        power_population,
+        power_cumulative,
+        linewidth=2,
+        color="#e76f51",
+        label=f"Power law (G={gini(power_influence):.2f})",
+    )
+    axes[14].set_title("Influence Tail")
+    axes[14].set_xlabel("Population Share")
+    axes[14].set_ylabel("Influence Share")
+    axes[14].legend(fontsize=8)
+
+    # 16. Structural influence and realized reach
+    reach_scenario = get_test_scenario("influence_susceptibility")
+    reach_config = reach_scenario.sim_config()
+    reach_settings = reach_scenario.settings()
+    reach_society = prepare_scenario_society(
+        "influence_susceptibility",
+        tmp_path,
+        enable_evolution=reach_config.enable_evolution,
+        output_name="reach",
+    )
+    reach_influence = reach_society.metadata["Influence"].to_numpy()
+    mean_reach_influence = reach_influence.mean()
+    reach_rng = np.random.default_rng(reach_settings["rng_seed"])
+    reach_indices = reach_rng.choice(
+        reach_config.num_agents,
+        size=reach_settings["sample_size"],
+        replace=False,
+    )
+    realized_reach = []
+    for idx in reach_indices:
+        thought = reach_society.exposures[idx].unsqueeze(0)
+        reach_result = run_debug_simulation(
+            reach_config,
+            thought,
+            society=reach_society,
+            urgency=reach_settings["urgency"],
+        )
+        reach_probability = min(
+            1.0,
+            reach_settings["reach_probability_base"]
+            + (reach_influence[idx] / mean_reach_influence)
+            * reach_settings["reach_probability_gain"],
+        )
+        sees_post = (
+            reach_rng.random(reach_config.num_agents) < reach_probability
+        )
+        authority_bonus = 1.0 + np.log1p(reach_influence[idx] / mean_reach_influence)
+        engaged = (
+            reach_result.engagement_scores.detach().cpu().numpy() * authority_bonus
+        )
+        realized_reach.append(
+            float(
+                (
+                    (engaged > reach_settings["engagement_threshold"])
+                    & sees_post
+                ).sum()
+            )
+        )
+    realized_reach = np.asarray(realized_reach, dtype=np.float64)
+    sampled_influence = reach_influence[reach_indices]
+    xs, ys = _line_of_best_fit(sampled_influence, realized_reach)
+    axes[15].scatter(
+        sampled_influence,
+        realized_reach,
+        s=18,
+        alpha=0.6,
+        color="#457b9d",
+    )
+    axes[15].plot(xs, ys, color="#e63946", linewidth=2)
+    axes[15].set_title("Influence vs. Reach")
+    axes[15].set_xlabel("Structural Influence")
+    axes[15].set_ylabel("Realized Reach")
+
+    # 17. Fairness polarization
+    polarization_scenario = get_test_scenario("bimodality_polarization")
+    polarization_config = polarization_scenario.sim_config()
+    polarization_society = prepare_scenario_society(
+        "bimodality_polarization",
+        tmp_path,
+        enable_evolution=polarization_config.enable_evolution,
+        output_name="bimodality",
+    )
+    fairness = polarization_society.exposures[:, DIMENSION_INDICES["Fairness"]].numpy()
+    fairness_bc = bimodality_coefficient(fairness)
+    axes[16].hist(
+        fairness,
+        bins=24,
+        color="#6d597a",
+        alpha=0.8,
+        edgecolor="white",
+    )
+    axes[16].axvline(fairness.mean(), color="#f4a261", linestyle="--", linewidth=2)
+    axes[16].text(
+        0.04,
+        0.95,
+        f"BC = {fairness_bc:.2f}",
+        transform=axes[16].transAxes,
+        va="top",
+        bbox={"boxstyle": "round", "facecolor": "white", "alpha": 0.8},
+    )
+    axes[16].set_title("Fairness Polarization")
+    axes[16].set_xlabel("Fairness Exposure")
+    axes[16].set_ylabel("Agent Count")
+
+    # 18. Truth refinement attention split
+    truth_scenario = get_test_scenario("truth_refinement")
+    truth_config = truth_scenario.sim_config()
+    truth_settings = truth_scenario.settings()
+    truth_config.skepticism_gain = truth_settings["skepticism_gain"]
+    truth_config.logic_gap_threshold = truth_settings["logic_gap_threshold"]
+    truth_society = build_debug_society(
+        truth_config,
+        torch.zeros(truth_config.num_agents, WORLD_DIMENSION_COUNT),
+        torch.tensor(truth_settings["personalities"], dtype=torch.float32),
+    )
+    truth_world = build_world(truth_settings["world"])
+    _, truth_attention, _ = run_cognitive_cycle(
+        truth_config,
+        truth_world,
+        urgency=0.0,
+        is_personal=False,
+        exposures=truth_society.exposures,
+        personalities=truth_society.personalities,
+        affinities=truth_society.affinities,
+    )
+    truth_x = np.arange(truth_config.num_agents)
+    axes[17].bar(
+        truth_x - width / 2,
+        truth_attention[:, 10].numpy(),
+        width=width,
+        label="Short term",
+        color="#8ecae6",
+    )
+    axes[17].bar(
+        truth_x + width / 2,
+        truth_attention[:, 11].numpy(),
+        width=width,
+        label="Long term",
+        color="#ffb703",
+    )
+    axes[17].set_xticks(truth_x, ["Populist", "Skeptical"])
+    axes[17].set_title("Truth Refinement")
+    axes[17].set_ylabel("Attention Weight")
+    axes[17].legend(fontsize=8)
+
+    # 19. Agent memory stacking
+    stack_scenario = get_test_scenario("agent_memory")
+    stack_config = stack_scenario.sim_config()
+    stack_settings = stack_scenario.settings()
+    memory_society = prepare_scenario_society(
+        "agent_memory",
+        tmp_path,
+        enable_evolution=stack_config.enable_evolution,
+        output_name="stacking_memory",
+    )
+    repeated_threat = build_world(stack_settings["repeat_threat"])
+    repeated_curve = []
+    for _ in range(stack_settings["repeat_count"]):
+        repeated_result = run_debug_simulation(
+            stack_config,
+            repeated_threat,
+            society=memory_society,
+            urgency=stack_settings["urgency"],
+        )
+        repeated_curve.append(repeated_result.engagement_scores.mean().item())
+
+    new_threat = build_world(stack_settings["new_threat"])
+    stacked_result = run_debug_simulation(
+        stack_config,
+        new_threat,
+        society=memory_society,
+        urgency=stack_settings["urgency"],
+    )
+    fresh_memory_society = prepare_scenario_society(
+        "agent_memory",
+        tmp_path,
+        enable_evolution=stack_config.enable_evolution,
+        output_name="fresh_memory",
+    )
+    fresh_result = run_debug_simulation(
+        stack_config,
+        new_threat,
+        society=fresh_memory_society,
+        urgency=stack_settings["urgency"],
+    )
+    memory_steps = np.arange(1, len(repeated_curve) + 1)
+    axes[18].plot(
+        memory_steps,
+        repeated_curve,
+        marker="o",
+        color="#264653",
+        label="Repeated threat",
+    )
+    axes[18].axhline(
+        stacked_result.engagement_scores.mean().item(),
+        color="#e76f51",
+        linestyle="--",
+        linewidth=2,
+        label="Stacked new threat",
+    )
+    axes[18].axhline(
+        fresh_result.engagement_scores.mean().item(),
+        color="#8d99ae",
+        linestyle=":",
+        linewidth=2,
+        label="Fresh new threat",
+    )
+    axes[18].set_title("Agent Memory")
+    axes[18].set_xlabel("Repeat Exposure")
+    axes[18].set_ylabel("Mean Engagement")
+    axes[18].legend(fontsize=8)
+
+    # 20. Virality stays bounded
+    virality_scenario = get_test_scenario("maximum_virality")
+    virality_config = virality_scenario.sim_config()
+    virality_settings = virality_scenario.settings()
+    virality_influence = torch.ones(virality_config.num_agents)
+
+    consensus_emotions = zero_emotions(virality_config.num_agents)
+    set_emotions(consensus_emotions, virality_settings["consensus_emotion"])
+
+    outlier_emotions = zero_emotions(virality_config.num_agents)
+    mainstream_count = virality_settings["outlier_mainstream_count"]
+    set_emotions(
+        outlier_emotions,
+        virality_settings["outlier_mainstream_emotion"],
+        rows=slice(None, mainstream_count),
+    )
+    set_emotions(
+        outlier_emotions,
+        virality_settings["outlier_emotions"],
+        rows=slice(mainstream_count, None),
+    )
+
+    consensus_state = aggregate_social_state(
+        virality_config,
+        consensus_emotions,
+        virality_influence,
+        engagement_scores=torch.ones(virality_config.num_agents),
+    )
+    outlier_state = aggregate_social_state(
+        virality_config,
+        outlier_emotions,
+        virality_influence,
+        engagement_scores=torch.cat(
+            [
+                torch.ones(mainstream_count),
+                torch.full(
+                    (virality_settings["outlier_count"],),
+                    virality_settings["boosted_engagement"],
+                ),
+            ]
+        ),
+    )
+    virality_x = np.arange(2)
+    axes[19].bar(
+        virality_x - width / 2,
+        [
+            consensus_state["mean_outrage_multiplier"],
+            outlier_state["mean_outrage_multiplier"],
+        ],
+        width=width,
+        label="Mean",
+        color="#a8dadc",
+    )
+    axes[19].bar(
+        virality_x + width / 2,
+        [
+            consensus_state["max_outrage_multiplier"],
+            outlier_state["max_outrage_multiplier"],
+        ],
+        width=width,
+        label="Max",
+        color="#1d3557",
+    )
+    axes[19].axhline(
+        1.0 + virality_config.max_viral_multiplier,
+        color="#e63946",
+        linestyle="--",
+        linewidth=2,
+        label="Configured cap",
+    )
+    axes[19].set_xticks(virality_x, ["Consensus", "Outliers"])
+    axes[19].set_title("Virality Bounds")
+    axes[19].set_ylabel("Outrage Multiplier")
+    axes[19].legend(fontsize=8)
+
     for axis in axes:
         axis.grid(True, alpha=0.2)
 
-    fig.suptitle("Research Paper Summary Panels", fontsize=20)
+    fig.suptitle("Expanded Research Paper Summary Panels", fontsize=20)
     fig.tight_layout(rect=(0, 0, 1, 0.98))
     fig.savefig(output_path, dpi=220, bbox_inches="tight")
     plt.close(fig)

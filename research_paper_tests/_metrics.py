@@ -2,6 +2,8 @@ import numpy as np
 import torch
 import networkx as nx
 
+from schema import DIMENSION_INDICES
+
 
 def gini(values) -> float:
     array = np.asarray(values, dtype=np.float64).flatten()
@@ -58,3 +60,15 @@ def mean_edge_cosine_similarity(features: torch.Tensor, adjacency_matrix: torch.
     rhs = features[cols]
     sim = torch.nn.functional.cosine_similarity(lhs, rhs, dim=1)
     return float(sim.mean().item())
+
+
+def mean_edge_topology_similarity(
+    exposures: torch.Tensor,
+    personalities: torch.Tensor,
+    adjacency_matrix: torch.Tensor,
+) -> float:
+    wealth_idx = DIMENSION_INDICES["Wealth"]
+    topology_exposures = exposures.clone()
+    topology_exposures[:, wealth_idx] = 0.0
+    topology_features = torch.cat([topology_exposures, personalities], dim=1)
+    return mean_edge_cosine_similarity(topology_features, adjacency_matrix)

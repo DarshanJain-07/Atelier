@@ -25,7 +25,7 @@ from research_paper_tests._metrics import (
     average_neighbor_distance,
     bimodality_coefficient,
     gini,
-    mean_edge_cosine_similarity,
+    mean_edge_topology_similarity,
 )
 from research_paper_tests.config_schema import (
     EMOTION_INDICES,
@@ -64,6 +64,80 @@ def _lorenz_curve(values: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     cumulative = np.concatenate([[0.0], np.cumsum(array) / np.sum(array)])
     population = np.linspace(0.0, 1.0, cumulative.size)
     return population, cumulative
+
+
+def _prepare_seeded_society(
+    scenario_name: str,
+    tmp_path,
+    seed: int,
+    *,
+    output_prefix: str,
+    **config_overrides,
+):
+    scenario = get_test_scenario(scenario_name)
+    config = scenario.sim_config(seed=seed, **config_overrides)
+    settings = scenario.settings()
+    society = prepare_scenario_society(
+        scenario_name,
+        tmp_path,
+        enable_evolution=config.enable_evolution,
+        output_name=f"{output_prefix}_seed_{seed}",
+        seed=seed,
+        **config_overrides,
+    )
+    return config, settings, society
+
+
+def _stacked_share_bars(
+    ax,
+    group_labels: list[str],
+    values: list[np.ndarray | list[float]],
+    stack_labels: list[str],
+    colors: list[str],
+):
+    # Each row is normalized to sum to 1.0, so the x-axis shows categories/groups
+    # and the y-axis always means "share of that group" rather than raw count.
+    # Read each bar from bottom to top to see how the composition changes.
+    matrix = np.asarray(values, dtype=np.float64)
+    normalized = matrix / np.clip(matrix.sum(axis=1, keepdims=True), 1e-9, None)
+    bottoms = np.zeros(normalized.shape[0], dtype=np.float64)
+    x = np.arange(normalized.shape[0])
+
+    for idx, stack_label in enumerate(stack_labels):
+        heights = normalized[:, idx]
+        ax.bar(
+            x,
+            heights,
+            bottom=bottoms,
+            color=colors[idx],
+            label=stack_label,
+        )
+        bottoms += heights
+
+    ax.set_xticks(x, group_labels)
+    ax.set_ylim(0.0, 1.0)
+    ax.set_ylabel("Share")
+
+
+def _plot_seed_lines(
+    ax,
+    seeds: list[int],
+    series: dict[str, list[float]],
+    *,
+    title: str,
+    ylabel: str,
+):
+    # The x-axis is the random seed used to regenerate the full scenario, not time.
+    # Each point is one independent rerun. If lines stay flat across seeds, the
+    # result is robust; if they swing a lot, the metric is seed-sensitive.
+    for label, values in series.items():
+        ax.plot(seeds, values, marker="o", linewidth=2, label=label)
+    ax.set_title(title)
+    ax.set_xlabel("Seed")
+    ax.set_ylabel(ylabel)
+    ax.set_xticks(seeds)
+    if len(series) > 1:
+        ax.legend(fontsize=8)
 
 
 def _build_gate_society(config, settings):
@@ -116,6 +190,10 @@ def test_generate_research_paper_summary_figure(tmp_path):
         - distortion_world[0, DIMENSION_INDICES["Physical_Safety"]].item()
     )
     xs, ys = _line_of_best_fit(neuroticism, distortion)
+    # x-axis: each agent's Neuroticism trait score.
+    # y-axis: how much the agent's perceived Physical_Safety signal deviates from
+    # the true world signal. Higher points mean stronger threat exaggeration.
+    # The red line summarizes whether more neurotic agents distort the signal more.
     axes[0].scatter(neuroticism, distortion, s=10, alpha=0.3, color="#457b9d")
     axes[0].plot(xs, ys, color="#e63946", linewidth=2)
     axes[0].set_title("Signal Distortion")
@@ -159,6 +237,9 @@ def test_generate_research_paper_summary_figure(tmp_path):
         isolated_curve.append(torch.norm(isolated).item())
         rehearsed_curve.append(torch.norm(rehearsed).item())
     steps = np.arange(len(isolated_curve))
+    # x-axis: consolidation/decay step number after the initial memory is formed.
+    # y-axis: overall memory strength (vector norm). Higher values mean the memory
+    # trace remains stronger. A slower drop means the memory is retained longer.
     axes[1].plot(steps, isolated_curve, marker="o", label="Isolated")
     axes[1].plot(steps, rehearsed_curve, marker="s", label="Rehearsed")
     axes[1].set_title("Memory Rehearsal")
@@ -181,6 +262,10 @@ def test_generate_research_paper_summary_figure(tmp_path):
     gate_engagement = gate_result.engagement_scores.numpy()
     gate_openness = gate_society.personalities[:, PERSONALITY_INDICES["Openness"]].numpy()
     xs, ys = _line_of_best_fit(gate_openness, gate_engagement)
+    # x-axis: Openness trait score for each agent.
+    # y-axis: final engagement score under this cognitive-gate scenario.
+    # Each dot is one agent. The trend line shows whether openness is associated
+    # with greater or lower willingness to engage with the incoming signal.
     axes[2].scatter(
         gate_openness,
         gate_engagement,
@@ -229,6 +314,10 @@ def test_generate_research_paper_summary_figure(tmp_path):
         society=algo_society,
         urgency=algo_settings["urgency"],
     )
+    # x-axis: experimental condition with and without algorithmic amplification.
+    # y-axis: mean engagement across the whole population.
+    # Taller bars indicate that the recommender/amplification logic keeps more
+    # users engaged on average.
     axes[3].bar(
         ["Baseline", "Amplified"],
         [
@@ -268,6 +357,10 @@ def test_generate_research_paper_summary_figure(tmp_path):
         + consensus_config.perception_social_consensus_gain
         * torch.sparse.mm(consensus_society.adjacency_matrix, baseline_perceived)
     )
+    # x-axis: perception model without vs. with local social consensus.
+    # y-axis: average distance between neighbors' perceived world states.
+    # Lower bars mean neighbors think more similarly, so consensus pulls local
+    # perceptions toward one another.
     axes[4].bar(
         ["Baseline", "Consensus"],
         [
@@ -328,6 +421,9 @@ def test_generate_research_paper_summary_figure(tmp_path):
         adjacency_matrix=granovetter_society.adjacency_matrix,
         personalities=granovetter_society.personalities,
     )
+    # x-axis: baseline aggregation vs. Granovetter threshold dynamics enabled.
+    # y-axis: acting ratio, i.e. the share of agents who end up taking action.
+    # A taller Cascade bar means a small committed minority triggers wider uptake.
     axes[5].bar(
         ["Baseline", "Cascade"],
         [baseline_granovetter["acting_ratio"], cascade_granovetter["acting_ratio"]],
@@ -355,16 +451,29 @@ def test_generate_research_paper_summary_figure(tmp_path):
     )
     assert low_society.adjacency_matrix is not None
     assert high_society.adjacency_matrix is not None
+    # x-axis: low-homophily vs. high-homophily network generation settings.
+    # y-axis: similarity across connected pairs in the same combined feature space
+    # that the topology builder uses (non-wealth exposures + personality traits).
+    # Higher values mean neighbors already resemble each other more according to
+    # the network-construction logic, which is the structural signature of echo chambers.
     axes[6].bar(
         ["Low", "High"],
         [
-            mean_edge_cosine_similarity(low_society.exposures, low_society.adjacency_matrix),
-            mean_edge_cosine_similarity(high_society.exposures, high_society.adjacency_matrix),
+            mean_edge_topology_similarity(
+                low_society.exposures,
+                low_society.personalities,
+                low_society.adjacency_matrix,
+            ),
+            mean_edge_topology_similarity(
+                high_society.exposures,
+                high_society.personalities,
+                high_society.adjacency_matrix,
+            ),
         ],
         color=["#ced4da", "#6d597a"],
     )
     axes[6].set_title("Echo Chambers")
-    axes[6].set_ylabel("Edge Similarity")
+    axes[6].set_ylabel("Topology Similarity")
 
     low_graph = adjacency_to_graph(low_society.adjacency_matrix)
     high_graph = adjacency_to_graph(high_society.adjacency_matrix)
@@ -373,7 +482,7 @@ def test_generate_research_paper_summary_figure(tmp_path):
             low_graph,
             random_state=homophily_settings["partition_seed"],
         ),
-        low_graph,
+            low_graph,
     )
     high_modularity = community_louvain.modularity(
         community_louvain.best_partition(
@@ -382,6 +491,9 @@ def test_generate_research_paper_summary_figure(tmp_path):
         ),
         high_graph,
     )
+    # x-axis: the same low/high homophily comparison as the previous panel.
+    # y-axis: Louvain modularity Q, where larger values mean cleaner separation
+    # into densely connected communities with fewer cross-community links.
     axes[7].bar(
         ["Low", "High"],
         [low_modularity, high_modularity],
@@ -399,6 +511,10 @@ def test_generate_research_paper_summary_figure(tmp_path):
         output_name="corr",
     )
     observed_corr = np.corrcoef(corr_society.personalities.numpy().T)
+    # x-axis and y-axis both list the Big Five traits: O, C, E, A, N.
+    # Each cell shows the correlation between a pair of traits across agents.
+    # Warm colors mean the traits rise together, cool colors mean trade-offs, and
+    # the diagonal is always 1 because each trait is perfectly correlated with itself.
     im = axes[8].imshow(observed_corr, vmin=-1.0, vmax=1.0, cmap="coolwarm")
     axes[8].set_title("Personality Correlations")
     axes[8].set_xticks(range(5), ["O", "C", "E", "A", "N"])
@@ -420,6 +536,9 @@ def test_generate_research_paper_summary_figure(tmp_path):
         enable_evolution=evolved_wealth_config.enable_evolution,
         output_name="evolved_wealth",
     )
+    # x-axis: baseline society vs. evolved society.
+    # y-axis: Gini coefficient of the Wealth dimension, where 0 is perfect equality
+    # and larger values mean more concentration of wealth among fewer agents.
     axes[9].bar(
         ["Baseline", "Evolved"],
         [
@@ -468,6 +587,10 @@ def test_generate_research_paper_summary_figure(tmp_path):
         urgency=relative_settings["urgency"],
     )
     anger = relative_result.final_emotions[:, EMOTION_INDICES["Anger"]]
+    # x-axis: social group identity in the deprivation experiment.
+    # y-axis: mean Anger after exposure to the same world state.
+    # A higher marginalized bar indicates the setup produces asymmetric emotional
+    # burden rather than a uniform reaction across groups.
     axes[10].bar(
         ["Marginalized", "Elites"],
         [
@@ -510,6 +633,10 @@ def test_generate_research_paper_summary_figure(tmp_path):
     neg = map_emotions_to_sentiment(negative_sentiment)
     x = np.arange(3)
     width = 0.35
+    # x-axis: sentiment buckets produced by mapping the social emotional state into
+    # Negative / Neutral / Positive components.
+    # y-axis: strength of each sentiment component for the prosperity vs. threat
+    # worlds. Whichever bar is taller dominates the emotional interpretation.
     axes[11].bar(x - width / 2, pos, width=width, label="Prosperity")
     axes[11].bar(x + width / 2, neg, width=width, label="Threat")
     axes[11].set_xticks(x, ["Negative", "Neutral", "Positive"])
@@ -549,6 +676,9 @@ def test_generate_research_paper_summary_figure(tmp_path):
         torch.set_rng_state(torch_state)
         np.random.set_state(numpy_state)
 
+    # x-axis: network before and after triadic closure is applied.
+    # y-axis: average clustering coefficient, which measures how often a node's
+    # neighbors are also connected to each other. Higher means more triangles.
     axes[12].bar(
         ["Backbone", "Closure"],
         [average_clustering(backbone), average_clustering(refined)],
@@ -574,6 +704,9 @@ def test_generate_research_paper_summary_figure(tmp_path):
         enable_evolution=socialized_config.enable_evolution,
         output_name="socialized",
     )
+    # x-axis: unsocialized baseline vs. socialized personality dynamics.
+    # y-axis: average personality distance between connected neighbors.
+    # Lower values mean network neighbors have become more alike in trait space.
     axes[13].bar(
         ["Base", "Socialized"],
         [
@@ -610,6 +743,10 @@ def test_generate_research_paper_summary_figure(tmp_path):
     power_influence = power_influence_society.metadata["Influence"].to_numpy()
     flat_population, flat_cumulative = _lorenz_curve(flat_influence)
     power_population, power_cumulative = _lorenz_curve(power_influence)
+    # x-axis: cumulative population share after sorting agents from least to most influential.
+    # y-axis: cumulative share of total influence held by that bottom share.
+    # The dashed diagonal is perfect equality; curves farther below it indicate
+    # stronger concentration, and the legend's Gini gives the same idea numerically.
     axes[14].plot(
         [0.0, 1.0],
         [0.0, 1.0],
@@ -688,6 +825,10 @@ def test_generate_research_paper_summary_figure(tmp_path):
     realized_reach = np.asarray(realized_reach, dtype=np.float64)
     sampled_influence = reach_influence[reach_indices]
     xs, ys = _line_of_best_fit(sampled_influence, realized_reach)
+    # x-axis: each sampled agent's structural influence score from the network.
+    # y-axis: realized reach, meaning how many agents actually end up engaged.
+    # Upward slope means central/high-status agents translate network position into
+    # wider practical spread rather than just nominal influence.
     axes[15].scatter(
         sampled_influence,
         realized_reach,
@@ -711,6 +852,10 @@ def test_generate_research_paper_summary_figure(tmp_path):
     )
     fairness = polarization_society.exposures[:, DIMENSION_INDICES["Fairness"]].numpy()
     fairness_bc = bimodality_coefficient(fairness)
+    # x-axis: agents' Fairness exposure values.
+    # y-axis: how many agents fall into each bin.
+    # Multiple separated peaks suggest polarization into camps, and a higher BC
+    # annotation indicates the distribution is more strongly bimodal.
     axes[16].hist(
         fairness,
         bins=24,
@@ -753,6 +898,10 @@ def test_generate_research_paper_summary_figure(tmp_path):
         affinities=truth_society.affinities,
     )
     truth_x = np.arange(truth_config.num_agents)
+    # x-axis: the two hand-crafted agent archetypes in this truth-refinement test.
+    # y-axis: attention weight assigned to short-term vs. long-term considerations.
+    # Within each pair, compare which timescale dominates; across pairs, compare
+    # how different personality styles allocate cognitive attention.
     axes[17].bar(
         truth_x - width / 2,
         truth_attention[:, 10].numpy(),
@@ -813,6 +962,10 @@ def test_generate_research_paper_summary_figure(tmp_path):
         urgency=stack_settings["urgency"],
     )
     memory_steps = np.arange(1, len(repeated_curve) + 1)
+    # x-axis: how many times the same threat has been repeated.
+    # y-axis: mean engagement level. The line shows sensitization to repetition,
+    # while the horizontal references compare a new threat with prior memory
+    # already built ("stacked") versus a truly fresh population.
     axes[18].plot(
         memory_steps,
         repeated_curve,
@@ -882,6 +1035,10 @@ def test_generate_research_paper_summary_figure(tmp_path):
         ),
     )
     virality_x = np.arange(2)
+    # x-axis: a broad consensus emotion profile vs. an outlier-heavy profile.
+    # y-axis: outrage multiplier produced by the aggregation logic.
+    # Compare mean and max bars to the dashed configured cap to verify that even
+    # extreme cases stay bounded instead of exploding without limit.
     axes[19].bar(
         virality_x - width / 2,
         [
@@ -918,6 +1075,662 @@ def test_generate_research_paper_summary_figure(tmp_path):
         axis.grid(True, alpha=0.2)
 
     fig.suptitle("Expanded Research Paper Summary Panels", fontsize=20)
+    fig.tight_layout(rect=(0, 0, 1, 0.98))
+    fig.savefig(output_path, dpi=220, bbox_inches="tight")
+    plt.close(fig)
+
+    assert output_path.exists()
+    assert output_path.stat().st_size > 0
+
+
+def test_generate_research_paper_advanced_visualizations(tmp_path):
+    from sklearn.cluster import KMeans
+    from sklearn.preprocessing import StandardScaler
+    import umap
+
+    output_dir = Path(__file__).resolve().parent / "generated"
+    output_dir.mkdir(exist_ok=True)
+    output_path = output_dir / "research_paper_advanced_visualizations.png"
+
+    fig, axes = plt.subplots(3, 3, figsize=(24, 20))
+    axes = axes.flatten()
+
+    # 1-3. Cluster landscape via UMAP, centroids, and neuroticism spread
+    cluster_scenario = get_test_scenario("clusters")
+    cluster_config = cluster_scenario.sim_config()
+    cluster_settings = cluster_scenario.settings()
+    cluster_society = prepare_scenario_society(
+        "clusters",
+        tmp_path,
+        enable_evolution=cluster_config.enable_evolution,
+        output_name="advanced_clusters",
+    )
+    cluster_personalities = cluster_society.personalities.numpy()
+    scaled_personalities = StandardScaler().fit_transform(cluster_personalities)
+    cluster_model = KMeans(
+        n_clusters=cluster_settings["cluster_count"],
+        random_state=cluster_settings["cluster_seed"],
+        n_init=cluster_settings["cluster_initializations"],
+    )
+    raw_cluster_labels = cluster_model.fit_predict(scaled_personalities)
+    neuroticism_idx = PERSONALITY_INDICES["Neuroticism"]
+    cluster_order = sorted(
+        range(cluster_settings["cluster_count"]),
+        key=lambda cluster_idx: float(
+            cluster_personalities[
+                raw_cluster_labels == cluster_idx,
+                neuroticism_idx,
+            ].mean()
+        ),
+    )
+    cluster_labels = np.empty_like(raw_cluster_labels)
+    for new_cluster_idx, old_cluster_idx in enumerate(cluster_order):
+        cluster_labels[raw_cluster_labels == old_cluster_idx] = new_cluster_idx
+
+    reducer = umap.UMAP(
+        random_state=cluster_settings["cluster_seed"],
+        n_neighbors=30,
+        min_dist=0.15,
+    )
+    embedding = reducer.fit_transform(scaled_personalities)
+    influence = cluster_society.metadata["Influence"].to_numpy(dtype=np.float64)
+    influence_sizes = 16.0 + 48.0 * (
+        (influence - influence.min()) / max(np.ptp(influence), 1e-6)
+    )
+    cluster_colors = plt.get_cmap("tab10")(
+        np.linspace(0.0, 1.0, cluster_settings["cluster_count"])
+    )
+
+    for cluster_idx in range(cluster_settings["cluster_count"]):
+        mask = cluster_labels == cluster_idx
+        # x-axis/y-axis: UMAP coordinates, which are learned embedding dimensions
+        # rather than original traits. Their absolute values do not matter; local
+        # distance and separation do. Nearby points have similar personalities.
+        # Point size reflects influence, so large points are influential agents.
+        axes[0].scatter(
+            embedding[mask, 0],
+            embedding[mask, 1],
+            s=influence_sizes[mask],
+            alpha=0.65,
+            color=cluster_colors[cluster_idx],
+            label=f"C{cluster_idx + 1}",
+        )
+    axes[0].set_title("Personality Cluster UMAP")
+    axes[0].set_xlabel("UMAP 1")
+    axes[0].set_ylabel("UMAP 2")
+    axes[0].legend(fontsize=8, ncol=2)
+
+    cluster_centers = np.vstack(
+        [
+            cluster_personalities[cluster_labels == cluster_idx].mean(axis=0)
+            for cluster_idx in range(cluster_settings["cluster_count"])
+        ]
+    )
+    # x-axis: Big Five traits O, C, E, A, N.
+    # y-axis: cluster identity after sorting clusters by average neuroticism.
+    # Cell color is the mean trait level of that cluster, so each row acts like a
+    # compact personality fingerprint for one discovered subgroup.
+    im = axes[1].imshow(
+        cluster_centers,
+        aspect="auto",
+        vmin=0.0,
+        vmax=1.0,
+        cmap="coolwarm",
+    )
+    axes[1].set_title("Cluster Trait Profiles")
+    axes[1].set_xticks(range(5), ["O", "C", "E", "A", "N"])
+    axes[1].set_yticks(
+        range(cluster_settings["cluster_count"]),
+        [f"C{i + 1}" for i in range(cluster_settings["cluster_count"])],
+    )
+    fig.colorbar(im, ax=axes[1], fraction=0.046, pad=0.04)
+
+    neuroticism_by_cluster = [
+        cluster_personalities[cluster_labels == cluster_idx, neuroticism_idx]
+        for cluster_idx in range(cluster_settings["cluster_count"])
+    ]
+    neuroticism_boxplot = axes[2].boxplot(
+        neuroticism_by_cluster,
+        tick_labels=[f"C{i + 1}" for i in range(cluster_settings["cluster_count"])],
+        patch_artist=True,
+        showfliers=False,
+    )
+    # x-axis: cluster identity.
+    # y-axis: Neuroticism scores within that cluster.
+    # The median line shows the typical value, the box shows the middle 50%, and
+    # taller boxes/whiskers mean more within-cluster spread.
+    for patch, color in zip(neuroticism_boxplot["boxes"], cluster_colors):
+        patch.set_facecolor(color)
+        patch.set_alpha(0.7)
+    axes[2].set_title("Cluster Neuroticism Spread")
+    axes[2].set_ylabel("Neuroticism")
+
+    # 4. Polarization as a distribution rather than a single scalar
+    polarization_config = get_test_scenario("bimodality_polarization").sim_config()
+    polarization_society = prepare_scenario_society(
+        "bimodality_polarization",
+        tmp_path,
+        enable_evolution=polarization_config.enable_evolution,
+        output_name="advanced_bimodality",
+    )
+    fairness = polarization_society.exposures[:, DIMENSION_INDICES["Fairness"]].numpy()
+    fairness_mean = fairness.mean()
+    fairness_bc = bimodality_coefficient(fairness)
+    # x-axis: Fairness exposure.
+    # y-axis: agent count per bin.
+    # The stacked colors split the population below vs. above the mean so the two
+    # poles are visually separated. Clear mass on both sides indicates polarization.
+    axes[3].hist(
+        [fairness[fairness < fairness_mean], fairness[fairness >= fairness_mean]],
+        bins=26,
+        stacked=True,
+        color=["#8ecae6", "#ef476f"],
+        alpha=0.85,
+        label=["Lower fairness pole", "Upper fairness pole"],
+    )
+    axes[3].axvline(fairness_mean, color="#1d3557", linestyle="--", linewidth=2)
+    axes[3].set_title("Fairness Polarization")
+    axes[3].set_xlabel("Fairness Exposure")
+    axes[3].set_ylabel("Agent Count")
+    axes[3].legend(fontsize=8)
+    axes[3].text(
+        0.03,
+        0.95,
+        f"BC = {fairness_bc:.2f}",
+        transform=axes[3].transAxes,
+        va="top",
+        bbox={"boxstyle": "round", "facecolor": "white", "alpha": 0.85},
+    )
+
+    # 5. Class composition stacked by wealth quartile
+    evolved_wealth_config = get_test_scenario("figure_wealth_evolved").sim_config()
+    evolved_wealth_society = prepare_scenario_society(
+        "figure_wealth_evolved",
+        tmp_path,
+        enable_evolution=evolved_wealth_config.enable_evolution,
+        output_name="advanced_wealth_evolved",
+    )
+    wealth_values = evolved_wealth_society.metadata["Raw_Wealth"].to_numpy(dtype=np.float64)
+    class_labels = evolved_wealth_society.metadata["Class"].astype(str).to_numpy()
+    wealth_quantile_ids = np.digitize(
+        wealth_values,
+        np.quantile(wealth_values, [0.25, 0.5, 0.75]),
+        right=True,
+    )
+    ordered_classes = [
+        label
+        for label in [
+            "Underclass",
+            "Working Class",
+            "Middle Class",
+            "Upper Middle",
+            "Elite",
+        ]
+        if label in set(class_labels)
+    ]
+    class_mix = []
+    for quartile_idx in range(4):
+        quartile_classes = class_labels[wealth_quantile_ids == quartile_idx]
+        class_mix.append(
+            np.array(
+                [(quartile_classes == class_name).sum() for class_name in ordered_classes],
+                dtype=np.float64,
+            )
+        )
+    # x-axis: wealth quartiles from Q1 (poorest) to Q4 (richest).
+    # y-axis: within-quartile share, so every bar sums to 100%.
+    # Each colored segment shows class composition inside that quartile. This helps
+    # separate absolute wealth ranking from the class labels assigned to agents.
+    _stacked_share_bars(
+        axes[4],
+        ["Q1", "Q2", "Q3", "Q4"],
+        class_mix,
+        ordered_classes,
+        ["#8d99ae", "#adb5bd", "#90be6d", "#f4a261", "#e76f51"][: len(ordered_classes)],
+    )
+    axes[4].set_title("Class Mix by Wealth Quartile")
+    axes[4].legend(fontsize=8, ncol=2)
+
+    # 6. Sentiment shown as stacked composition
+    semantic_scenario = get_test_scenario("figure_semantic_alignment")
+    semantic_config = semantic_scenario.sim_config()
+    semantic_settings = semantic_scenario.settings()
+    semantic_society = prepare_scenario_society(
+        "figure_semantic_alignment",
+        tmp_path,
+        enable_evolution=semantic_config.enable_evolution,
+        output_name="advanced_semantic",
+    )
+    prosperity_result = run_debug_simulation(
+        semantic_config,
+        build_world(semantic_settings["positive_world"]),
+        society=semantic_society,
+        urgency=semantic_settings["urgency"],
+    )
+    threat_result = run_debug_simulation(
+        semantic_config,
+        build_world(semantic_settings["negative_world"]),
+        society=semantic_society,
+        urgency=semantic_settings["urgency"],
+    )
+    # x-axis: world framing condition, prosperity vs. threat.
+    # y-axis: share of the resulting sentiment mix in Negative / Neutral / Positive.
+    # Because bars are normalized, compare color proportions rather than total height.
+    _stacked_share_bars(
+        axes[5],
+        ["Prosperity", "Threat"],
+        [
+            map_emotions_to_sentiment(prosperity_result.social_state["objective_center"]),
+            map_emotions_to_sentiment(threat_result.social_state["objective_center"]),
+        ],
+        ["Negative", "Neutral", "Positive"],
+        ["#d62828", "#adb5bd", "#2a9d8f"],
+    )
+    axes[5].set_title("Semantic Sentiment Composition")
+    axes[5].legend(fontsize=8)
+
+    # 7. Endogenous events as stacked social-state sentiment
+    endogenous_scenario = get_test_scenario("endogenous_events")
+    endogenous_config = endogenous_scenario.sim_config()
+    endogenous_settings = endogenous_scenario.settings()
+    endogenous_influence = torch.ones(endogenous_config.num_agents)
+    stable_emotions = zero_emotions(endogenous_config.num_agents)
+    set_emotions(stable_emotions, endogenous_settings["stable_emotion"])
+    stable_state = aggregate_social_state(
+        endogenous_config,
+        stable_emotions,
+        endogenous_influence,
+    )
+    polarized_emotions = zero_emotions(endogenous_config.num_agents)
+    midpoint = endogenous_config.num_agents // 2
+    set_emotions(
+        polarized_emotions,
+        endogenous_settings["polarized_group_a"],
+        rows=slice(None, midpoint),
+    )
+    set_emotions(
+        polarized_emotions,
+        endogenous_settings["polarized_group_b"],
+        rows=slice(midpoint, None),
+    )
+    polarized_state = aggregate_social_state(
+        endogenous_config,
+        polarized_emotions,
+        endogenous_influence,
+    )
+    # x-axis: stable emotions vs. polarized emotions before the endogenous-event check.
+    # y-axis: share of Negative / Neutral / Positive sentiment in the aggregate state.
+    # The annotation reports which social action/event was triggered under that state,
+    # so the panel links emotional composition to discrete collective outcomes.
+    _stacked_share_bars(
+        axes[6],
+        ["Stable", "Polarized"],
+        [
+            map_emotions_to_sentiment(stable_state["objective_center"]),
+            map_emotions_to_sentiment(polarized_state["objective_center"]),
+        ],
+        ["Negative", "Neutral", "Positive"],
+        ["#d62828", "#adb5bd", "#2a9d8f"],
+    )
+    axes[6].set_title("Endogenous Event Trigger")
+    axes[6].legend(fontsize=8)
+    axes[6].text(
+        0.03,
+        0.95,
+        f"Action: {polarized_state.get('action_name') or 'None'}",
+        transform=axes[6].transAxes,
+        va="top",
+        bbox={"boxstyle": "round", "facecolor": "white", "alpha": 0.85},
+    )
+
+    # 8. Personal shocks stay more local
+    personal_scenario = get_test_scenario("personal")
+    personal_config = personal_scenario.sim_config()
+    personal_settings = personal_scenario.settings()
+    personal_society = prepare_scenario_society(
+        "personal",
+        tmp_path,
+        enable_evolution=personal_config.enable_evolution,
+        output_name="advanced_personal",
+    )
+    personal_world = build_world(personal_settings["world"])
+    general_result = run_debug_simulation(
+        personal_config,
+        personal_world,
+        society=personal_society,
+        urgency=personal_settings["urgency"],
+        is_personal=False,
+    )
+    personal_result = run_debug_simulation(
+        personal_config,
+        personal_world,
+        society=personal_society,
+        urgency=personal_settings["urgency"],
+        is_personal=True,
+    )
+    scope_boxplot = axes[7].boxplot(
+        [
+            general_result.engagement_scores.numpy(),
+            personal_result.engagement_scores.numpy(),
+        ],
+        tick_labels=["General", "Personal"],
+        patch_artist=True,
+        showfliers=False,
+    )
+    # x-axis: whether the same event is treated as general/public or personal/local.
+    # y-axis: engagement score distribution across agents.
+    # Compare medians and spread: a lower/tighter Personal box means the shock stays
+    # more localized instead of diffusing broadly through the population.
+    for patch, color in zip(scope_boxplot["boxes"], ["#457b9d", "#f4a261"]):
+        patch.set_facecolor(color)
+        patch.set_alpha(0.7)
+    axes[7].set_title("Event Scope Localization")
+    axes[7].set_ylabel("Engagement")
+
+    # 9. Cascade-size distribution from sampled seeds
+    r0_scenario = get_test_scenario("r0_basic_reproduction")
+    r0_config = r0_scenario.sim_config()
+    r0_settings = r0_scenario.settings()
+    r0_society = prepare_scenario_society(
+        "r0_basic_reproduction",
+        tmp_path,
+        enable_evolution=r0_config.enable_evolution,
+        output_name="advanced_r0",
+    )
+    r0_rng = np.random.default_rng(r0_settings["rng_seed"])
+    r0_seed_indices = r0_rng.choice(
+        r0_config.num_agents,
+        size=r0_settings["seed_sample_count"],
+        replace=False,
+    )
+    cascade_sizes = []
+    for idx in r0_seed_indices:
+        thought = r0_society.exposures[idx].unsqueeze(0)
+        r0_result = run_debug_simulation(
+            r0_config,
+            thought,
+            society=r0_society,
+            urgency=r0_settings["urgency"],
+        )
+        engaged = (r0_result.engagement_scores > r0_config.cascade_threshold).sum().item() - 1
+        cascade_sizes.append(max(0, engaged))
+    cascade_sizes = np.asarray(cascade_sizes, dtype=np.int64)
+    cascade_bins = np.arange(cascade_sizes.max() + 2) - 0.5
+    # x-axis: number of secondary agents engaged by a sampled seed post.
+    # y-axis: how many sampled seeds produced that cascade size.
+    # A long right tail means most seeds stay small but a few create much larger
+    # cascades, which is typical of heavy-tailed diffusion processes.
+    axes[8].hist(
+        cascade_sizes,
+        bins=cascade_bins,
+        color="#6d597a",
+        alpha=0.85,
+        edgecolor="white",
+    )
+    axes[8].axvline(cascade_sizes.mean(), color="#e76f51", linestyle="--", linewidth=2)
+    axes[8].set_title("Cascade Size Distribution")
+    axes[8].set_xlabel("Secondary Engagement Count")
+    axes[8].set_ylabel("Sample Count")
+
+    for axis in axes:
+        axis.grid(True, alpha=0.2)
+
+    fig.suptitle("Research Paper Advanced Visualizations", fontsize=20)
+    fig.tight_layout(rect=(0, 0, 1, 0.98))
+    fig.savefig(output_path, dpi=220, bbox_inches="tight")
+    plt.close(fig)
+
+    assert output_path.exists()
+    assert output_path.stat().st_size > 0
+
+
+def test_generate_research_paper_multiseed_debug_figure(tmp_path):
+    output_dir = Path(__file__).resolve().parent / "generated"
+    output_dir.mkdir(exist_ok=True)
+    output_path = output_dir / "research_paper_multiseed_debug.png"
+
+    seeds = [7, 21, 42, 84]
+    wealth_baseline_gini = []
+    wealth_evolved_gini = []
+    echo_low_similarity = []
+    echo_high_similarity = []
+    influence_flat_gini = []
+    influence_power_gini = []
+    consensus_baseline_distance = []
+    consensus_distance = []
+    social_base_distance = []
+    socialized_distance = []
+    fairness_bimodality = []
+
+    for seed in seeds:
+        _, _, wealth_baseline_society = _prepare_seeded_society(
+            "figure_wealth_baseline",
+            tmp_path,
+            seed,
+            output_prefix="multiseed_wealth_baseline",
+        )
+        _, _, wealth_evolved_society = _prepare_seeded_society(
+            "figure_wealth_evolved",
+            tmp_path,
+            seed,
+            output_prefix="multiseed_wealth_evolved",
+        )
+        wealth_baseline_gini.append(
+            gini(wealth_baseline_society.exposures[:, DIMENSION_INDICES["Wealth"]].numpy())
+        )
+        wealth_evolved_gini.append(
+            gini(wealth_evolved_society.exposures[:, DIMENSION_INDICES["Wealth"]].numpy())
+        )
+
+        _, _, echo_low_society = _prepare_seeded_society(
+            "figure_echo_chambers_low",
+            tmp_path,
+            seed,
+            output_prefix="multiseed_echo_low",
+        )
+        _, _, echo_high_society = _prepare_seeded_society(
+            "figure_echo_chambers_high",
+            tmp_path,
+            seed,
+            output_prefix="multiseed_echo_high",
+        )
+        echo_low_similarity.append(
+            mean_edge_topology_similarity(
+                echo_low_society.exposures,
+                echo_low_society.personalities,
+                echo_low_society.adjacency_matrix,
+            )
+        )
+        echo_high_similarity.append(
+            mean_edge_topology_similarity(
+                echo_high_society.exposures,
+                echo_high_society.personalities,
+                echo_high_society.adjacency_matrix,
+            )
+        )
+
+        _, _, influence_flat_society = _prepare_seeded_society(
+            "cascade_power_law_flat",
+            tmp_path,
+            seed,
+            output_prefix="multiseed_influence_flat",
+        )
+        _, _, influence_power_society = _prepare_seeded_society(
+            "cascade_power_law_power",
+            tmp_path,
+            seed,
+            output_prefix="multiseed_influence_power",
+        )
+        influence_flat_gini.append(gini(influence_flat_society.metadata["Influence"].to_numpy()))
+        influence_power_gini.append(gini(influence_power_society.metadata["Influence"].to_numpy()))
+
+        consensus_config, consensus_settings, consensus_society = _prepare_seeded_society(
+            "figure_social_consensus",
+            tmp_path,
+            seed,
+            output_prefix="multiseed_consensus",
+        )
+        assert consensus_society.adjacency_matrix is not None
+        consensus_world = build_world(consensus_settings["world"])
+        baseline_consensus_config = get_test_scenario(
+            "perception_social_consensus_baseline"
+        ).sim_config(
+            num_agents=consensus_config.num_agents,
+            seed=seed,
+        )
+        baseline_perceived = distort_world_signal(
+            baseline_consensus_config,
+            consensus_world,
+            consensus_society.personalities,
+            adjacency_matrix=consensus_society.adjacency_matrix,
+        )
+        consensus_perceived = (
+            (1.0 - consensus_config.perception_social_consensus_gain) * baseline_perceived
+            + consensus_config.perception_social_consensus_gain
+            * torch.sparse.mm(consensus_society.adjacency_matrix, baseline_perceived)
+        )
+        consensus_baseline_distance.append(
+            average_neighbor_distance(
+                baseline_perceived,
+                consensus_society.adjacency_matrix,
+            )
+        )
+        consensus_distance.append(
+            average_neighbor_distance(
+                consensus_perceived,
+                consensus_society.adjacency_matrix,
+            )
+        )
+
+        _, _, social_base_society = _prepare_seeded_society(
+            "personality_socialization_base",
+            tmp_path,
+            seed,
+            output_prefix="multiseed_social_base",
+        )
+        _, _, socialized_society = _prepare_seeded_society(
+            "personality_socialization_socialized",
+            tmp_path,
+            seed,
+            output_prefix="multiseed_socialized",
+        )
+        social_base_distance.append(
+            average_neighbor_distance(
+                social_base_society.personalities,
+                social_base_society.adjacency_matrix,
+            )
+        )
+        socialized_distance.append(
+            average_neighbor_distance(
+                socialized_society.personalities,
+                socialized_society.adjacency_matrix,
+            )
+        )
+
+        _, _, polarization_society = _prepare_seeded_society(
+            "bimodality_polarization",
+            tmp_path,
+            seed,
+            output_prefix="multiseed_bimodality",
+        )
+        fairness_bimodality.append(
+            bimodality_coefficient(
+                polarization_society.exposures[:, DIMENSION_INDICES["Fairness"]].numpy()
+            )
+        )
+
+    fig, axes = plt.subplots(2, 3, figsize=(24, 13))
+    axes = axes.flatten()
+
+    # x-axis: random seed used to regenerate the baseline/evolved wealth scenarios.
+    # y-axis: wealth inequality (Gini). Small gaps across seeds mean the inequality
+    # result is reproducible instead of being an artifact of one initialization.
+    _plot_seed_lines(
+        axes[0],
+        seeds,
+        {
+            "Baseline": wealth_baseline_gini,
+            "Evolved": wealth_evolved_gini,
+        },
+        title="Wealth Gini by Seed",
+        ylabel="Gini",
+    )
+    # x-axis: random seed.
+    # y-axis: topology-space similarity between connected agents using the same
+    # feature bundle the network generator uses. Consistently higher values for
+    # the high-homophily line mean stronger echo chambers across reruns.
+    _plot_seed_lines(
+        axes[1],
+        seeds,
+        {
+            "Low homophily": echo_low_similarity,
+            "High homophily": echo_high_similarity,
+        },
+        title="Echo Similarity by Seed",
+        ylabel="Topology Similarity",
+    )
+    # x-axis: random seed.
+    # y-axis: Gini of influence scores. The comparison checks whether the power-law
+    # setup keeps producing a more unequal influence distribution across reruns.
+    _plot_seed_lines(
+        axes[2],
+        seeds,
+        {
+            "Flat influence": influence_flat_gini,
+            "Power law": influence_power_gini,
+        },
+        title="Influence Inequality by Seed",
+        ylabel="Influence Gini",
+    )
+    # x-axis: random seed.
+    # y-axis: average neighbor perception distance. Lower consensus values across
+    # seeds indicate the consensus mechanism reliably aligns local perceptions.
+    _plot_seed_lines(
+        axes[3],
+        seeds,
+        {
+            "Baseline": consensus_baseline_distance,
+            "Consensus": consensus_distance,
+        },
+        title="Consensus Distance by Seed",
+        ylabel="Neighbor Distance",
+    )
+    # x-axis: random seed.
+    # y-axis: neighbor personality distance. If the socialized line stays below the
+    # base line, socialization consistently reduces trait friction between neighbors.
+    _plot_seed_lines(
+        axes[4],
+        seeds,
+        {
+            "Base": social_base_distance,
+            "Socialized": socialized_distance,
+        },
+        title="Trait Friction by Seed",
+        ylabel="Neighbor Trait Distance",
+    )
+    # x-axis: random seed.
+    # y-axis: bimodality coefficient of Fairness exposure. Values above the dashed
+    # threshold suggest a clearly polarized distribution rather than a single mound.
+    _plot_seed_lines(
+        axes[5],
+        seeds,
+        {"Fairness BC": fairness_bimodality},
+        title="Polarization by Seed",
+        ylabel="Bimodality Coefficient",
+    )
+    axes[5].axhline(
+        0.555,
+        color="#e63946",
+        linestyle="--",
+        linewidth=2,
+        label="Polarized threshold",
+    )
+    axes[5].legend(fontsize=8)
+
+    for axis in axes:
+        axis.grid(True, alpha=0.2)
+
+    fig.suptitle("Research Paper Multi-Seed Debug Comparison", fontsize=20)
     fig.tight_layout(rect=(0, 0, 1, 0.98))
     fig.savefig(output_path, dpi=220, bbox_inches="tight")
     plt.close(fig)

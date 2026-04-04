@@ -1,4 +1,4 @@
-from research_paper_tests._metrics import mean_edge_cosine_similarity
+from research_paper_tests._metrics import mean_edge_topology_similarity
 from research_paper_tests.config_schema import (
     get_test_scenario,
     prepare_scenario_society,
@@ -22,11 +22,15 @@ def test_homophilous_topology_forms_stronger_echo_chambers(tmp_path):
         output_name="high",
     )
 
-    low_similarity = mean_edge_cosine_similarity(
-        low_society.exposures, low_society.adjacency_matrix
+    low_similarity = mean_edge_topology_similarity(
+        low_society.exposures,
+        low_society.personalities,
+        low_society.adjacency_matrix,
     )
-    high_similarity = mean_edge_cosine_similarity(
-        high_society.exposures, high_society.adjacency_matrix
+    high_similarity = mean_edge_topology_similarity(
+        high_society.exposures,
+        high_society.personalities,
+        high_society.adjacency_matrix,
     )
 
     assert high_similarity > low_similarity

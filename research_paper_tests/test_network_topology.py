@@ -1,6 +1,6 @@
 import torch
 
-from research_paper_tests._metrics import mean_edge_cosine_similarity
+from research_paper_tests._metrics import mean_edge_topology_similarity
 from research_paper_tests.config_schema import (
     get_test_scenario,
     prepare_scenario_society,
@@ -28,5 +28,9 @@ def test_network_topology_is_normalized_and_homophilous(tmp_path):
         atol=settings["row_sum_tolerance"],
     )
 
-    edge_similarity = mean_edge_cosine_similarity(society.exposures, adjacency)
+    edge_similarity = mean_edge_topology_similarity(
+        society.exposures,
+        society.personalities,
+        adjacency,
+    )
     assert edge_similarity > settings["min_edge_similarity"]

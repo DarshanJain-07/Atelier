@@ -161,7 +161,7 @@ def test_world_direction_changes_which_emotion_dominates(tmp_path):
     )
 
 
-def test_bridge_links_increase_cross_cluster_diffusion(tmp_path):
+def test_bridge_agents_expand_cross_cluster_diffusion(tmp_path):
     del tmp_path
     scenario = get_test_scenario("bridge_diffusion")
     config = scenario.sim_config()

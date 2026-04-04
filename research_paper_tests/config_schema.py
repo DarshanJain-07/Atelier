@@ -574,6 +574,20 @@ TEST_SCENARIOS: dict[str, ResearchPaperTestScenario] = {
             "min_bridge_local_arousal_gain": 0.06,
         },
     ),
+    "viral_scaling": ResearchPaperTestScenario(
+        config_overrides=_merge(
+            NO_NETWORK_NO_EVOLUTION,
+            {
+                "num_agents": 128,
+                "stewing_ticks": 1,
+            },
+        ),
+        values={
+            "amplitudes": [0.0, 0.04, 0.08, 0.12, 0.16, 0.24, 0.36, 0.6, 0.9],
+            "emotion_name": "Anger",
+            "near_cap_tolerance": 0.05,
+        },
+    ),
     "echo_chambers_high": ResearchPaperTestScenario(
         config_overrides=_merge(
             NETWORK_NO_EVOLUTION,

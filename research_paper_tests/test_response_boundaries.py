@@ -35,6 +35,7 @@ def _run_boundary_worlds(config, society, worlds: dict[str, dict[str, float]], u
         sentiment = map_emotions_to_sentiment(
             result.social_state["objective_center"],
             result.social_state["acting_ratio"],
+            config=config,
         )
         results[label] = {
             "mean_engagement": float(result.engagement_scores.mean().item()),

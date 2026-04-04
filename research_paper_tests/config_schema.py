@@ -94,6 +94,15 @@ def live_run_profile_defaults() -> dict[str, Any]:
             "memory_social_rehearsal_gain": sim_defaults[
                 "memory_social_rehearsal_gain"
             ],
+            "sentiment_neutrality_acting_threshold": sim_defaults[
+                "sentiment_neutrality_acting_threshold"
+            ],
+            "sentiment_neutrality_activation": sim_defaults[
+                "sentiment_neutrality_activation"
+            ],
+            "sentiment_neutrality_leaky_slope": sim_defaults[
+                "sentiment_neutrality_leaky_slope"
+            ],
             "use_network_topology": sim_defaults["use_network_topology"],
             "homophily_strength": sim_defaults["homophily_strength"],
             "influence_bias_exp": sim_defaults["influence_bias_exp"],
@@ -586,6 +595,45 @@ TEST_SCENARIOS: dict[str, ResearchPaperTestScenario] = {
             "amplitudes": [0.0, 0.04, 0.08, 0.12, 0.16, 0.24, 0.36, 0.6, 0.9],
             "emotion_name": "Anger",
             "near_cap_tolerance": 0.05,
+        },
+    ),
+    "trait_sweeps": ResearchPaperTestScenario(
+        config_overrides=_merge(
+            CALM_NO_NETWORK,
+            {
+                "num_agents": 9,
+                "use_selective_exposure": True,
+                "selective_exposure_base_tolerance": -0.3,
+                "selective_exposure_openness_factor": 0.4,
+                "base_action_cost": 0.55,
+            },
+        ),
+        values={
+            "trait_values": [0.05, 0.16, 0.27, 0.39, 0.5, 0.61, 0.73, 0.84, 0.95],
+            "baseline_fill": 0.5,
+            "openness_world": {
+                "Innovation": 0.8,
+                "Fairness": 0.7,
+                "Sanctity": -0.9,
+                "In_Group": -0.5,
+            },
+            "openness_exposure": {
+                "Innovation": -0.8,
+                "Fairness": -0.7,
+                "Sanctity": 0.9,
+                "In_Group": 0.5,
+            },
+            "threat_world": {
+                "Physical_Safety": -0.85,
+                "Stability": -0.65,
+            },
+            "urgency": 0.2,
+            "monotonic_tolerance": 1e-6,
+            "min_openness_gain": 0.05,
+            "min_extraversion_attention_gain": 0.005,
+            "min_extraversion_cost_drop": 0.05,
+            "min_neuroticism_cost_drop": 0.05,
+            "min_conscientiousness_engagement_drop": 0.05,
         },
     ),
     "echo_chambers_high": ResearchPaperTestScenario(

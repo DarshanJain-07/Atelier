@@ -632,10 +632,12 @@ def test_generate_research_paper_summary_figure(tmp_path):
     pos = map_emotions_to_sentiment(
         positive_sentiment,
         semantic_positive.social_state["acting_ratio"],
+        config=semantic_config,
     )
     neg = map_emotions_to_sentiment(
         negative_sentiment,
         semantic_negative.social_state["acting_ratio"],
+        config=semantic_config,
     )
     x = np.arange(3)
     width = 0.35
@@ -1329,10 +1331,12 @@ def test_generate_research_paper_advanced_visualizations(tmp_path):
             map_emotions_to_sentiment(
                 prosperity_result.social_state["objective_center"],
                 prosperity_result.social_state["acting_ratio"],
+                config=semantic_config,
             ),
             map_emotions_to_sentiment(
                 threat_result.social_state["objective_center"],
                 threat_result.social_state["acting_ratio"],
+                config=semantic_config,
             ),
         ],
         ["Negative", "Neutral", "Positive"],
@@ -1381,10 +1385,12 @@ def test_generate_research_paper_advanced_visualizations(tmp_path):
             map_emotions_to_sentiment(
                 stable_state["objective_center"],
                 stable_state["acting_ratio"],
+                config=endogenous_config,
             ),
             map_emotions_to_sentiment(
                 polarized_state["objective_center"],
                 polarized_state["acting_ratio"],
+                config=endogenous_config,
             ),
         ],
         ["Negative", "Neutral", "Positive"],

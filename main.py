@@ -175,6 +175,17 @@ class RunProfile(BaseModel):
     memory_social_rehearsal_gain: float = _sim_config_field(
         "memory_social_rehearsal_gain"
     )
+    sentiment_neutrality_acting_threshold: float = _sim_config_field(
+        "sentiment_neutrality_acting_threshold",
+        ge=0.0,
+    )
+    sentiment_neutrality_activation: str = _sim_config_field(
+        "sentiment_neutrality_activation"
+    )
+    sentiment_neutrality_leaky_slope: float = _sim_config_field(
+        "sentiment_neutrality_leaky_slope",
+        ge=0.0,
+    )
 
     use_network_topology: bool = _sim_config_field("use_network_topology")
     homophily_strength: float = _sim_config_field("homophily_strength")
@@ -485,18 +496,28 @@ def map_emotions_to_sentiment(
     emotion_probs_8dim: torch.Tensor | np.ndarray,
     acting_ratio: float | torch.Tensor | np.ndarray | None = None,
     *,
-    activation: str = "relu",
-    leaky_slope: float = 0.05,
+    config: SimConfig | None = None,
+    activation: str | None = None,
+    leaky_slope: float | None = None,
 ) -> np.ndarray:
     if acting_ratio is None:
         return validator.map_plutchik_to_sentiment(emotion_probs_8dim)
+
+    active_config = config if config is not None else SimConfig()
+    activation_name = activation or active_config.sentiment_neutrality_activation
+    leaky_slope_value = (
+        active_config.sentiment_neutrality_leaky_slope
+        if leaky_slope is None
+        else leaky_slope
+    )
 
     return (
         emotions_to_behavior_aware_sentiment_distribution(
             emotion_probs_8dim,
             acting_ratio,
-            activation=activation,
-            leaky_slope=leaky_slope,
+            neutral_acting_threshold=active_config.sentiment_neutrality_acting_threshold,
+            activation=activation_name,
+            leaky_slope=leaky_slope_value,
         )
         .detach()
         .cpu()

@@ -71,9 +71,9 @@ def emotions_to_behavior_aware_sentiment_distribution(
     emotion_probs: torch.Tensor | list[float],
     acting_ratio: float | torch.Tensor | list[float],
     *,
-    neutral_acting_threshold: float = 0.05,
-    activation: str = "relu",
-    leaky_slope: float = 0.05,
+    neutral_acting_threshold: float,
+    activation: str,
+    leaky_slope: float,
 ) -> torch.Tensor:
     sentiment = emotions_to_sentiment_distribution(emotion_probs)
     acting_tensor = torch.as_tensor(
@@ -97,11 +97,10 @@ def emotions_to_behavior_aware_sentiment_distribution(
         1.0,
     )
 
-    if sentiment.ndim > 1:
-        neutral_gate = neutral_gate.unsqueeze(-1)
+    neutral_gate_expanded = neutral_gate.unsqueeze(-1) if sentiment.ndim > 1 else neutral_gate
 
-    adjusted = sentiment * (1.0 - neutral_gate)
-    adjusted[..., 1] = adjusted[..., 1] + neutral_gate.squeeze(-1) if sentiment.ndim > 1 else adjusted[..., 1] + neutral_gate
+    adjusted = sentiment * (1.0 - neutral_gate_expanded)
+    adjusted[..., 1] = adjusted[..., 1] + neutral_gate
     return adjusted / adjusted.sum(dim=-1, keepdim=True).clamp_min(1e-9)
 
 # --- CONSTANTS ---
@@ -200,6 +199,9 @@ class SimConfig:
         0.15  # Lowered from 0.25 to prevent dead zone for average agents
     )
     engagement_gain: float = 10.0  # Sharpness of transition
+    sentiment_neutrality_acting_threshold: float = 0.05
+    sentiment_neutrality_activation: str = "relu"
+    sentiment_neutrality_leaky_slope: float = 0.05
     use_selective_exposure: bool = True
     selective_exposure_base_tolerance: float = -0.3
     selective_exposure_openness_factor: float = 0.4
@@ -354,6 +356,14 @@ class SimConfig:
             raise ValueError("mutation_temperature must be between 0.0 and 1.0")
         if not (0.0 <= self.emotion_temperature <= 1.0):
             raise ValueError("emotion_temperature must be between 0.0 and 1.0")
+        if self.sentiment_neutrality_acting_threshold < 0.0:
+            raise ValueError("sentiment_neutrality_acting_threshold must be >= 0.0")
+        if self.sentiment_neutrality_leaky_slope < 0.0:
+            raise ValueError("sentiment_neutrality_leaky_slope must be >= 0.0")
+        if self.sentiment_neutrality_activation not in {"relu", "leaky_relu"}:
+            raise ValueError(
+                "sentiment_neutrality_activation must be one of: relu, leaky_relu"
+            )
         if self.panic_threshold > 0:
             # Panic threshold is a safety score threshold, usually negative.
             raise ValueError("panic_threshold must be <= 0")

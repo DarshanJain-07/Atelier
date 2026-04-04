@@ -209,6 +209,7 @@ def test_generate_emotion_direction_and_bridge_diffusion_figure(tmp_path):
                 map_emotions_to_sentiment(
                     result.social_state["objective_center"],
                     result.social_state["acting_ratio"],
+                    config=emotion_config,
                 ),
                 dtype=np.float64,
             ),

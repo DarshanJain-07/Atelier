@@ -629,8 +629,14 @@ def test_generate_research_paper_summary_figure(tmp_path):
     positive_sentiment = semantic_positive.social_state["objective_center"]
     negative_sentiment = semantic_negative.social_state["objective_center"]
 
-    pos = map_emotions_to_sentiment(positive_sentiment)
-    neg = map_emotions_to_sentiment(negative_sentiment)
+    pos = map_emotions_to_sentiment(
+        positive_sentiment,
+        semantic_positive.social_state["acting_ratio"],
+    )
+    neg = map_emotions_to_sentiment(
+        negative_sentiment,
+        semantic_negative.social_state["acting_ratio"],
+    )
     x = np.arange(3)
     width = 0.35
     # x-axis: sentiment buckets produced by mapping the social emotional state into
@@ -1320,8 +1326,14 @@ def test_generate_research_paper_advanced_visualizations(tmp_path):
         axes[5],
         ["Prosperity", "Threat"],
         [
-            map_emotions_to_sentiment(prosperity_result.social_state["objective_center"]),
-            map_emotions_to_sentiment(threat_result.social_state["objective_center"]),
+            map_emotions_to_sentiment(
+                prosperity_result.social_state["objective_center"],
+                prosperity_result.social_state["acting_ratio"],
+            ),
+            map_emotions_to_sentiment(
+                threat_result.social_state["objective_center"],
+                threat_result.social_state["acting_ratio"],
+            ),
         ],
         ["Negative", "Neutral", "Positive"],
         ["#d62828", "#adb5bd", "#2a9d8f"],
@@ -1366,8 +1378,14 @@ def test_generate_research_paper_advanced_visualizations(tmp_path):
         axes[6],
         ["Stable", "Polarized"],
         [
-            map_emotions_to_sentiment(stable_state["objective_center"]),
-            map_emotions_to_sentiment(polarized_state["objective_center"]),
+            map_emotions_to_sentiment(
+                stable_state["objective_center"],
+                stable_state["acting_ratio"],
+            ),
+            map_emotions_to_sentiment(
+                polarized_state["objective_center"],
+                polarized_state["acting_ratio"],
+            ),
         ],
         ["Negative", "Neutral", "Positive"],
         ["#d62828", "#adb5bd", "#2a9d8f"],

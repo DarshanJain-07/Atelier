@@ -473,6 +473,107 @@ TEST_SCENARIOS: dict[str, ResearchPaperTestScenario] = {
             "urgency": 0.5,
         },
     ),
+    "boundary_dose_response": ResearchPaperTestScenario(
+        config_overrides=_merge(
+            CALM_NO_NETWORK,
+            {"num_agents": 256},
+        ),
+        values={
+            "world_direction": {
+                "Physical_Safety": -1.0,
+                "Fairness": -0.7,
+            },
+            "magnitudes": [0.0, 0.15, 0.3, 0.45, 0.6, 0.75, 0.9],
+            "urgency": 0.2,
+            "monotonic_tolerance": 1e-6,
+            "min_engagement_gain": 0.08,
+            "min_acting_gain": 0.05,
+            "min_valence_drop": 0.08,
+        },
+    ),
+    "boundary_low_salience": ResearchPaperTestScenario(
+        config_overrides=_merge(
+            CALM_NO_NETWORK,
+            {"num_agents": 256},
+        ),
+        values={
+            "worlds": {
+                "Zero": {},
+                "Faint Threat": {"Physical_Safety": -0.03},
+                "Mixed Weak": {
+                    "Wealth": 0.03,
+                    "Physical_Safety": -0.03,
+                    "Innovation": 0.03,
+                    "Fairness": -0.03,
+                },
+                "Salient Threat": {
+                    "Physical_Safety": -0.6,
+                    "Fairness": -0.35,
+                },
+            },
+            "low_salience_labels": ["Zero", "Faint Threat", "Mixed Weak"],
+            "salient_label": "Salient Threat",
+            "urgency": 0.2,
+            "max_low_engagement": 0.08,
+            "max_low_abs_valence": 0.2,
+            "min_salient_engagement": 0.18,
+            "min_salient_acting_ratio": 0.08,
+            "min_salient_acting_gap": 0.2,
+            "min_salient_valence_gap": 0.08,
+        },
+    ),
+    "emotion_directionality": ResearchPaperTestScenario(
+        config_overrides=_merge(
+            CALM_NO_NETWORK,
+            {"num_agents": 256},
+        ),
+        values={
+            "worlds": {
+                "Prosperity": {
+                    "Wealth": 0.8,
+                    "Freedom": 0.6,
+                    "Innovation": 0.5,
+                },
+                "Threat": {
+                    "Physical_Safety": -0.9,
+                    "Stability": -0.7,
+                },
+                "Injustice": {
+                    "Fairness": -0.9,
+                    "Care": -0.4,
+                },
+            },
+            "urgency": 0.2,
+            "min_positive_valence": 0.05,
+            "max_negative_valence": -0.1,
+            "min_fear_gap": 0.08,
+            "min_anger_gap": 0.08,
+            "allowed_injustice_emotions": ["Anger", "Disgust"],
+        },
+    ),
+    "bridge_diffusion": ResearchPaperTestScenario(
+        config_overrides=_merge(
+            CALM_NO_NETWORK,
+            {
+                "num_agents": 10,
+                "use_granovetter_thresholds": True,
+                "granovetter_threshold_mean": 0.25,
+                "granovetter_threshold_std": 0.0,
+                "dominant_emotion_threshold": 0.1,
+                "base_action_cost": 0.42,
+                "stewing_ticks": 1,
+            },
+        ),
+        values={
+            "community_a_size": 4,
+            "bridge_size": 2,
+            "community_b_size": 4,
+            "core_emotion": {"Anger": 0.35},
+            "marginal_emotion": {"Anger": 0.18},
+            "min_bridge_acting_gain": 0.25,
+            "min_bridge_local_arousal_gain": 0.06,
+        },
+    ),
     "echo_chambers_high": ResearchPaperTestScenario(
         config_overrides=_merge(
             NETWORK_NO_EVOLUTION,

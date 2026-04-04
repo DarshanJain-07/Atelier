@@ -34,7 +34,10 @@ def test_accuracy_metrics_prefer_matching_baseline(tmp_path):
         is_personal=False,
     )
     emotion_center = result.social_state["objective_center"]
-    sentiment = map_emotions_to_sentiment(emotion_center)
+    sentiment = map_emotions_to_sentiment(
+        emotion_center,
+        result.social_state["acting_ratio"],
+    )
 
     negative_match = calculate_validation_metrics(
         emotion_center,

@@ -41,8 +41,14 @@ def test_semantic_alignment_rewards_matching_sentiment_baselines(tmp_path):
     positive_center = positive.social_state["objective_center"]
     negative_center = negative.social_state["objective_center"]
 
-    positive_sentiment = map_emotions_to_sentiment(positive_center)
-    negative_sentiment = map_emotions_to_sentiment(negative_center)
+    positive_sentiment = map_emotions_to_sentiment(
+        positive_center,
+        positive.social_state["acting_ratio"],
+    )
+    negative_sentiment = map_emotions_to_sentiment(
+        negative_center,
+        negative.social_state["acting_ratio"],
+    )
 
     positive_match = calculate_validation_metrics(
         positive_center,

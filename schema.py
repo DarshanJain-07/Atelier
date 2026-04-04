@@ -66,6 +66,44 @@ def emotions_to_sentiment_distribution(
     sentiment = torch.matmul(emotion_tensor, bucket_matrix)
     return sentiment / sentiment.sum(dim=-1, keepdim=True).clamp_min(1e-9)
 
+
+def emotions_to_behavior_aware_sentiment_distribution(
+    emotion_probs: torch.Tensor | list[float],
+    acting_ratio: float | torch.Tensor | list[float],
+    *,
+    neutral_acting_threshold: float = 0.05,
+    activation: str = "relu",
+    leaky_slope: float = 0.05,
+) -> torch.Tensor:
+    sentiment = emotions_to_sentiment_distribution(emotion_probs)
+    acting_tensor = torch.as_tensor(
+        acting_ratio,
+        dtype=sentiment.dtype,
+        device=sentiment.device,
+    )
+
+    margin = neutral_acting_threshold - acting_tensor
+    if activation == "relu":
+        neutral_gate = torch.clamp(margin, min=0.0)
+    elif activation == "leaky_relu":
+        neutral_gate = torch.where(margin >= 0.0, margin, margin * leaky_slope)
+        neutral_gate = torch.clamp(neutral_gate, min=0.0)
+    else:
+        raise ValueError("activation must be one of: relu, leaky_relu")
+
+    neutral_gate = torch.clamp(
+        neutral_gate / max(neutral_acting_threshold, 1e-9),
+        0.0,
+        1.0,
+    )
+
+    if sentiment.ndim > 1:
+        neutral_gate = neutral_gate.unsqueeze(-1)
+
+    adjusted = sentiment * (1.0 - neutral_gate)
+    adjusted[..., 1] = adjusted[..., 1] + neutral_gate.squeeze(-1) if sentiment.ndim > 1 else adjusted[..., 1] + neutral_gate
+    return adjusted / adjusted.sum(dim=-1, keepdim=True).clamp_min(1e-9)
+
 # --- CONSTANTS ---
 # Map the 12 Dimensions to 8 Plutchik Emotions
 # Shape: (12 Input Dims, 8 Output Emotions)

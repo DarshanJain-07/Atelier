@@ -39,6 +39,7 @@ from schema import (
     EMOTION_LABELS,
     PERSONALITY_CORRELATIONS,
     SimConfig,
+    emotions_to_behavior_aware_sentiment_distribution,
 )
 from society_evolution import SocietyEvolution
 from validation import Validator
@@ -480,8 +481,27 @@ def aggregate_social_state(
     )
 
 
-def map_emotions_to_sentiment(emotion_probs_8dim: torch.Tensor | np.ndarray) -> np.ndarray:
-    return validator.map_plutchik_to_sentiment(emotion_probs_8dim)
+def map_emotions_to_sentiment(
+    emotion_probs_8dim: torch.Tensor | np.ndarray,
+    acting_ratio: float | torch.Tensor | np.ndarray | None = None,
+    *,
+    activation: str = "relu",
+    leaky_slope: float = 0.05,
+) -> np.ndarray:
+    if acting_ratio is None:
+        return validator.map_plutchik_to_sentiment(emotion_probs_8dim)
+
+    return (
+        emotions_to_behavior_aware_sentiment_distribution(
+            emotion_probs_8dim,
+            acting_ratio,
+            activation=activation,
+            leaky_slope=leaky_slope,
+        )
+        .detach()
+        .cpu()
+        .numpy()
+    )
 
 
 def calculate_validation_metrics(

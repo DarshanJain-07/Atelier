@@ -636,6 +636,29 @@ TEST_SCENARIOS: dict[str, ResearchPaperTestScenario] = {
             "min_conscientiousness_engagement_drop": 0.05,
         },
     ),
+    "population_segmentation": ResearchPaperTestScenario(
+        config_overrides=_merge(
+            CALM_NO_NETWORK,
+            {
+                "num_agents": 400,
+            },
+        ),
+        values={
+            "urgency": 0.2,
+            "magnitudes": [0.0, 0.25, 0.5, 0.75, 1.0],
+            "class_order": [
+                "Underclass",
+                "Working Class",
+                "Middle Class",
+                "Upper Middle",
+                "Elite",
+            ],
+            "engagement_gap_floor": 0.04,
+            "action_gap_floor": 0.05,
+            "min_dimensions_with_engagement_separation": 11,
+            "min_dimensions_with_action_separation": 12,
+        },
+    ),
     "echo_chambers_high": ResearchPaperTestScenario(
         config_overrides=_merge(
             NETWORK_NO_EVOLUTION,

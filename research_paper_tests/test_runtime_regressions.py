@@ -65,6 +65,13 @@ def test_prepare_society_cache_isolates_evolution_variants(tmp_path, isolated_so
     baseline_run = evolved_run.model_copy(
         update={"enable_evolution": evolved_settings["baseline_enable_evolution"]}
     )
+    expected_classes = {
+        "Underclass",
+        "Working Class",
+        "Middle Class",
+        "Upper Middle",
+        "Elite",
+    }
 
     _, evolved_meta, _, _, _, _, _, _ = prepare_society_sync(
         evolved_run, str(tmp_path / "evolved")
@@ -73,8 +80,12 @@ def test_prepare_society_cache_isolates_evolution_variants(tmp_path, isolated_so
         baseline_run, str(tmp_path / "baseline")
     )
 
-    assert baseline_meta["Class"].eq("Agent").all()
-    assert not evolved_meta["Class"].eq("Agent").all()
+    assert set(baseline_meta["Class"].unique()).issubset(expected_classes)
+    assert set(evolved_meta["Class"].unique()).issubset(expected_classes)
+    assert not baseline_meta["Class"].eq("Agent").any()
+    assert not evolved_meta["Class"].eq("Agent").any()
+    assert not baseline_meta.equals(evolved_meta)
+    assert not baseline_meta["Raw_Wealth"].equals(evolved_meta["Raw_Wealth"])
 
     with SOCIETY_CACHE_LOCK:
         assert len(SOCIETY_CACHE) == 2

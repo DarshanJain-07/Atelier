@@ -1,13 +1,16 @@
 import asyncio
 import hashlib
+import html
 import json
 import os
+import re
 import shutil
 import time
 import uuid
 from collections import OrderedDict
 from copy import deepcopy
 from dataclasses import asdict, dataclass, fields as dataclass_fields, replace
+from pathlib import Path
 from threading import Lock
 from typing import Any, List, Tuple, cast
 
@@ -22,6 +25,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
 
 from cognitive_engine import CognitiveEngine
+from docs_router import router as docs_router
 from explainability import ExplainabilityEngine
 from generate_society import (
     apply_triadic_closure,
@@ -44,13 +48,31 @@ from schema import (
 from society_evolution import SocietyEvolution
 from validation import Validator
 
+try:
+    import markdown as markdown_lib
+except ImportError:
+    markdown_lib = None
+
 load_dotenv()
 
 # Check API Key
 if not os.getenv("GEMINI_API_KEY"):
     print("❌ ERROR: GEMINI_API_KEY not set. Simulation will fail.")
 
-app = FastAPI()
+PROJECT_ROOT = Path(__file__).resolve().parent
+FRONTEND_DIR = PROJECT_ROOT / "frontend"
+DOCS_HTML_PATH = FRONTEND_DIR / "docs.html"
+PRIMARY_DOC_PATHS = (
+    ("index", PROJECT_ROOT / "docs" / "index.md"),
+    ("readme", PROJECT_ROOT / "README.md"),
+    ("development", PROJECT_ROOT / "docs" / "development.md"),
+    ("api-reference", PROJECT_ROOT / "docs" / "api-reference.md"),
+    ("testing", PROJECT_ROOT / "docs" / "testing.md"),
+)
+
+app = FastAPI(
+    docs_url="/api/docs"
+)
 validator = Validator()
 
 # Enable CORS - Restrict this in production!
@@ -63,6 +85,8 @@ app.add_middleware(
 )
 
 print("✅ Server Ready.")
+
+app.include_router(docs_router)
 
 # Persistent LRU cache for societies (seed + count + temp -> data)
 MAX_CACHE_SIZE = 7
@@ -83,6 +107,99 @@ _RUN_PROFILE_TO_SIM_CONFIG_FIELD_MAP = {
     "use_maslow": "use_maslow_gating",
     "use_power_law": "use_power_law_influence",
 }
+
+
+def _extract_doc_title(markdown_text: str, fallback: str) -> str:
+    for line in markdown_text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("#"):
+            return stripped.lstrip("#").strip() or fallback
+    return fallback
+
+
+def _collect_docs_registry() -> tuple[list[dict[str, str]], dict[str, Path], dict[Path, str]]:
+    pages: list[dict[str, str]] = []
+    slug_to_path: dict[str, Path] = {}
+    path_to_slug: dict[Path, str] = {}
+    seen_paths: set[Path] = set()
+
+    def register(slug: str, path: Path) -> None:
+        resolved = path.resolve()
+        if not path.exists() or slug in slug_to_path or resolved in seen_paths:
+            return
+
+        markdown_text = path.read_text(encoding="utf-8")
+        slug_to_path[slug] = path
+        path_to_slug[resolved] = slug
+        seen_paths.add(resolved)
+        pages.append(
+            {
+                "slug": slug,
+                "title": _extract_doc_title(
+                    markdown_text,
+                    slug.replace("-", " ").title(),
+                ),
+                "source_path": path.relative_to(PROJECT_ROOT).as_posix(),
+            }
+        )
+
+    for slug, path in PRIMARY_DOC_PATHS:
+        register(slug, path)
+
+    for path in sorted((PROJECT_ROOT / "docs").glob("*.md")):
+        register(path.stem, path)
+
+    return pages, slug_to_path, path_to_slug
+
+
+_MARKDOWN_LINK_PATTERN = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
+
+
+def _rewrite_markdown_links(
+    markdown_text: str,
+    source_path: Path,
+    path_to_slug: dict[Path, str],
+) -> str:
+    def replace_link(match: re.Match[str]) -> str:
+        label, target = match.groups()
+
+        if (
+            "://" in target
+            or target.startswith("#")
+            or target.startswith("mailto:")
+        ):
+            return match.group(0)
+
+        path_part, sep, anchor = target.partition("#")
+        if not path_part.endswith(".md"):
+            return match.group(0)
+
+        resolved_target = (source_path.parent / path_part).resolve()
+        slug = path_to_slug.get(resolved_target)
+        if slug is None:
+            return match.group(0)
+
+        doc_href = "/docs" if slug == "index" else f"/docs/{slug}"
+        if sep:
+            doc_href = f"{doc_href}#{anchor}"
+        return f"[{label}]({doc_href})"
+
+    return _MARKDOWN_LINK_PATTERN.sub(replace_link, markdown_text)
+
+
+def _render_markdown(markdown_text: str) -> str:
+    if markdown_lib is None:
+        return f"<pre>{html.escape(markdown_text)}</pre>"
+
+    return markdown_lib.markdown(
+        markdown_text,
+        extensions=[
+            "fenced_code",
+            "tables",
+            "toc",
+            "sane_lists",
+        ],
+    )
 
 
 def _sim_config_default(field_name: str) -> Any:
@@ -1265,16 +1382,10 @@ async def run_simulation(req: SimulationRequest, background_tasks: BackgroundTas
 
     return {"status": "success", "results": all_results}
 
-
-# app.mount("/docs/", StaticFiles(directory="site", html=True), name="docs")
-
-
-# @app.get("/docs")
-# async def docs_redirect():
-#     from fastapi.responses import RedirectResponse
-
-#     return RedirectResponse(url="/docs/")
-
+# Mount the generated test figures directory
+generated_dir = os.path.join(os.path.dirname(__file__), "research_paper_tests", "generated")
+if os.path.exists(generated_dir):
+    app.mount("/generated", StaticFiles(directory=generated_dir), name="generated")
 
 app.mount("/", StaticFiles(directory="frontend", html=True), name="frontend")
 

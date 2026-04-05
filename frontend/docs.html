@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>ATELIER Docs</title>
+        <link
+            href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+            rel="stylesheet"
+        />
+        <link rel="stylesheet" href="/docs.css" />
+        <script>
+            window.MathJax = {
+                tex: {
+                    inlineMath: [['$', '$'], ['\\(', '\\)']],
+                    displayMath: [['$$', '$$'], ['\\[', '\\]']]
+                }
+            };
+        </script>
+        <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    </head>
+    <body>
+        <div class="docs-shell">
+            <aside class="docs-sidebar">
+                <a class="docs-brand" href="/docs">
+                    <span class="docs-brand-mark"></span>
+                    <span>ATELIER Docs</span>
+                </a>
+
+                <nav id="docs-nav" class="docs-nav" aria-label="Documentation pages">
+                    <div class="docs-loading">Loading pages...</div>
+                </nav>
+
+                <div class="docs-sidebar-actions">
+                    <a class="docs-link-button" href="/">Open Simulator</a>
+                </div>
+            </aside>
+
+            <main class="docs-main">
+                <section id="docs-content" class="docs-content" aria-live="polite">
+                    <div class="docs-loading">Loading page...</div>
+                </section>
+            </main>
+        </div>
+
+        <noscript>
+            <div class="docs-noscript">
+                This page needs JavaScript enabled to load the markdown documents.
+            </div>
+        </noscript>
+
+        <script src="/docs.js"></script>
+    </body>
+</html>

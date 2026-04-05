@@ -1,4 +1,4 @@
-# Cognitive Engine (`cognitive_engine.py`)
+# Cognitive Engine
 
 The **Cognitive Engine** is the "brain" of each agent. It is a high-performance PyTorch implementation that transforms the objective **World Tensor** into a subjective, internalized **Context Vector** based on an agent's unique personality, memories, and social context.
 

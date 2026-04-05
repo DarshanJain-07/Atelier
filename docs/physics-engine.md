@@ -1,4 +1,4 @@
-# Social Physics Engine (`physics_engine.py`)
+# Social Physics Engine
 
 The **Social Physics Engine** is responsible for the macroscopic behavior of the simulation. It aggregates thousands of individual agent states into global societal metrics, models the spread of emotions through networks, and triggers secondary "Endogenous Events".
 

@@ -1,4 +1,4 @@
-# Society Evolution (`society_evolution.py`)
+# Society Evolution
 
 The **Society Evolution** module handles the long-term, multi-generational shifts in the simulation. It transforms a static population into a dynamic society where wealth, influence, and ideology evolve through inheritance, reinvestment, and cultural drift.
 

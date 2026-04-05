@@ -98,7 +98,7 @@ The catalog below documents every current `research_paper_tests/test_*.py` file 
 | File | Test function(s) | What it verifies | Artifacts |
 | --- | --- | --- | --- |
 | `test_wealth_gini.py` | `test_evolution_increases_wealth_inequality` | Evolved societies differ measurably from baseline societies on wealth inequality. | None |
-| `test_population_segmentation.py` | `test_same_event_produces_distinct_subgroup_response_profiles`; `test_generate_population_segmentation_figure` | The same event produces materially different engagement/action profiles across classes. | `generated/population_segmentation.png` |
+| `test_population_segmentation.py` | `test_same_event_produces_distinct_subgroup_response_profiles`; `test_generate_population_segmentation_figure` | The same event produces materially different engagement/action profiles across classes. | [![generated/population_segmentation.png](/generated/population_segmentation.png)](/generated/population_segmentation.png) |
 
 ### Cognitive Processing And Perception
 
@@ -111,7 +111,7 @@ The catalog below documents every current `research_paper_tests/test_*.py` file 
 | `test_truth_refinement.py` | `test_truth_refinement_prioritizes_long_term_for_skeptical_agents` | Skeptical agents reweight attention from short-term framing toward long-term implications. | None |
 | `test_relative_deprivation.py` | `test_relative_deprivation_hits_marginalized_agents_harder` | The same event produces stronger anger in structurally marginalized agents than in elites. | Included in summary figure coverage |
 | `test_personal.py` | `test_personal_events_stay_more_localized_than_general_events` | Personal events stay more localized than identical non-personal events. | None |
-| `test_trait_sweeps.py` | `test_trait_sweeps_reveal_monotonic_behavioral_gradients`; `test_generate_trait_sweeps_figure` | Trait sweeps produce directional gradients in engagement, attention, and action cost. | `generated/trait_sweeps.png` |
+| `test_trait_sweeps.py` | `test_trait_sweeps_reveal_monotonic_behavioral_gradients`; `test_generate_trait_sweeps_figure` | Trait sweeps produce directional gradients in engagement, attention, and action cost. | [![generated/trait_sweeps.png](/generated/trait_sweeps.png)](/generated/trait_sweeps.png) |
 
 ### Memory, Amplification, And Social Contagion
 
@@ -120,7 +120,7 @@ The catalog below documents every current `research_paper_tests/test_*.py` file 
 | `test_memory_rehearsal.py` | `test_memory_rehearsal_slows_decay` | Social rehearsal slows memory decay relative to isolated retention. | Included in summary figure coverage |
 | `test_agent_memory.py` | `test_agent_memory_accumulates_and_stacks_new_threats` | Repeated threats build memory and amplify later related engagement. | Included in summary figure coverage |
 | `test_algorithmic_filter_bubble.py` | `test_algorithmic_filter_bubble_mutates_feed_and_boosts_engagement` | The algorithmic amplification pass mutates the feed and increases engagement. | Included in summary figure coverage |
-| `test_viral_scaling.py` | `test_viral_scaling_has_sigmoid_regime_and_cap`; `test_generate_viral_scaling_figure` | Viral amplification follows a nonlinear growth regime and respects its cap. | `generated/viral_scaling.png` |
+| `test_viral_scaling.py` | `test_viral_scaling_has_sigmoid_regime_and_cap`; `test_generate_viral_scaling_figure` | Viral amplification follows a nonlinear growth regime and respects its cap. | [![generated/viral_scaling.png](/generated/viral_scaling.png)](/generated/viral_scaling.png) |
 | `test_maximum_virality.py` | `test_virality_multiplier_stays_bounded_by_config` | Maximum virality remains bounded by config-defined limits. | None |
 | `test_r0_basic_reproduction.py` | `test_r0_estimate_finds_nonzero_secondary_engagement` | Seeding thought contagion produces non-zero secondary engagement. | None |
 | `test_granovetter_cascade.py` | `test_granovetter_thresholds_increase_collective_action` | Threshold-style cascade logic increases or preserves collective action relative to baseline aggregation. | Included in summary figure coverage |
@@ -131,8 +131,8 @@ The catalog below documents every current `research_paper_tests/test_*.py` file 
 | --- | --- | --- | --- |
 | `test_semantic_alignment.py` | `test_semantic_alignment_rewards_matching_sentiment_baselines` | Prosperity and threat worlds map to matching sentiment profiles better than mismatched baselines. | Included in summary figure coverage |
 | `test_accuracy_metrics.py` | `test_accuracy_metrics_prefer_matching_baseline` | Validation metrics reward a matching baseline over an intentionally mismatched one. | None |
-| `test_response_boundaries.py` | `test_event_magnitude_monotonically_increases_engagement_and_action`; `test_low_salience_worlds_keep_reaction_bounded_before_escalation`; `test_generate_response_boundaries_figure` | Reaction strength scales with event magnitude while low-salience worlds remain bounded before escalation. | `generated/response_boundaries.png` |
-| `test_emotion_direction_and_bridge_diffusion.py` | `test_world_direction_changes_which_emotion_dominates`; `test_bridge_agents_expand_cross_cluster_diffusion`; `test_generate_emotion_direction_and_bridge_diffusion_figure` | Different world directions produce different dominant emotions, and bridge agents spread emotion across otherwise separate communities. | `generated/emotion_direction_and_bridge_diffusion.png` |
+| `test_response_boundaries.py` | `test_event_magnitude_monotonically_increases_engagement_and_action`; `test_low_salience_worlds_keep_reaction_bounded_before_escalation`; `test_generate_response_boundaries_figure` | Reaction strength scales with event magnitude while low-salience worlds remain bounded before escalation. | [![generated/response_boundaries.png](/generated/response_boundaries.png)](/generated/response_boundaries.png) |
+| `test_emotion_direction_and_bridge_diffusion.py` | `test_world_direction_changes_which_emotion_dominates`; `test_bridge_agents_expand_cross_cluster_diffusion`; `test_generate_emotion_direction_and_bridge_diffusion_figure` | Different world directions produce different dominant emotions, and bridge agents spread emotion across otherwise separate communities. | [![generated/emotion_direction_and_bridge_diffusion.png](/generated/emotion_direction_and_bridge_diffusion.png)](/generated/emotion_direction_and_bridge_diffusion.png) |
 | `test_endogenous_events.py` | `test_endogenous_events_fire_only_for_unstable_societies` | Endogenous follow-on events are emitted only under unstable/highly polarized states. | None |
 | `test_bimodality_polarization.py` | `test_bimodality_coefficient_detects_polarized_distribution` | Bimodality coefficient distinguishes polarized distributions from normal ones. | Included in summary figure coverage |
 
@@ -147,7 +147,7 @@ The catalog below documents every current `research_paper_tests/test_*.py` file 
 
 | File | Test function(s) | What it verifies | Artifacts |
 | --- | --- | --- | --- |
-| `test_research_paper_figures.py` | `test_generate_research_paper_summary_figure`; `test_generate_research_paper_advanced_visualizations`; `test_generate_research_paper_multiseed_debug_figure` | Composite figure generation covering multiple mechanisms, plus advanced and multi-seed visualization outputs used for research presentation. | `generated/research_paper_summary.png`; `generated/research_paper_advanced_visualizations.png`; `generated/research_paper_multiseed_debug.png` |
+| `test_research_paper_figures.py` | `test_generate_research_paper_summary_figure`; `test_generate_research_paper_advanced_visualizations`; `test_generate_research_paper_multiseed_debug_figure` | Composite figure generation covering multiple mechanisms, plus advanced and multi-seed visualization outputs used for research presentation. | [![generated/research_paper_summary.png](/generated/research_paper_summary.png)](/generated/research_paper_summary.png); [![generated/research_paper_advanced_visualizations.png](/generated/research_paper_advanced_visualizations.png)](/generated/research_paper_advanced_visualizations.png); [![generated/research_paper_multiseed_debug.png](/generated/research_paper_multiseed_debug.png)](/generated/research_paper_multiseed_debug.png) |
 
 ## Figure-Generating Tests
 
@@ -155,12 +155,12 @@ The suite currently includes explicit figure-generation tests for:
 
 | Test file | Output |
 | --- | --- |
-| `test_response_boundaries.py` | `generated/response_boundaries.png` |
-| `test_trait_sweeps.py` | `generated/trait_sweeps.png` |
-| `test_viral_scaling.py` | `generated/viral_scaling.png` |
-| `test_emotion_direction_and_bridge_diffusion.py` | `generated/emotion_direction_and_bridge_diffusion.png` |
-| `test_population_segmentation.py` | `generated/population_segmentation.png` |
-| `test_research_paper_figures.py` | `generated/research_paper_summary.png`, `generated/research_paper_advanced_visualizations.png`, `generated/research_paper_multiseed_debug.png` |
+| `test_response_boundaries.py` | [![generated/response_boundaries.png](/generated/response_boundaries.png)](/generated/response_boundaries.png) |
+| `test_trait_sweeps.py` | [![generated/trait_sweeps.png](/generated/trait_sweeps.png)](/generated/trait_sweeps.png) |
+| `test_viral_scaling.py` | [![generated/viral_scaling.png](/generated/viral_scaling.png)](/generated/viral_scaling.png) |
+| `test_emotion_direction_and_bridge_diffusion.py` | [![generated/emotion_direction_and_bridge_diffusion.png](/generated/emotion_direction_and_bridge_diffusion.png)](/generated/emotion_direction_and_bridge_diffusion.png) |
+| `test_population_segmentation.py` | [![generated/population_segmentation.png](/generated/population_segmentation.png)](/generated/population_segmentation.png) |
+| `test_research_paper_figures.py` | [![generated/research_paper_summary.png](/generated/research_paper_summary.png)](/generated/research_paper_summary.png), [![generated/research_paper_advanced_visualizations.png](/generated/research_paper_advanced_visualizations.png)](/generated/research_paper_advanced_visualizations.png), [![generated/research_paper_multiseed_debug.png](/generated/research_paper_multiseed_debug.png)](/generated/research_paper_multiseed_debug.png) |
 
 ## Practical Notes
 

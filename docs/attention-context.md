@@ -1,4 +1,4 @@
-# Attention Context & Cognitive Gates (`attention_context.py`)
+# Attention Context & Cognitive Gates
 
 The **Attention Context** is a modular pipeline within the Cognitive Engine that determines the **Internalized Relevance** of a world event for an individual agent. It implements a series of "Cognitive Gates" that filter, amplify, or suppress the 12-dimensional World Tensor based on an agent's Big Five personality traits and existing exposures.
 

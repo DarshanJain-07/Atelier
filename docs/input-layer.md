@@ -1,4 +1,4 @@
-# Perception Layer (`input_layer.py`)
+# Perception Layer
 
 The **Perception Layer** is the entry point of the ATELIER framework. It serves as a **Neuro-Symbolic bridge**, translating unstructured natural language (news, policies, social media) into a structured 12-dimensional **World Tensor** and metadata that drives the multi-agent simulation.
 
@@ -93,4 +93,4 @@ The agent's **Neuroticism** determines how much noise is added to the objective 
 $$DistortedSignal = WorldTensor + (\alpha \cdot Noise)$$
 
 Where $\alpha$ (distortion magnitude) is calculated as:
-$$\alpha = BaseAlpha \cdot (1.0 + Neurotic_Gain \cdot Neuroticism)$$
+$$\alpha = BaseAlpha \cdot (1.0 + Neurotic Gain \cdot Neuroticism)$$

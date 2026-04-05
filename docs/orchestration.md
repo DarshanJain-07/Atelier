@@ -1,4 +1,4 @@
-# Orchestration Layer (`main.py`)
+# Orchestration Layer
 
 The **Orchestration Layer** is a FastAPI-based backend that coordinates the various modules of the ATELIER framework. It handles concurrent execution, state management, and the advanced feedback loops that make the simulation autopoietic.
 

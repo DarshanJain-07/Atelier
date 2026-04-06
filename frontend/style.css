@@ -25,6 +25,32 @@
     --font-mono: "JetBrains Mono", monospace;
 }
 
+/* Global Custom Scrollbar */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+}
+
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--text-secondary);
+}
+
+
+
 * {
     box-sizing: border-box;
     margin: 0;
@@ -272,25 +298,7 @@ canvas {
         opacity 0.3s ease,
         transform 0.3s ease;
 
-    /* [FIX] Added Firefox Scrollbar Support */
-    scrollbar-width: thin;
-    scrollbar-color: var(--border) var(--bg-panel);
-}
-
-.sidebar::-webkit-scrollbar {
-    width: 6px;
-}
-.sidebar::-webkit-scrollbar-track {
-    background: var(--bg-panel);
-}
-.sidebar::-webkit-scrollbar-thumb {
-    background: var(--border);
-    border-radius: 3px;
-}
-.sidebar::-webkit-scrollbar-thumb:hover {
-    background: var(--text-secondary);
-}
-
+    }
 /* Hide Spin Buttons on Number Inputs */
 input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button {
@@ -1044,19 +1052,7 @@ input[type="range"]::-moz-range-track {
     gap: 28px;
     min-height: 200px;
 
-    /* [FIX] Added Firefox Scrollbar Support */
-    scrollbar-width: thin;
-    scrollbar-color: var(--border) var(--bg-panel);
-}
-
-.history-graph-container::-webkit-scrollbar {
-    width: 6px;
-}
-.history-graph-container::-webkit-scrollbar-thumb {
-    background: var(--border);
-    border-radius: 3px;
-}
-
+    }
 .empty-history-msg {
     color: var(--text-muted);
     text-align: center;
@@ -1393,15 +1389,6 @@ input[type="range"]::-moz-range-track {
     font-size: 0.75rem;
     font-weight: 700;
 }
-
-.run-filmstrip::-webkit-scrollbar {
-    height: 4px;
-}
-.run-filmstrip::-webkit-scrollbar-thumb {
-    background: var(--border);
-    border-radius: 2px;
-}
-
 /* --- PER-RUN BATCH TOGGLES --- */
 .batch-toggle-grid {
     display: grid;

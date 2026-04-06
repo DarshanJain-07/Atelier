@@ -22,6 +22,32 @@
     --font-mono: "JetBrains Mono", monospace;
 }
 
+/* Global Custom Scrollbar */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+}
+
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--text-secondary);
+}
+
+
+
 * {
     box-sizing: border-box;
     margin: 0;
@@ -116,25 +142,7 @@ a {
     display: flex;
     flex-direction: column;
     gap: 8px;
-    /* Firefox Scrollbar Support */
-    scrollbar-width: thin;
-    scrollbar-color: var(--border) var(--bg-panel);
-}
-
-.docs-nav::-webkit-scrollbar {
-    width: 6px;
-}
-.docs-nav::-webkit-scrollbar-track {
-    background: var(--bg-panel);
-}
-.docs-nav::-webkit-scrollbar-thumb {
-    background: var(--border);
-    border-radius: 3px;
-}
-.docs-nav::-webkit-scrollbar-thumb:hover {
-    background: var(--text-secondary);
-}
-
+    }
 .docs-nav-item {
     display: flex;
     flex-direction: column;
@@ -213,21 +221,6 @@ a {
     overflow-y: auto;
     background-color: var(--bg-app);
 }
-
-.docs-main::-webkit-scrollbar {
-    width: 8px;
-}
-.docs-main::-webkit-scrollbar-track {
-    background: var(--bg-app);
-}
-.docs-main::-webkit-scrollbar-thumb {
-    background: var(--border-highlight);
-    border-radius: 4px;
-}
-.docs-main::-webkit-scrollbar-thumb:hover {
-    background: var(--text-secondary);
-}
-
 .docs-content {
     padding: 32px 32px 96px 32px;
     width: 100%;
@@ -324,24 +317,7 @@ a {
     font-size: 0.9rem;
     display: block;
     overflow-x: auto;
-    /* Optional Firefox scrollbar styling for the table */
-    scrollbar-width: thin;
-    scrollbar-color: var(--border-highlight) transparent;
-}
-.docs-content table::-webkit-scrollbar {
-    height: 8px;
-}
-.docs-content table::-webkit-scrollbar-track {
-    background: transparent;
-}
-.docs-content table::-webkit-scrollbar-thumb {
-    background: var(--border-highlight);
-    border-radius: 4px;
-}
-.docs-content table::-webkit-scrollbar-thumb:hover {
-    background: var(--text-secondary);
-}
-.docs-content th,
+    }.docs-content th,
 .docs-content td {
     padding: 10px 14px;
     border: 1px solid var(--border);

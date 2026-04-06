@@ -42,6 +42,21 @@ python3 -m pytest research_paper_tests/test_runtime_regressions.py -q
 python3 -m pytest research_paper_tests/test_trait_sweeps.py -q
 ```
 
+### Paper Values Export
+
+To generate citation-friendly numeric values for the research paper, run:
+
+```bash
+.venv/bin/pytest research_paper_tests/test_paper_values_report.py -q
+```
+
+This produces:
+
+- `research_paper_tests/generated/paper_values_report.md`
+- `research_paper_tests/generated/paper_values_report.json`
+
+The markdown file is meant for quick copy/paste into writing notes, while the JSON file preserves the same values in a structured format for tables, scripts, or appendix generation.
+
 ## Test Harness Structure
 
 | Path | Role |
@@ -148,6 +163,7 @@ The catalog below documents every current `research_paper_tests/test_*.py` file 
 | File | Test function(s) | What it verifies | Artifacts |
 | --- | --- | --- | --- |
 | `test_research_paper_figures.py` | `test_generate_research_paper_summary_figure`; `test_generate_research_paper_advanced_visualizations`; `test_generate_research_paper_multiseed_debug_figure` | Composite figure generation covering multiple mechanisms, plus advanced and multi-seed visualization outputs used for research presentation. | [![generated/research_paper_summary.png](/generated/research_paper_summary.png)](/generated/research_paper_summary.png); [![generated/research_paper_advanced_visualizations.png](/generated/research_paper_advanced_visualizations.png)](/generated/research_paper_advanced_visualizations.png); [![generated/research_paper_multiseed_debug.png](/generated/research_paper_multiseed_debug.png)](/generated/research_paper_multiseed_debug.png) |
+| `test_paper_values_report.py` | `test_generate_paper_values_report` | Generates deterministic numeric outputs for paper-ready quoting across sentiment, validation, boundaries, topology, inequality, memory, and virality scenarios. | `generated/paper_values_report.md`, `generated/paper_values_report.json` |
 
 ## Figure-Generating Tests
 

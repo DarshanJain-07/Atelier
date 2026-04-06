@@ -1,0 +1,306 @@
+{
+  "generation_command": ".venv/bin/pytest research_paper_tests/test_paper_values_report.py -q",
+  "report_name": "research_paper_values",
+  "sections": {
+    "accuracy_metrics": {
+      "acting_ratio": 0.855469,
+      "matching_wasserstein": 0.3038,
+      "mismatched_wasserstein": 1.3962,
+      "seed": 42,
+      "sentiment": {
+        "Negative": 0.646493,
+        "Neutral": 0.253178,
+        "Positive": 0.100329
+      },
+      "sentiment_valence": -0.539,
+      "wasserstein_gap": 1.0924
+    },
+    "algorithmic_filter_bubble": {
+      "amplified_mean_engagement": 0.326299,
+      "baseline_mean_engagement": 0.106574,
+      "engagement_gain": 0.219725,
+      "max_world_shift": 0.3
+    },
+    "emotion_directionality_and_bridge_diffusion": {
+      "bridge_diffusion": {
+        "acting_ratio_gain": 0.4,
+        "acting_ratio_with_bridge": 1.0,
+        "acting_ratio_without_bridge": 0.6,
+        "community_b_local_arousal_gain": 0.068,
+        "community_b_local_arousal_with_bridge": 0.248,
+        "community_b_local_arousal_without_bridge": 0.18
+      },
+      "world_directionality": {
+        "Injustice": {
+          "acting_ratio": 0.898438,
+          "dominant_emotion": "Anger",
+          "emotion_center": {
+            "Anger": 0.48941,
+            "Anticipation": 0.055893,
+            "Disgust": 0.146406,
+            "Fear": 0.063275,
+            "Joy": 0.03776,
+            "Sadness": 0.171361,
+            "Surprise": 0.055893,
+            "Trust": 0.018035
+          },
+          "sentiment": {
+            "Negative": 0.661552,
+            "Neutral": 0.266462,
+            "Positive": 0.071986
+          },
+          "sentiment_valence": -0.612
+        },
+        "Prosperity": {
+          "acting_ratio": 0.886719,
+          "dominant_emotion": "Joy",
+          "emotion_center": {
+            "Anger": 0.013505,
+            "Anticipation": 0.085969,
+            "Disgust": 0.02924,
+            "Fear": 0.023446,
+            "Joy": 0.673925,
+            "Sadness": 0.010625,
+            "Surprise": 0.103782,
+            "Trust": 0.064621
+          },
+          "sentiment": {
+            "Negative": 0.054528,
+            "Neutral": 0.200064,
+            "Positive": 0.745409
+          },
+          "sentiment_valence": 0.694
+        },
+        "Threat": {
+          "acting_ratio": 0.921875,
+          "dominant_emotion": "Fear",
+          "emotion_center": {
+            "Anger": 0.123874,
+            "Anticipation": 0.046647,
+            "Disgust": 0.046647,
+            "Fear": 0.597956,
+            "Joy": 0.033745,
+            "Sadness": 0.097125,
+            "Surprise": 0.035618,
+            "Trust": 0.012558
+          },
+          "sentiment": {
+            "Negative": 0.702006,
+            "Neutral": 0.234275,
+            "Positive": 0.063719
+          },
+          "sentiment_valence": -0.635
+        }
+      }
+    },
+    "louvain_modularity": {
+      "absolute_gain": 0.185271,
+      "high_homophily": 0.28524,
+      "low_homophily": 0.099969
+    },
+    "memory_rehearsal": {
+      "final_norm_gain": 5.592401,
+      "isolated_curve": [
+        10.0,
+        5.0,
+        2.5,
+        1.25,
+        0.625,
+        0.3125
+      ],
+      "rehearsed_curve": [
+        10.0,
+        9.0,
+        8.099998,
+        7.289999,
+        6.560999,
+        5.904901
+      ]
+    },
+    "network_clustering": {
+      "absolute_gain": 0.550366,
+      "backbone": 0.065414,
+      "with_triadic_closure": 0.615779
+    },
+    "response_boundaries": {
+      "dose_response": [
+        {
+          "acting_ratio": 0.0,
+          "magnitude": 0.0,
+          "mean_engagement": 0.0,
+          "sentiment_valence": -0.138
+        },
+        {
+          "acting_ratio": 0.777344,
+          "magnitude": 0.15,
+          "mean_engagement": 0.106356,
+          "sentiment_valence": -0.286
+        },
+        {
+          "acting_ratio": 0.847656,
+          "magnitude": 0.3,
+          "mean_engagement": 0.231087,
+          "sentiment_valence": -0.413
+        },
+        {
+          "acting_ratio": 0.882812,
+          "magnitude": 0.45,
+          "mean_engagement": 0.327931,
+          "sentiment_valence": -0.516
+        },
+        {
+          "acting_ratio": 0.898438,
+          "magnitude": 0.6,
+          "mean_engagement": 0.401527,
+          "sentiment_valence": -0.595
+        },
+        {
+          "acting_ratio": 0.921875,
+          "magnitude": 0.75,
+          "mean_engagement": 0.458063,
+          "sentiment_valence": -0.657
+        },
+        {
+          "acting_ratio": 0.925781,
+          "magnitude": 0.9,
+          "mean_engagement": 0.502383,
+          "sentiment_valence": -0.706
+        }
+      ],
+      "low_salience_worlds": {
+        "Faint Threat": {
+          "acting_ratio": 0.515625,
+          "mean_engagement": 0.007493,
+          "sentiment": {
+            "Negative": 0.404812,
+            "Neutral": 0.354287,
+            "Positive": 0.240901
+          },
+          "sentiment_valence": -0.164
+        },
+        "Mixed Weak": {
+          "acting_ratio": 0.632812,
+          "mean_engagement": 0.011567,
+          "sentiment": {
+            "Negative": 0.390801,
+            "Neutral": 0.358118,
+            "Positive": 0.251082
+          },
+          "sentiment_valence": -0.14
+        },
+        "Salient Threat": {
+          "acting_ratio": 0.890625,
+          "mean_engagement": 0.384224,
+          "sentiment": {
+            "Negative": 0.638325,
+            "Neutral": 0.261943,
+            "Positive": 0.099732
+          },
+          "sentiment_valence": -0.57
+        },
+        "Zero": {
+          "acting_ratio": 0.0,
+          "mean_engagement": 0.0,
+          "sentiment": {
+            "Negative": 0.0,
+            "Neutral": 1.0,
+            "Positive": 0.0
+          },
+          "sentiment_valence": -0.138
+        }
+      }
+    },
+    "semantic_alignment": {
+      "negative_minus_positive_negative_share": 0.589216,
+      "negative_world": {
+        "acting_ratio": 0.925781,
+        "sentiment": {
+          "Negative": 0.686125,
+          "Neutral": 0.245584,
+          "Positive": 0.068291
+        },
+        "sentiment_valence": -0.687,
+        "wasserstein_against_positive": 1.4178,
+        "wasserstein_match": 0.1822
+      },
+      "positive_world": {
+        "acting_ratio": 0.8125,
+        "sentiment": {
+          "Negative": 0.096909,
+          "Neutral": 0.330003,
+          "Positive": 0.573088
+        },
+        "sentiment_valence": 0.505,
+        "wasserstein_against_negative": 1.2762,
+        "wasserstein_match": 0.3238
+      },
+      "seed": 42
+    },
+    "sentiment_mapping": {
+      "high_activity": {
+        "Negative": 0.8,
+        "Neutral": 0.2,
+        "Positive": 0.0
+      },
+      "low_activity": {
+        "Negative": 0.533333,
+        "Neutral": 0.466667,
+        "Positive": 0.0
+      },
+      "negative_drop_low_vs_raw": 0.266667,
+      "neutral_gain_low_vs_high": 0.266667,
+      "neutral_gain_low_vs_raw": 0.266667,
+      "raw": {
+        "Negative": 0.8,
+        "Neutral": 0.2,
+        "Positive": 0.0
+      }
+    },
+    "viral_scaling": {
+      "amplitudes": [
+        0.0,
+        0.04,
+        0.08,
+        0.12,
+        0.16,
+        0.24,
+        0.36,
+        0.6,
+        0.9
+      ],
+      "configured_cap": 11.0,
+      "max_multiplier": [
+        2.192,
+        3.042,
+        4.274,
+        5.8,
+        7.365,
+        9.629,
+        10.772,
+        10.995,
+        11.0
+      ],
+      "mean_multiplier": [
+        2.192,
+        3.042,
+        4.274,
+        5.8,
+        7.365,
+        9.629,
+        10.772,
+        10.995,
+        11.0
+      ],
+      "peak_slope_segment": {
+        "from_amplitude": 0.12,
+        "slope": 39.125,
+        "to_amplitude": 0.16
+      }
+    },
+    "wealth_gini": {
+      "absolute_delta": 0.124479,
+      "baseline": 0.199135,
+      "evolved": 0.323614
+    }
+  }
+}

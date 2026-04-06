@@ -199,7 +199,7 @@ class SimConfig:
         0.15  # Lowered from 0.25 to prevent dead zone for average agents
     )
     engagement_gain: float = 10.0  # Sharpness of transition
-    sentiment_neutrality_acting_threshold: float = 0.05
+    sentiment_neutrality_acting_threshold: float = 0.15
     sentiment_neutrality_activation: str = "relu"
     sentiment_neutrality_leaky_slope: float = 0.05
     use_selective_exposure: bool = True

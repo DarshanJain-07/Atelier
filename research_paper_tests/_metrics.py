@@ -72,3 +72,35 @@ def mean_edge_topology_similarity(
     topology_exposures[:, wealth_idx] = 0.0
     topology_features = torch.cat([topology_exposures, personalities], dim=1)
     return mean_edge_cosine_similarity(topology_features, adjacency_matrix)
+
+
+def mad_metrics(features: torch.Tensor, partition: dict[int, int]) -> dict[str, float]:
+    n = features.shape[0]
+    if n <= 1:
+        return {"mad": 0.0, "mad_within": 0.0, "mad_between": 0.0, "madgap": 0.0, "gdr": 0.0}
+    
+    distances = torch.cdist(features, features, p=2)
+    
+    communities = torch.tensor([partition.get(i, -1) for i in range(n)], device=features.device)
+    same_community = communities.unsqueeze(0) == communities.unsqueeze(1)
+    
+    eye_mask = torch.eye(n, dtype=torch.bool, device=features.device)
+    
+    mad = float(distances[~eye_mask].mean().item())
+    
+    within_mask = same_community & ~eye_mask
+    mad_within = float(distances[within_mask].mean().item()) if within_mask.any() else 0.0
+        
+    between_mask = ~same_community & ~eye_mask
+    mad_between = float(distances[between_mask].mean().item()) if between_mask.any() else 0.0
+        
+    madgap = mad_between - mad_within
+    gdr = mad_between / mad_within if mad_within > 0 else float('inf')
+    
+    return {
+        "mad": mad,
+        "mad_within": mad_within,
+        "mad_between": mad_between,
+        "madgap": madgap,
+        "gdr": gdr
+    }

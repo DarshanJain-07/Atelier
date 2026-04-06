@@ -104,3 +104,96 @@ def mad_metrics(features: torch.Tensor, partition: dict[int, int]) -> dict[str, 
         "madgap": madgap,
         "gdr": gdr
     }
+
+
+def wl_graph_hash(adjacency_matrix: torch.Tensor, iterations: int = 3) -> str:
+    """Computes a Weisfeiler-Lehman graph hash for structural comparison."""
+    graph = adjacency_to_graph(adjacency_matrix)
+    import warnings
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", UserWarning)
+        return nx.weisfeiler_lehman_graph_hash(graph, iterations=iterations)
+
+
+def wl_node_hashes(adjacency_matrix: torch.Tensor, iterations: int = 3) -> dict[int, list[str]]:
+    """Computes Weisfeiler-Lehman subgraph hashes for node-level structural roles."""
+    graph = adjacency_to_graph(adjacency_matrix)
+    import warnings
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", UserWarning)
+        return nx.weisfeiler_lehman_subgraph_hashes(graph, iterations=iterations)
+
+
+def wl_echo_chamber_structural_similarity(
+    adjacency_matrix: torch.Tensor, 
+    partition: dict[int, int], 
+    iterations: int = 3
+) -> dict[tuple[int, int], float]:
+    """
+    Computes pairwise structural similarity of echo chambers (communities) 
+    using WL subgraph hashes.
+    """
+    from collections import Counter
+    import itertools
+    
+    hashes = wl_node_hashes(adjacency_matrix, iterations=iterations)
+    
+    # group hashes by community (use the final iteration hash as representation)
+    community_hashes = {}
+    for node, comm in partition.items():
+        if comm not in community_hashes:
+            community_hashes[comm] = []
+        # Use the hash from the final iteration to represent the node's structural role
+        community_hashes[comm].append(hashes[node][-1])
+        
+    similarities = {}
+    communities = sorted(list(community_hashes.keys()))
+    
+    for c1, c2 in itertools.combinations(communities, 2):
+        counter_a = Counter(community_hashes[c1])
+        counter_b = Counter(community_hashes[c2])
+        
+        all_keys = set(counter_a.keys()).union(counter_b.keys())
+        vec_a = np.array([counter_a[k] for k in all_keys], dtype=np.float64)
+        vec_b = np.array([counter_b[k] for k in all_keys], dtype=np.float64)
+        
+        norm_a = np.linalg.norm(vec_a)
+        norm_b = np.linalg.norm(vec_b)
+        
+        sim = 0.0
+        if norm_a > 0 and norm_b > 0:
+            sim = float(np.dot(vec_a, vec_b) / (norm_a * norm_b))
+        similarities[(c1, c2)] = sim
+        
+    return similarities
+
+
+def wl_kernel_similarity(adj_a: torch.Tensor, adj_b: torch.Tensor, iterations: int = 3) -> float:
+    """
+    Computes a continuous structural similarity score between two graphs using 
+    a WL Subtree Kernel (dot product of normalized hash frequency vectors).
+    """
+    from collections import Counter
+    
+    hashes_a = wl_node_hashes(adj_a, iterations=iterations)
+    hashes_b = wl_node_hashes(adj_b, iterations=iterations)
+    
+    # Flatten the hashes for all iterations
+    # In WL Subtree Kernel, features are counts of all subtrees across all iterations
+    flat_a = [h for node_hashes in hashes_a.values() for h in node_hashes]
+    flat_b = [h for node_hashes in hashes_b.values() for h in node_hashes]
+    
+    counter_a = Counter(flat_a)
+    counter_b = Counter(flat_b)
+    
+    all_keys = set(counter_a.keys()).union(counter_b.keys())
+    vec_a = np.array([counter_a[k] for k in all_keys], dtype=np.float64)
+    vec_b = np.array([counter_b[k] for k in all_keys], dtype=np.float64)
+    
+    norm_a = np.linalg.norm(vec_a)
+    norm_b = np.linalg.norm(vec_b)
+    
+    if norm_a == 0 or norm_b == 0:
+        return 0.0
+    return float(np.dot(vec_a, vec_b) / (norm_a * norm_b))
+

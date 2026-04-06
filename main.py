@@ -1004,7 +1004,7 @@ async def run_simulation(req: SimulationRequest, background_tasks: BackgroundTas
     try:
         # Start LLM Task
         print(f"[{request_id}] Analyzing News with LLM...")
-        llm_task = asyncio.to_thread(get_world_state, req.news_text)
+        llm_task = asyncio.create_task(get_world_state(req.news_text))
 
         # Start Baseline Tasks
         print(f"[{request_id}] Analyzing News with Baseline AIs...")

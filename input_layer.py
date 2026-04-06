@@ -1,9 +1,9 @@
+import asyncio
 import json
 import os
-import time
 from typing import Optional, Tuple
 
-import requests
+import aiohttp
 import torch
 from dotenv import load_dotenv
 from pydantic import BaseModel
@@ -51,7 +51,7 @@ class WorldState(BaseModel):
     model_config = {"extra": "forbid"}
 
 
-def get_world_state(user_input: str) -> Tuple[torch.Tensor, float, bool, list[str], str]:
+async def get_world_state(user_input: str) -> Tuple[torch.Tensor, float, bool, list[str], str]:
     """
     Analyzes the news event using the LLM.
     Returns:
@@ -173,39 +173,40 @@ def get_world_state(user_input: str) -> Tuple[torch.Tensor, float, bool, list[st
     base_delay = 1
     result: Optional[WorldState] = None
 
-    for attempt in range(max_retries):
-        try:
-            resp = requests.post(
-                url,
-                headers=headers,
-                data=json.dumps(payload),
-                timeout=10,
-            )
-
-            if resp.status_code != 200:
-                raise LLMGenerationError(f"API Error {resp.status_code}: {resp.text}")
-
-            data = resp.json()
-
+    async with aiohttp.ClientSession() as session:
+        for attempt in range(max_retries):
             try:
-                text_response = data["candidates"][0]["content"]["parts"][0]["text"]
-            except (KeyError, IndexError) as e:
-                raise LLMGenerationError(
-                    f"Unexpected API response format: {data}"
-                ) from e
+                async with session.post(
+                    url,
+                    headers=headers,
+                    data=json.dumps(payload),
+                    timeout=10,
+                ) as resp:
+                    if resp.status != 200:
+                        text = await resp.text()
+                        raise LLMGenerationError(f"API Error {resp.status}: {text}")
 
-            parsed_json = json.loads(text_response)
+                    data = await resp.json()
 
-            result = WorldState(**parsed_json)
+                    try:
+                        text_response = data["candidates"][0]["content"]["parts"][0]["text"]
+                    except (KeyError, IndexError) as e:
+                        raise LLMGenerationError(
+                            f"Unexpected API response format: {data}"
+                        ) from e
 
-            break
+                    parsed_json = json.loads(text_response)
 
-        except Exception as e:
-            if attempt == max_retries - 1:
-                raise DimensionParseError(f"Dimension Retrieval Failure: {e}") from e
+                    result = WorldState(**parsed_json)
 
-            print(f"Retrying after error: {e}")
-            time.sleep(base_delay * (2**attempt))
+                    break
+
+            except Exception as e:
+                if attempt == max_retries - 1:
+                    raise DimensionParseError(f"Dimension Retrieval Failure: {e}") from e
+
+                print(f"Retrying after error: {e}")
+                await asyncio.sleep(base_delay * (2**attempt))
 
     if result is None:
         raise RuntimeError("WorldState parsing failed after retries")
@@ -228,12 +229,15 @@ def get_world_state(user_input: str) -> Tuple[torch.Tensor, float, bool, list[st
 
 if __name__ == "__main__":
     # Test
-    news = "Introduction of new rules regarding flight time duty regulations of plane members severely impacting of major airlines"
-    if not GEMINI_API_KEY:
-        raise ValueError("GEMINI_API_KEY not found in .env file")
-    tensor, urg, pers, biases, reason = get_world_state(news)
-    print(f"Biases: {biases}")
-    print(f"Reasoning: {reason}")
-    print(f"Tensor: {tensor}")
-    print(f"Urgency: {urg}")
-    print(f"Personal: {pers}")
+    async def main():
+        news = "Introduction of new rules regarding flight time duty regulations of plane members severely impacting of major airlines"
+        if not GEMINI_API_KEY:
+            raise ValueError("GEMINI_API_KEY not found in .env file")
+        tensor, urg, pers, biases, reason = await get_world_state(news)
+        print(f"Biases: {biases}")
+        print(f"Reasoning: {reason}")
+        print(f"Tensor: {tensor}")
+        print(f"Urgency: {urg}")
+        print(f"Personal: {pers}")
+
+    asyncio.run(main())

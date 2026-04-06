@@ -36,7 +36,7 @@ EMOTION_LABELS: List[str] = [
 ]
 
 VALENCE_WEIGHTS = torch.tensor(
-    [1.0, 0.5, -0.8, 0.0, -1.0, -0.5, -0.8, 0.5], dtype=torch.float32
+    [1.0, 0.5, -0.5, 0.0, -0.5, -0.5, -0.5, 0.5], dtype=torch.float32
 )
 
 
@@ -325,7 +325,7 @@ class SimConfig:
     max_viral_multiplier: float = 10.0
     saturation_midpoint: float = 0.25
     elite_percentile: float = 0.95
-    dominant_emotion_threshold: float = 0.1
+    dominant_emotion_threshold: float = 0.155
     elite_divergence_threshold: float = 0.4
     polarization_threshold: float = 0.5
     action_threshold: float = 0.15

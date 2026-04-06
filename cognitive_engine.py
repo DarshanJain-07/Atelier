@@ -315,7 +315,14 @@ class CognitiveEngine:
         residual_gain = getattr(self.config, "attention_residual_gain", 0.35)
         modulated_gain = getattr(self.config, "attention_modulated_gain", 1.0)
         context_scale = residual_gain + (attention_weights * modulated_gain)
+        
         context_vector = perceived_world * context_scale
+        
+        # Restore energy norm to prevent signal attenuation
+        original_norm = torch.norm(perceived_world, dim=1, keepdim=True)
+        new_norm = torch.norm(context_vector, dim=1, keepdim=True) + 1e-9
+        context_vector = context_vector * (original_norm / new_norm)
+        
         context_vector = torch.clamp(context_vector, -2.0, 2.0)
 
         return context_vector, attention_weights, engagement_scores

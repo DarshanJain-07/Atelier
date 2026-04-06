@@ -158,11 +158,17 @@ class SocialPhysicsEngine:
                 local_influence = getattr(self.config, "stewing_local_influence", 0.3)
                 viral_influence = getattr(self.config, "stewing_viral_influence", 0.1)
 
+                target_arousal = torch.norm(current_emotions, dim=1, keepdim=True)
+
                 new_emotions = (
                     self_retention * current_emotions
                     + local_influence * local_centers
                     + viral_influence * viral_center.unsqueeze(0).expand(N, -1)
                 )
+                
+                # Restore arousal to prevent energy loss during averaging
+                new_arousal = torch.norm(new_emotions, dim=1, keepdim=True) + 1e-9
+                new_emotions = new_emotions * (target_arousal / new_arousal)
                 
                 current_emotions = new_emotions
 

@@ -22,7 +22,7 @@ from dotenv import load_dotenv
 from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, create_model
 
 from cognitive_engine import CognitiveEngine
 from docs_router import router as docs_router
@@ -42,8 +42,12 @@ from schema import (
     DIMENSION_INDICES,
     EMOTION_LABELS,
     PERSONALITY_CORRELATIONS,
+    SIM_CONFIG_FIELDS,
+    RUN_PROFILE_INTERNAL_ONLY_FIELDS,
+    RUN_PROFILE_TO_SIM_CONFIG_FIELD_MAP,
     SimConfig,
     emotions_to_behavior_aware_sentiment_distribution,
+    sim_config_default,
 )
 from society_evolution import SocietyEvolution
 from validation import Validator
@@ -92,22 +96,6 @@ app.include_router(docs_router)
 MAX_CACHE_SIZE = 7
 SOCIETY_CACHE: OrderedDict[str, Any] = OrderedDict()
 SOCIETY_CACHE_LOCK = Lock()
-
-_BASE_SIM_CONFIG = SimConfig()
-_SIM_CONFIG_DEFAULTS = {
-    config_field.name: deepcopy(getattr(_BASE_SIM_CONFIG, config_field.name))
-    for config_field in dataclass_fields(SimConfig)
-    if config_field.init
-}
-_RUN_PROFILE_TO_SIM_CONFIG_FIELD_MAP = {
-    "agent_count": "num_agents",
-    "temperature": "mutation_temperature",
-    "use_distortion": "use_signal_distortion",
-    "use_pressure": "use_time_pressure",
-    "use_maslow": "use_maslow_gating",
-    "use_power_law": "use_power_law_influence",
-}
-
 
 def _extract_doc_title(markdown_text: str, fallback: str) -> str:
     for line in markdown_text.splitlines():
@@ -203,7 +191,7 @@ def _render_markdown(markdown_text: str) -> str:
 
 
 def _sim_config_default(field_name: str) -> Any:
-    return deepcopy(_SIM_CONFIG_DEFAULTS[field_name])
+    return sim_config_default(field_name)
 
 
 def _sim_config_field(
@@ -222,146 +210,53 @@ def _sim_config_field(
     )
 
 
-class RunProfile(BaseModel):
+class _RunProfileBaseModel(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
-    seed: int = _sim_config_field("seed")
-    temperature: float = _sim_config_field(
-        "mutation_temperature",
-        alias="mutation_temperature",
-        ge=0.0,
-        le=1.0,
-    )
-    social_class: str = "All"
-    agent_count: int = _sim_config_field("num_agents", alias="num_agents", gt=0)
-    use_distortion: bool = _sim_config_field(
-        "use_signal_distortion",
-        alias="use_signal_distortion",
-    )
-    use_pressure: bool = _sim_config_field(
-        "use_time_pressure",
-        alias="use_time_pressure",
-    )
-    use_maslow: bool = _sim_config_field(
-        "use_maslow_gating",
-        alias="use_maslow_gating",
-    )
-    use_power_law: bool = _sim_config_field(
-        "use_power_law_influence",
-        alias="use_power_law_influence",
-    )
-    emotion_temperature: float = _sim_config_field(
-        "emotion_temperature",
-        ge=0.0,
-        le=1.0,
-    )
-    panic_threshold: float = _sim_config_field("panic_threshold", le=0.0)
 
-    # New Features
-    stewing_ticks: int = _sim_config_field("stewing_ticks")
-    stewing_self_retention: float = _sim_config_field("stewing_self_retention")
-    stewing_local_influence: float = _sim_config_field("stewing_local_influence")
-    stewing_viral_influence: float = _sim_config_field("stewing_viral_influence")
+_RUN_PROFILE_FIELD_CONSTRAINTS: dict[str, dict[str, Any]] = {
+    "agent_count": {"gt": 0},
+    "emotion_temperature": {"ge": 0.0, "le": 1.0},
+    "panic_threshold": {"le": 0.0},
+    "sentiment_neutrality_acting_threshold": {"ge": 0.0},
+    "sentiment_neutrality_leaky_slope": {"ge": 0.0},
+    "temperature": {"ge": 0.0, "le": 1.0},
+}
 
-    use_algorithmic_amplification: bool = _sim_config_field(
-        "use_algorithmic_amplification"
-    )
-    algo_sample_size: float = _sim_config_field("algo_sample_size")
-    algo_exaggeration_factor: float = _sim_config_field("algo_exaggeration_factor")
 
-    use_selective_exposure: bool = _sim_config_field("use_selective_exposure")
-    selective_exposure_base_tolerance: float = _sim_config_field(
-        "selective_exposure_base_tolerance"
-    )
-    selective_exposure_openness_factor: float = _sim_config_field(
-        "selective_exposure_openness_factor"
-    )
-    selective_exposure_gain: float = _sim_config_field("selective_exposure_gain")
-    selective_exposure_max_suppression: float = _sim_config_field(
-        "selective_exposure_max_suppression"
+def _build_run_profile_model() -> type[BaseModel]:
+    sim_to_run_field_map = {
+        sim_field_name: run_field_name
+        for run_field_name, sim_field_name in RUN_PROFILE_TO_SIM_CONFIG_FIELD_MAP.items()
+    }
+    field_definitions: dict[str, tuple[Any, Any]] = {
+        "social_class": (str, "All")
+    }
+
+    for config_field in dataclass_fields(SimConfig):
+        if not config_field.init or config_field.name in RUN_PROFILE_INTERNAL_ONLY_FIELDS:
+            continue
+
+        run_field_name = sim_to_run_field_map.get(config_field.name, config_field.name)
+        alias = config_field.name if run_field_name != config_field.name else None
+        field_definitions[run_field_name] = (
+            config_field.type,
+            _sim_config_field(
+                config_field.name,
+                alias=alias,
+                **_RUN_PROFILE_FIELD_CONSTRAINTS.get(run_field_name, {}),
+            ),
+        )
+
+    return create_model(
+        "RunProfile",
+        __base__=_RunProfileBaseModel,
+        __module__=__name__,
+        **field_definitions,
     )
 
-    use_agent_memory: bool = _sim_config_field("use_agent_memory")
-    memory_decay_rate: float = _sim_config_field("memory_decay_rate")
-    memory_desensitization_gain: float = _sim_config_field(
-        "memory_desensitization_gain"
-    )
-    memory_trigger_stacking_gain: float = _sim_config_field(
-        "memory_trigger_stacking_gain"
-    )
-    memory_social_rehearsal_gain: float = _sim_config_field(
-        "memory_social_rehearsal_gain"
-    )
-    sentiment_neutrality_acting_threshold: float = _sim_config_field(
-        "sentiment_neutrality_acting_threshold",
-        ge=0.0,
-    )
-    sentiment_neutrality_activation: str = _sim_config_field(
-        "sentiment_neutrality_activation"
-    )
-    sentiment_neutrality_leaky_slope: float = _sim_config_field(
-        "sentiment_neutrality_leaky_slope",
-        ge=0.0,
-    )
 
-    use_network_topology: bool = _sim_config_field("use_network_topology")
-    homophily_strength: float = _sim_config_field("homophily_strength")
-    influence_bias_exp: float = _sim_config_field("influence_bias_exp")
-    triadic_closure_prob: float = _sim_config_field("triadic_closure_prob")
-    triadic_closure_iterations: int = _sim_config_field("triadic_closure_iterations")
-    triadic_closure_homophily_threshold: float = _sim_config_field(
-        "triadic_closure_homophily_threshold"
-    )
-    use_granovetter_thresholds: bool = _sim_config_field("use_granovetter_thresholds")
-    granovetter_threshold_mean: float = _sim_config_field(
-        "granovetter_threshold_mean"
-    )
-    granovetter_threshold_std: float = _sim_config_field("granovetter_threshold_std")
-    personality_socialization_gain: float = _sim_config_field(
-        "personality_socialization_gain"
-    )
-    enable_evolution: bool = _sim_config_field("enable_evolution")
-
-    # Researcher (Cognitive)
-    cross_dim_interaction_strength: float = _sim_config_field(
-        "cross_dim_interaction_strength"
-    )
-    threat_sensitivity_gain: float = _sim_config_field("threat_sensitivity_gain")
-    k_processing_tanh_gain: float = _sim_config_field("k_processing_tanh_gain")
-    attention_residual_gain: float = _sim_config_field("attention_residual_gain")
-    attention_modulated_gain: float = _sim_config_field("attention_modulated_gain")
-    relevance_importance_weight: float = _sim_config_field(
-        "relevance_importance_weight"
-    )
-    relevance_base_weight: float = _sim_config_field("relevance_base_weight")
-    threat_amplifier_gain: float = _sim_config_field("threat_amplifier_gain")
-    stress_neurotic_amplification: float = _sim_config_field(
-        "stress_neurotic_amplification"
-    )
-    stress_openness_reduction: float = _sim_config_field("stress_openness_reduction")
-    stress_extraversion_boost: float = _sim_config_field("stress_extraversion_boost")
-
-    # Researcher (Physics)
-    outrage_gain: float = _sim_config_field("outrage_gain")
-    max_viral_multiplier: float = _sim_config_field("max_viral_multiplier")
-    saturation_midpoint: float = _sim_config_field("saturation_midpoint")
-
-    # Researcher (Distortion)
-    distortion_max_noise: float = _sim_config_field("distortion_max_noise")
-    distortion_neurotic_gain: float = _sim_config_field("distortion_neurotic_gain")
-    perception_social_consensus_gain: float = _sim_config_field(
-        "perception_social_consensus_gain"
-    )
-    affinity_min_strength: float = _sim_config_field("affinity_min_strength")
-    normalize_affinities_by_mean: bool = _sim_config_field(
-        "normalize_affinities_by_mean"
-    )
-
-    # Researcher (Evolution)
-    evolution_generations: int = _sim_config_field("evolution_generations")
-    inheritance_fraction: float = _sim_config_field("inheritance_fraction")
-    shock_frequency: float = _sim_config_field("shock_frequency")
-    shock_magnitude: float = _sim_config_field("shock_magnitude")
+RunProfile = cast(type[BaseModel], _build_run_profile_model())
 
 
 class SimulationRequest(BaseModel):
@@ -416,11 +311,14 @@ def run_profile_to_sim_config_kwargs(
 ) -> dict[str, Any]:
     config_kwargs: dict[str, Any] = {}
     for field_name, field_value in run.model_dump().items():
-        sim_field_name = _RUN_PROFILE_TO_SIM_CONFIG_FIELD_MAP.get(
+        sim_field_name = RUN_PROFILE_TO_SIM_CONFIG_FIELD_MAP.get(
             field_name,
             field_name,
         )
-        if sim_field_name in _SIM_CONFIG_DEFAULTS:
+        if (
+            sim_field_name in SIM_CONFIG_FIELDS
+            and sim_field_name not in RUN_PROFILE_INTERNAL_ONLY_FIELDS
+        ):
             config_kwargs[sim_field_name] = deepcopy(field_value)
     config_kwargs.update(overrides)
     return config_kwargs

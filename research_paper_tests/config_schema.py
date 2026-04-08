@@ -2,13 +2,21 @@ from __future__ import annotations
 
 import os
 from copy import deepcopy
-from dataclasses import dataclass, field, fields
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Mapping
 
 import torch
 
-from schema import DIMENSIONS, DIMENSION_INDICES, EMOTION_LABELS, SimConfig
+from schema import (
+    DIMENSIONS,
+    DIMENSION_INDICES,
+    EMOTION_LABELS,
+    RUN_PROFILE_FIELDS,
+    SIM_CONFIG_DEFAULTS,
+    SIM_CONFIG_FIELDS,
+    SimConfig,
+)
 
 
 PERSONALITY_LABELS = (
@@ -38,16 +46,9 @@ def _merge(*mappings: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def live_sim_config_defaults() -> dict[str, Any]:
-    base_config = SimConfig()
-    return {
-        config_field.name: deepcopy(getattr(base_config, config_field.name))
-        for config_field in fields(SimConfig)
-        if config_field.init
-    }
+    return deepcopy(SIM_CONFIG_DEFAULTS)
 
 
-SIM_CONFIG_DEFAULTS = live_sim_config_defaults()
-SIM_CONFIG_FIELDS = frozenset(SIM_CONFIG_DEFAULTS)
 DEFAULT_SMOKE_NUM_AGENTS = 128
 DEFAULT_SMOKE_EVOLUTION_GENERATIONS = 2
 SESSION_EVOLUTION_MODE_ENV = "RESEARCH_TEST_EVOLUTION_MODE"
@@ -61,107 +62,7 @@ EVOLUTION_VARIANT_LABELS = {
 def live_run_profile_defaults() -> dict[str, Any]:
     from main import RunProfile
 
-    sim_defaults = live_sim_config_defaults()
-    defaults = RunProfile().model_dump()
-    defaults.update(
-        {
-            "seed": sim_defaults["seed"],
-            "temperature": sim_defaults["mutation_temperature"],
-            "agent_count": sim_defaults["num_agents"],
-            "use_distortion": sim_defaults["use_signal_distortion"],
-            "use_pressure": sim_defaults["use_time_pressure"],
-            "use_maslow": sim_defaults["use_maslow_gating"],
-            "use_power_law": sim_defaults["use_power_law_influence"],
-            "emotion_temperature": sim_defaults["emotion_temperature"],
-            "panic_threshold": sim_defaults["panic_threshold"],
-            "stewing_ticks": sim_defaults["stewing_ticks"],
-            "stewing_self_retention": sim_defaults["stewing_self_retention"],
-            "stewing_local_influence": sim_defaults["stewing_local_influence"],
-            "stewing_viral_influence": sim_defaults["stewing_viral_influence"],
-            "use_algorithmic_amplification": sim_defaults[
-                "use_algorithmic_amplification"
-            ],
-            "algo_sample_size": sim_defaults["algo_sample_size"],
-            "algo_exaggeration_factor": sim_defaults["algo_exaggeration_factor"],
-            "use_agent_memory": sim_defaults["use_agent_memory"],
-            "memory_decay_rate": sim_defaults["memory_decay_rate"],
-            "memory_desensitization_gain": sim_defaults[
-                "memory_desensitization_gain"
-            ],
-            "memory_trigger_stacking_gain": sim_defaults[
-                "memory_trigger_stacking_gain"
-            ],
-            "memory_social_rehearsal_gain": sim_defaults[
-                "memory_social_rehearsal_gain"
-            ],
-            "sentiment_neutrality_acting_threshold": sim_defaults[
-                "sentiment_neutrality_acting_threshold"
-            ],
-            "sentiment_neutrality_activation": sim_defaults[
-                "sentiment_neutrality_activation"
-            ],
-            "sentiment_neutrality_leaky_slope": sim_defaults[
-                "sentiment_neutrality_leaky_slope"
-            ],
-            "use_network_topology": sim_defaults["use_network_topology"],
-            "homophily_strength": sim_defaults["homophily_strength"],
-            "influence_bias_exp": sim_defaults["influence_bias_exp"],
-            "triadic_closure_prob": sim_defaults["triadic_closure_prob"],
-            "triadic_closure_iterations": sim_defaults[
-                "triadic_closure_iterations"
-            ],
-            "triadic_closure_homophily_threshold": sim_defaults[
-                "triadic_closure_homophily_threshold"
-            ],
-            "use_granovetter_thresholds": sim_defaults[
-                "use_granovetter_thresholds"
-            ],
-            "granovetter_threshold_mean": sim_defaults[
-                "granovetter_threshold_mean"
-            ],
-            "granovetter_threshold_std": sim_defaults["granovetter_threshold_std"],
-            "personality_socialization_gain": sim_defaults[
-                "personality_socialization_gain"
-            ],
-            "enable_evolution": sim_defaults["enable_evolution"],
-            "cross_dim_interaction_strength": sim_defaults[
-                "cross_dim_interaction_strength"
-            ],
-            "threat_sensitivity_gain": sim_defaults["threat_sensitivity_gain"],
-            "k_processing_tanh_gain": sim_defaults["k_processing_tanh_gain"],
-            "attention_residual_gain": sim_defaults["attention_residual_gain"],
-            "attention_modulated_gain": sim_defaults["attention_modulated_gain"],
-            "relevance_importance_weight": sim_defaults[
-                "relevance_importance_weight"
-            ],
-            "relevance_base_weight": sim_defaults["relevance_base_weight"],
-            "threat_amplifier_gain": sim_defaults["threat_amplifier_gain"],
-            "stress_neurotic_amplification": sim_defaults[
-                "stress_neurotic_amplification"
-            ],
-            "stress_openness_reduction": sim_defaults["stress_openness_reduction"],
-            "stress_extraversion_boost": sim_defaults[
-                "stress_extraversion_boost"
-            ],
-            "outrage_gain": sim_defaults["outrage_gain"],
-            "max_viral_multiplier": sim_defaults["max_viral_multiplier"],
-            "saturation_midpoint": sim_defaults["saturation_midpoint"],
-            "distortion_max_noise": sim_defaults["distortion_max_noise"],
-            "distortion_neurotic_gain": sim_defaults["distortion_neurotic_gain"],
-            "perception_social_consensus_gain": sim_defaults[
-                "perception_social_consensus_gain"
-            ],
-            "affinity_min_strength": sim_defaults["affinity_min_strength"],
-            "normalize_affinities_by_mean": sim_defaults[
-                "normalize_affinities_by_mean"
-            ],
-            "evolution_generations": sim_defaults["evolution_generations"],
-            "inheritance_fraction": sim_defaults["inheritance_fraction"],
-            "shock_frequency": sim_defaults["shock_frequency"],
-            "shock_magnitude": sim_defaults["shock_magnitude"],
-        }
-    )
-    return defaults
+    return RunProfile().model_dump()
 
 
 def apply_config_attrs(
@@ -1318,12 +1219,22 @@ def prepare_scenario_society(
 
 def _validate_schema() -> None:
     invalid_overrides: dict[str, list[str]] = {}
+    invalid_run_profile_overrides: dict[str, list[str]] = {}
     for scenario_name, scenario in TEST_SCENARIOS.items():
         unknown_fields = sorted(set(scenario.config_overrides) - SIM_CONFIG_FIELDS)
         if unknown_fields:
             invalid_overrides[scenario_name] = unknown_fields
+        unknown_run_fields = sorted(
+            set(scenario.run_profile_overrides) - RUN_PROFILE_FIELDS
+        )
+        if unknown_run_fields:
+            invalid_run_profile_overrides[scenario_name] = unknown_run_fields
     if invalid_overrides:
         raise ValueError(f"Invalid SimConfig overrides: {invalid_overrides}")
+    if invalid_run_profile_overrides:
+        raise ValueError(
+            f"Invalid RunProfile overrides: {invalid_run_profile_overrides}"
+        )
     missing_society_cases = sorted(
         scenario_name
         for scenario_name in SOCIETY_EVOLUTION_CASES

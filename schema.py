@@ -1,5 +1,6 @@
-from dataclasses import dataclass
-from typing import List
+from copy import deepcopy
+from dataclasses import dataclass, fields
+from typing import Any, List
 
 import torch
 
@@ -367,6 +368,46 @@ class SimConfig:
         if self.panic_threshold > 0:
             # Panic threshold is a safety score threshold, usually negative.
             raise ValueError("panic_threshold must be <= 0")
+
+
+def sim_config_defaults() -> dict[str, Any]:
+    base_config = SimConfig()
+    return {
+        config_field.name: deepcopy(getattr(base_config, config_field.name))
+        for config_field in fields(SimConfig)
+        if config_field.init
+    }
+
+
+SIM_CONFIG_DEFAULTS = sim_config_defaults()
+SIM_CONFIG_FIELDS = frozenset(SIM_CONFIG_DEFAULTS)
+
+RUN_PROFILE_TO_SIM_CONFIG_FIELD_MAP = {
+    "agent_count": "num_agents",
+    "temperature": "mutation_temperature",
+    "use_distortion": "use_signal_distortion",
+    "use_pressure": "use_time_pressure",
+    "use_maslow": "use_maslow_gating",
+    "use_power_law": "use_power_law_influence",
+}
+SIM_CONFIG_TO_RUN_PROFILE_FIELD_MAP = {
+    sim_field_name: run_field_name
+    for run_field_name, sim_field_name in RUN_PROFILE_TO_SIM_CONFIG_FIELD_MAP.items()
+}
+RUN_PROFILE_INTERNAL_ONLY_FIELDS = frozenset({"wealth_dim_idx"})
+RUN_PROFILE_EXTRA_FIELDS = frozenset({"social_class"})
+RUN_PROFILE_FIELDS = frozenset(
+    RUN_PROFILE_EXTRA_FIELDS
+    | {
+        SIM_CONFIG_TO_RUN_PROFILE_FIELD_MAP.get(field_name, field_name)
+        for field_name in SIM_CONFIG_FIELDS
+        if field_name not in RUN_PROFILE_INTERNAL_ONLY_FIELDS
+    }
+)
+
+
+def sim_config_default(field_name: str) -> Any:
+    return deepcopy(SIM_CONFIG_DEFAULTS[field_name])
 
 
 if __name__ == "__main__":

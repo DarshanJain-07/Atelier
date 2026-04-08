@@ -4,22 +4,22 @@
   "sections": {
     "accuracy_metrics": {
       "acting_ratio": 0.855469,
-      "matching_wasserstein": 0.3038,
-      "mismatched_wasserstein": 1.3962,
+      "matching_wasserstein": 0.5465,
+      "mismatched_wasserstein": 1.1535,
       "seed": 42,
       "sentiment": {
-        "Negative": 0.646493,
-        "Neutral": 0.253178,
+        "Negative": 0.403868,
+        "Neutral": 0.495803,
         "Positive": 0.100329
       },
-      "sentiment_valence": -0.539,
-      "wasserstein_gap": 1.0924
+      "sentiment_valence": -0.299,
+      "wasserstein_gap": 0.607
     },
     "algorithmic_filter_bubble": {
-      "amplified_mean_engagement": 0.326299,
-      "baseline_mean_engagement": 0.106574,
-      "engagement_gain": 0.219725,
-      "max_world_shift": 0.3
+      "amplified_mean_engagement": 0.144935,
+      "baseline_mean_engagement": 0.100495,
+      "engagement_gain": 0.044439,
+      "max_world_shift": 0.1
     },
     "emotion_directionality_and_bridge_diffusion": {
       "bridge_diffusion": {
@@ -45,11 +45,11 @@
             "Trust": 0.018035
           },
           "sentiment": {
-            "Negative": 0.661552,
-            "Neutral": 0.266462,
+            "Negative": 0.41928,
+            "Neutral": 0.508734,
             "Positive": 0.071986
           },
-          "sentiment_valence": -0.612
+          "sentiment_valence": -0.361
         },
         "Prosperity": {
           "acting_ratio": 0.886719,
@@ -65,11 +65,11 @@
             "Trust": 0.064621
           },
           "sentiment": {
-            "Negative": 0.054528,
-            "Neutral": 0.200064,
+            "Negative": 0.038213,
+            "Neutral": 0.216379,
             "Positive": 0.745409
           },
-          "sentiment_valence": 0.694
+          "sentiment_valence": 0.711
         },
         "Threat": {
           "acting_ratio": 0.921875,
@@ -85,11 +85,11 @@
             "Trust": 0.012558
           },
           "sentiment": {
-            "Negative": 0.702006,
-            "Neutral": 0.234275,
+            "Negative": 0.435339,
+            "Neutral": 0.500942,
             "Positive": 0.063719
           },
-          "sentiment_valence": -0.635
+          "sentiment_valence": -0.369
         }
       }
     },
@@ -128,75 +128,75 @@
           "acting_ratio": 0.0,
           "magnitude": 0.0,
           "mean_engagement": 0.0,
-          "sentiment_valence": -0.138
+          "sentiment_valence": 0.0
         },
         {
           "acting_ratio": 0.777344,
           "magnitude": 0.15,
           "mean_engagement": 0.106356,
-          "sentiment_valence": -0.286
+          "sentiment_valence": -0.11
         },
         {
           "acting_ratio": 0.847656,
           "magnitude": 0.3,
           "mean_engagement": 0.231087,
-          "sentiment_valence": -0.413
+          "sentiment_valence": -0.204
         },
         {
           "acting_ratio": 0.882812,
           "magnitude": 0.45,
           "mean_engagement": 0.327931,
-          "sentiment_valence": -0.516
+          "sentiment_valence": -0.28
         },
         {
           "acting_ratio": 0.898438,
           "magnitude": 0.6,
           "mean_engagement": 0.401527,
-          "sentiment_valence": -0.595
+          "sentiment_valence": -0.339
         },
         {
           "acting_ratio": 0.921875,
           "magnitude": 0.75,
           "mean_engagement": 0.458063,
-          "sentiment_valence": -0.657
+          "sentiment_valence": -0.384
         },
         {
           "acting_ratio": 0.925781,
           "magnitude": 0.9,
           "mean_engagement": 0.502383,
-          "sentiment_valence": -0.706
+          "sentiment_valence": -0.42
         }
       ],
       "low_salience_worlds": {
         "Faint Threat": {
-          "acting_ratio": 0.515625,
+          "acting_ratio": 0.0,
           "mean_engagement": 0.007493,
           "sentiment": {
-            "Negative": 0.404812,
-            "Neutral": 0.354287,
-            "Positive": 0.240901
+            "Negative": 0.0,
+            "Neutral": 1.0,
+            "Positive": 0.0
           },
-          "sentiment_valence": -0.164
+          "sentiment_valence": -0.019
         },
         "Mixed Weak": {
-          "acting_ratio": 0.632812,
+          "acting_ratio": 0.0,
           "mean_engagement": 0.011567,
           "sentiment": {
-            "Negative": 0.390801,
-            "Neutral": 0.358118,
-            "Positive": 0.251082
+            "Negative": 0.0,
+            "Neutral": 1.0,
+            "Positive": 0.0
           },
-          "sentiment_valence": -0.14
+          "sentiment_valence": -0.002
         },
         "Salient Threat": {
           "acting_ratio": 0.890625,
           "mean_engagement": 0.384224,
           "sentiment": {
-            "Negative": 0.638325,
-            "Neutral": 0.261943,
+            "Negative": 0.402281,
+            "Neutral": 0.497986,
             "Positive": 0.099732
           },
-          "sentiment_valence": -0.57
+          "sentiment_valence": -0.32
         },
         "Zero": {
           "acting_ratio": 0.0,
@@ -206,53 +206,53 @@
             "Neutral": 1.0,
             "Positive": 0.0
           },
-          "sentiment_valence": -0.138
+          "sentiment_valence": 0.0
         }
       }
     },
     "semantic_alignment": {
-      "negative_minus_positive_negative_share": 0.589216,
+      "negative_minus_positive_negative_share": 0.365898,
       "negative_world": {
         "acting_ratio": 0.925781,
         "sentiment": {
-          "Negative": 0.686125,
-          "Neutral": 0.245584,
+          "Negative": 0.432682,
+          "Neutral": 0.499027,
           "Positive": 0.068291
         },
-        "sentiment_valence": -0.687,
-        "wasserstein_against_positive": 1.4178,
-        "wasserstein_match": 0.1822
+        "sentiment_valence": -0.405,
+        "wasserstein_against_positive": 1.1644,
+        "wasserstein_match": 0.4356
       },
       "positive_world": {
         "acting_ratio": 0.8125,
         "sentiment": {
-          "Negative": 0.096909,
-          "Neutral": 0.330003,
+          "Negative": 0.066784,
+          "Neutral": 0.360128,
           "Positive": 0.573088
         },
-        "sentiment_valence": 0.505,
-        "wasserstein_against_negative": 1.2762,
-        "wasserstein_match": 0.3238
+        "sentiment_valence": 0.537,
+        "wasserstein_against_negative": 1.3063,
+        "wasserstein_match": 0.2937
       },
       "seed": 42
     },
     "sentiment_mapping": {
       "high_activity": {
-        "Negative": 0.8,
-        "Neutral": 0.2,
+        "Negative": 0.5,
+        "Neutral": 0.5,
         "Positive": 0.0
       },
       "low_activity": {
-        "Negative": 0.533333,
-        "Neutral": 0.466667,
+        "Negative": 0.333333,
+        "Neutral": 0.666667,
         "Positive": 0.0
       },
-      "negative_drop_low_vs_raw": 0.266667,
-      "neutral_gain_low_vs_high": 0.266667,
-      "neutral_gain_low_vs_raw": 0.266667,
+      "negative_drop_low_vs_raw": 0.166667,
+      "neutral_gain_low_vs_high": 0.166667,
+      "neutral_gain_low_vs_raw": 0.166667,
       "raw": {
-        "Negative": 0.8,
-        "Neutral": 0.2,
+        "Negative": 0.5,
+        "Neutral": 0.5,
         "Positive": 0.0
       }
     },

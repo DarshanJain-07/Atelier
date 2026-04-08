@@ -726,12 +726,14 @@ def execute_simulation_cycle(
 
         final_world_tensor = input_world_tensor.clone()
         exaggeration = active_society.config.algo_exaggeration_factor
+        signal_floor = 0.05
         for dim_idx in top_dims:
             current_val = final_world_tensor[0, dim_idx].item()
-            if abs(current_val) > 0.05:
-                final_world_tensor[0, dim_idx] *= exaggeration
-            else:
-                final_world_tensor[0, dim_idx] = -0.3
+            # Amplification should only strengthen existing signal, not invent
+            # a negative narrative for neutral or near-zero inputs.
+            if abs(current_val) <= signal_floor:
+                continue
+            final_world_tensor[0, dim_idx] *= exaggeration
 
         final_world_tensor = torch.clamp(final_world_tensor, -1.0, 1.0)
         context_vector, attention_weights, engagement_scores = cog_engine.run(

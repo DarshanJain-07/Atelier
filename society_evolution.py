@@ -47,7 +47,10 @@ class SocietyEvolution:
         # These represent persistent, compounding personality drifts (e.g., "becoming more bitter" or "more open")
         # generated deterministically so the same agent always evolves the same way given the same seed.
         gen = torch.Generator()
-        gen.manual_seed(self.config.seed + 888)  # Distinct seed
+        gen.manual_seed(
+            self.config.seed
+            + getattr(self.config, "evolution_idiosyncrasy_seed_offset", 888)
+        )
         
         # LogNormal centered at 0 (so exp is centered at 1). 
         # Small std dev (0.01) results in factors like 0.99 or 1.01.

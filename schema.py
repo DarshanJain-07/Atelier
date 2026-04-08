@@ -307,6 +307,7 @@ class SimConfig:
         0.5  # If similarity to societal mean is less than this, agents repel
     )
     repulsion_rate: float = 0.02
+    evolution_idiosyncrasy_seed_offset: int = 888
     record_history: bool = False
 
     # --- Initialization Parameters ---
@@ -394,7 +395,9 @@ SIM_CONFIG_TO_RUN_PROFILE_FIELD_MAP = {
     sim_field_name: run_field_name
     for run_field_name, sim_field_name in RUN_PROFILE_TO_SIM_CONFIG_FIELD_MAP.items()
 }
-RUN_PROFILE_INTERNAL_ONLY_FIELDS = frozenset({"wealth_dim_idx"})
+RUN_PROFILE_INTERNAL_ONLY_FIELDS = frozenset(
+    {"wealth_dim_idx", "evolution_idiosyncrasy_seed_offset"}
+)
 RUN_PROFILE_EXTRA_FIELDS = frozenset({"social_class"})
 RUN_PROFILE_FIELDS = frozenset(
     RUN_PROFILE_EXTRA_FIELDS

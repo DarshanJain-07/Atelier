@@ -286,6 +286,11 @@ class DebugSimulationResult:
     final_emotions: torch.Tensor
     social_state: dict[str, Any]
     validation_result: dict[str, Any] | None = None
+    followup_context_vector: torch.Tensor | None = None
+    followup_attention_weights: torch.Tensor | None = None
+    followup_engagement_scores: torch.Tensor | None = None
+    followup_emotions: torch.Tensor | None = None
+    followup_social_state: dict[str, Any] | None = None
 
 
 def seed_everything(seed: int) -> None:
@@ -756,6 +761,17 @@ def execute_simulation_cycle(
         personalities=active_society.personalities,
         is_personal=is_personal,
     )
+    primary_context_vector = context_vector
+    primary_attention_weights = attention_weights
+    primary_engagement_scores = engagement_scores
+    primary_final_emotions = final_emotions
+    primary_social_state = deepcopy(social_state)
+
+    followup_context_vector = None
+    followup_attention_weights = None
+    followup_engagement_scores = None
+    followup_emotions = None
+    followup_social_state = None
 
     action_vector = social_state.get("action_vector")
     action_name = social_state.get("action_name")
@@ -765,7 +781,11 @@ def execute_simulation_cycle(
             dtype=torch.float32,
             device=final_world_tensor.device,
         )
-        context_vector, attention_weights, engagement_scores = cog_engine.run(
+        (
+            followup_context_vector,
+            followup_attention_weights,
+            followup_engagement_scores,
+        ) = cog_engine.run(
             world_tensor_raw=action_tensor,
             urgency=0.8,
             is_personal=True,
@@ -775,24 +795,34 @@ def execute_simulation_cycle(
             agent_memory=memory,
             adjacency_matrix=active_society.adjacency_matrix,
         )
-        final_emotions = cog_engine.project_emotions(context_vector)
-        social_state = phys_engine.aggregate_society(
-            final_emotions,
+        followup_emotions = cog_engine.project_emotions(followup_context_vector)
+        followup_social_state = phys_engine.aggregate_society(
+            followup_emotions,
             active_society.metadata["Influence"].to_numpy(dtype=np.float32),
-            engagement_scores=engagement_scores,
+            engagement_scores=followup_engagement_scores,
             adjacency_matrix=active_society.adjacency_matrix,
             personalities=active_society.personalities,
             is_personal=True,
         )
-        social_state["endogenous_event"] = action_name
+        primary_social_state["endogenous_event"] = action_name
 
     if active_society.config.use_agent_memory:
-        conf = float(social_state.get("confidence", 0.0))
-        act_ratio = float(social_state.get("acting_ratio", 0.0))
+        memory_context_vector = (
+            followup_context_vector
+            if followup_context_vector is not None
+            else primary_context_vector
+        )
+        memory_social_state = (
+            followup_social_state
+            if followup_social_state is not None
+            else primary_social_state
+        )
+        conf = float(memory_social_state.get("confidence", 0.0))
+        act_ratio = float(memory_social_state.get("acting_ratio", 0.0))
         rehearsal_factor = (conf + act_ratio) / 2.0
         active_society.memory = cog_engine.consolidate_memory(
             agent_memory=memory,
-            context_vector=context_vector,
+            context_vector=memory_context_vector,
             social_rehearsal_factor=rehearsal_factor,
         )
 
@@ -800,7 +830,7 @@ def execute_simulation_cycle(
     if baseline_probs is not None:
         validation_result = build_validation_result(
             active_society.config,
-            social_state,
+            primary_social_state,
             baseline_probs,
         )
 
@@ -808,12 +838,17 @@ def execute_simulation_cycle(
         society=active_society,
         input_world_tensor=input_world_tensor,
         final_world_tensor=final_world_tensor,
-        context_vector=context_vector,
-        attention_weights=attention_weights,
-        engagement_scores=engagement_scores,
-        final_emotions=final_emotions,
-        social_state=social_state,
+        context_vector=primary_context_vector,
+        attention_weights=primary_attention_weights,
+        engagement_scores=primary_engagement_scores,
+        final_emotions=primary_final_emotions,
+        social_state=primary_social_state,
         validation_result=validation_result,
+        followup_context_vector=followup_context_vector,
+        followup_attention_weights=followup_attention_weights,
+        followup_engagement_scores=followup_engagement_scores,
+        followup_emotions=followup_emotions,
+        followup_social_state=followup_social_state,
     )
 
 

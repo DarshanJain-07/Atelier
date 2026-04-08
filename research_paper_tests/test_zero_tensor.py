@@ -1,48 +1,43 @@
 import torch
-from schema import SimConfig
+
 from cognitive_engine import CognitiveEngine
 from physics_engine import SocialPhysicsEngine
+from schema import SimConfig
 
-def run_zero_test():
+
+def test_zero_tensor_produces_neutral_inert_state():
+    torch.manual_seed(42)
+
     config = SimConfig()
     cog_engine = CognitiveEngine(config)
     phys_engine = SocialPhysicsEngine(config)
 
-    N = 3
-    # Use a pure zero tensor
     world_tensor_raw = torch.zeros(1, 12)
-    personalities = torch.rand(N, 5)
-    exposures = torch.zeros(N, 12)
-    agent_affinities = torch.ones(N, 12)
-    urgency = 0.0
-    is_personal = False
-
-    print("=== COGNITIVE ENGINE ZERO TEST ===")
-    print(f"1. Original World Tensor: {world_tensor_raw.tolist()}")
+    personalities = torch.rand(3, 5)
+    exposures = torch.zeros(3, 12)
+    agent_affinities = torch.ones(3, 12)
 
     context_vector, attention_weights, engagement_scores = cog_engine.run(
         world_tensor_raw=world_tensor_raw,
-        urgency=urgency,
-        is_personal=is_personal,
+        urgency=0.0,
+        is_personal=False,
         exposures=exposures,
         personalities=personalities,
         agent_affinities=agent_affinities,
     )
-    
-    print(f"2. Context Vector: {context_vector.tolist()[0]}")
-
     emotions = cog_engine.project_emotions(context_vector)
-    print(f"3. Projected Emotions (Logits -> Softmax): {emotions.tolist()[0]}")
+    result = phys_engine.aggregate_society(
+        emotions,
+        torch.ones(3),
+        engagement_scores,
+    )
 
-    print("\n=== PHYSICS ENGINE ZERO TEST ===")
-    influence_scores = torch.tensor([1.0, 1.0, 1.0])
-    
-    result = phys_engine.aggregate_society(emotions, influence_scores, engagement_scores)
-    
-    print(f"Dominant Emotion: {result['dominant_emotion']}")
-    print(f"Confidence: {result['confidence']}")
-    print(f"Valence: {result['sentiment_valence']}")
-    print(f"Action Potential Vector: {result['action_vector']}")
+    assert torch.equal(context_vector, torch.zeros_like(context_vector))
+    assert torch.allclose(attention_weights.sum(dim=1), torch.ones(3), atol=1e-5)
+    assert torch.equal(engagement_scores, torch.zeros_like(engagement_scores))
+    assert torch.allclose(emotions.sum(dim=1), torch.ones(3), atol=1e-5)
 
-if __name__ == "__main__":
-    run_zero_test()
+    assert result["dominant_emotion"] == "Neutral"
+    assert result["confidence"] == 0.125
+    assert result["sentiment_valence"] == 0.0
+    assert result["action_vector"] is None

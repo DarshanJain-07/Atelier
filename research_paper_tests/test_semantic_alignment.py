@@ -75,5 +75,10 @@ def test_semantic_alignment_rewards_matching_sentiment_baselines(tmp_path):
     assert negative_sentiment[SENTIMENT_INDICES["Positive"]] < positive_sentiment[
         SENTIMENT_INDICES["Positive"]
     ]
+    assert positive_match["wasserstein_distance"] < positive_against_negative[
+        "wasserstein_distance"
+    ]
     assert negative_match["wasserstein_distance"] < positive_against_negative["wasserstein_distance"]
-    assert negative_against_positive["wasserstein_distance"] > positive_against_negative["wasserstein_distance"]
+    assert negative_match["wasserstein_distance"] < negative_against_positive[
+        "wasserstein_distance"
+    ]

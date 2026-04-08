@@ -20,6 +20,7 @@
     /* [FIX] Extracted hardcoded hexes into the design system */
     --danger: #ef4444;
     --info: #60a5fa;
+    --warning: #f59e0b;
 
     --font-ui: "Inter", sans-serif;
     --font-mono: "JetBrains Mono", monospace;
@@ -1640,54 +1641,116 @@ input[type="range"]::-moz-range-track {
 
 /* --- TOAST NOTIFICATIONS --- */
 .toast-container {
-    position: absolute;
-    top: 80px;
-    left: 50%;
-    transform: translateX(-50%);
+    position: fixed;
+    top: 72px;
+    right: 24px;
     display: flex;
     flex-direction: column;
     gap: 10px;
+    width: min(360px, calc(100vw - 32px));
     z-index: 2000;
     pointer-events: none;
 }
 
 .toast {
-    color: #fff;
-    padding: 12px 24px;
-    border-radius: 8px;
-    font-weight: 600;
-    font-size: 0.85rem;
-    letter-spacing: 0.05em;
-    animation: toastFadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    position: relative;
+    width: 100%;
+    padding: 12px 16px 12px 18px;
+    background: var(--bg-panel);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
+    font-family: var(--font-ui);
+    font-size: 0.78rem;
+    font-weight: 500;
+    line-height: 1.45;
+    letter-spacing: 0.04em;
     display: flex;
     align-items: center;
-    gap: 10px;
-    backdrop-filter: blur(4px);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    animation: toastFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    overflow: hidden;
 }
 
-.toast-error {
-    background: rgba(230, 57, 70, 0.9);
-    box-shadow: 0 4px 15px rgba(230, 57, 70, 0.4);
-    border: 1px solid #ff4d4d;
+.toast::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 2px;
+    height: 100%;
+    background: var(--toast-accent, var(--accent));
 }
 
 .toast-success {
-    background: rgba(16, 185, 129, 0.9);
-    box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
-    border: 1px solid #34d399;
+    --toast-accent: var(--accent);
+    border-color: rgba(16, 185, 129, 0.22);
+    background:
+        linear-gradient(180deg, rgba(16, 185, 129, 0.06), rgba(16, 185, 129, 0.02)),
+        var(--bg-panel);
+}
+
+.toast-error {
+    --toast-accent: var(--danger);
+    border-color: rgba(239, 68, 68, 0.22);
+    background:
+        linear-gradient(180deg, rgba(239, 68, 68, 0.06), rgba(239, 68, 68, 0.02)),
+        var(--bg-panel);
 }
 
 .toast-warning {
-    background: rgba(245, 158, 11, 0.9);
-    box-shadow: 0 4px 15px rgba(245, 158, 11, 0.4);
-    border: 1px solid #fbbf24;
+    --toast-accent: var(--warning);
+    border-color: rgba(245, 158, 11, 0.22);
+    background:
+        linear-gradient(180deg, rgba(245, 158, 11, 0.06), rgba(245, 158, 11, 0.02)),
+        var(--bg-panel);
 }
 
 .toast-info {
-    background: rgba(59, 130, 246, 0.9);
-    box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
-    border: 1px solid #60a5fa;
+    --toast-accent: var(--info);
+    border-color: rgba(96, 165, 250, 0.22);
+    background:
+        linear-gradient(180deg, rgba(96, 165, 250, 0.06), rgba(96, 165, 250, 0.02)),
+        var(--bg-panel);
 }
+
+@keyframes toastFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.toast.fade-out {
+    animation: toastFadeOut 0.3s ease forwards;
+}
+
+@keyframes toastFadeOut {
+    to {
+        opacity: 0;
+        transform: translateY(-8px);
+    }
+}
+
+@media screen and (max-width: 768px) {
+    .toast-container {
+        top: 68px;
+        right: 16px;
+        width: calc(100vw - 32px);
+    }
+
+    .toast {
+        padding: 11px 14px 11px 16px;
+        font-size: 0.75rem;
+    }
+}
+
 
 .section-header {
     display: flex;
@@ -1723,11 +1786,11 @@ input[type="range"]::-moz-range-track {
 @keyframes toastFadeIn {
     from {
         opacity: 0;
-        transform: translateY(-20px) scale(0.9);
+        transform: translateY(-12px) translateX(12px) scale(0.98);
     }
     to {
         opacity: 1;
-        transform: translateY(0) scale(1);
+        transform: translateY(0) translateX(0) scale(1);
     }
 }
 
@@ -1738,7 +1801,18 @@ input[type="range"]::-moz-range-track {
 @keyframes toastFadeOut {
     to {
         opacity: 0;
-        transform: translateY(-20px) scale(0.9);
+        transform: translateY(-10px) translateX(12px) scale(0.98);
     }
 }
 
+@media screen and (max-width: 768px) {
+    .toast-container {
+        top: 68px;
+        right: 16px;
+        width: calc(100vw - 32px);
+    }
+
+    .toast {
+        padding: 13px 16px 13px 18px;
+    }
+}

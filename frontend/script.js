@@ -743,7 +743,7 @@ function updateSeedInputs() {
 async function runSimulation() {
   const inputVal = document.getElementById("news-input").value;
   if (!inputVal) {
-    alert("Please enter a news headline.");
+    showToast("Please enter a news headline.", "warning");
     return;
   }
 

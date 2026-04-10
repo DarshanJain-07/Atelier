@@ -179,9 +179,8 @@ def test_bridge_agents_expand_cross_cluster_diffusion(tmp_path):
 
 
 def test_generate_emotion_direction_and_bridge_diffusion_figure(tmp_path):
-    output_dir = Path(__file__).resolve().parent / "generated"
-    output_dir.mkdir(exist_ok=True)
-    output_path = output_dir / "emotion_direction_and_bridge_diffusion.png"
+    output_dir = Path(__file__).resolve().parent / "generated" / "emotion_and_bridge"
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     emotion_scenario = get_test_scenario("emotion_directionality")
     emotion_config = emotion_scenario.sim_config()
@@ -220,45 +219,44 @@ def test_generate_emotion_direction_and_bridge_diffusion_figure(tmp_path):
     bridge_settings = bridge_scenario.settings()
     bridge_metrics = _bridge_diffusion_metrics(bridge_config, bridge_settings)
 
-    fig, axes = plt.subplots(2, 2, figsize=(20, 14))
-    axes = axes.flatten()
-
     labels = list(emotion_settings["worlds"])
     x = np.arange(len(labels))
     width = 0.25
     key_emotions = ["Joy", "Fear", "Anger"]
     key_colors = ["#2a9d8f", "#457b9d", "#d62828"]
 
-    # x-axis: world framing condition.
-    # y-axis: aggregate probability mass on key emotions. This shows how changing
-    # the direction of the same system input shifts the dominant emotional reaction.
+    # Figure 1: Emotion Directionality
+    fig1, ax1 = plt.subplots(figsize=(10, 8))
     for offset, emotion_name, color in zip([-width, 0.0, width], key_emotions, key_colors):
         emotion_idx = EMOTION_INDICES[emotion_name]
-        axes[0].bar(
+        ax1.bar(
             x + offset,
             [emotion_results[label]["center"][emotion_idx] for label in labels],
             width=width,
             label=emotion_name,
             color=color,
         )
-    axes[0].set_xticks(x, labels)
-    axes[0].set_title("Emotion Directionality")
-    axes[0].set_ylabel("Objective-Center Weight")
-    axes[0].legend(fontsize=8)
+    ax1.set_xticks(x, labels)
+    ax1.set_title("Emotion Directionality", fontsize=16)
+    ax1.set_ylabel("Objective-Center Weight", fontsize=12)
+    ax1.legend(fontsize=10)
+    ax1.grid(True, alpha=0.2)
+    path1 = output_dir / "emotion_directionality.png"
+    fig1.savefig(path1, dpi=220, bbox_inches="tight")
+    plt.close(fig1)
 
+    # Figure 2: Emotion-to-Sentiment Mapping
+    fig2, ax2 = plt.subplots(figsize=(10, 8))
     sentiment_colors = ["#d62828", "#adb5bd", "#2a9d8f"]
     sentiment_labels = ["Negative", "Neutral", "Positive"]
     bottoms = np.zeros(len(labels), dtype=np.float64)
 
-    # x-axis: world framing condition.
-    # y-axis: sentiment composition. Compare how prosperity vs threat vs injustice
-    # move the whole society toward positive or negative aggregate interpretation.
     for idx, sentiment_label in enumerate(sentiment_labels):
         heights = np.array(
             [emotion_results[label]["sentiment"][idx] for label in labels],
             dtype=np.float64,
         )
-        axes[1].bar(
+        ax2.bar(
             x,
             heights,
             bottom=bottoms,
@@ -266,16 +264,19 @@ def test_generate_emotion_direction_and_bridge_diffusion_figure(tmp_path):
             label=sentiment_label,
         )
         bottoms += heights
-    axes[1].set_xticks(x, labels)
-    axes[1].set_ylim(0.0, 1.0)
-    axes[1].set_title("Emotion-to-Sentiment Mapping")
-    axes[1].set_ylabel("Share")
-    axes[1].legend(fontsize=8)
+    ax2.set_xticks(x, labels)
+    ax2.set_ylim(0.0, 1.0)
+    ax2.set_title("Emotion-to-Sentiment Mapping", fontsize=16)
+    ax2.set_ylabel("Share", fontsize=12)
+    ax2.legend(fontsize=10)
+    ax2.grid(True, alpha=0.2)
+    path2 = output_dir / "sentiment_mapping.png"
+    fig2.savefig(path2, dpi=220, bbox_inches="tight")
+    plt.close(fig2)
 
-    # x-axis: network without vs. with bridge links.
-    # y-axis: average local arousal inside the remote community B. Higher values
-    # mean bridge links import more emotional energy into the otherwise separate cluster.
-    axes[2].bar(
+    # Figure 3: Bridge Effect on Remote Community
+    fig3, ax3 = plt.subplots(figsize=(10, 8))
+    ax3.bar(
         ["Without bridge", "With bridge"],
         [
             bridge_metrics["without_b_local_arousal"],
@@ -283,13 +284,16 @@ def test_generate_emotion_direction_and_bridge_diffusion_figure(tmp_path):
         ],
         color=["#adb5bd", "#264653"],
     )
-    axes[2].set_title("Bridge Effect on Remote Community")
-    axes[2].set_ylabel("Mean Local Arousal in Community B")
+    ax3.set_title("Bridge Effect on Remote Community", fontsize=16)
+    ax3.set_ylabel("Mean Local Arousal in Community B", fontsize=12)
+    ax3.grid(True, alpha=0.2)
+    path3 = output_dir / "bridge_arousal_effect.png"
+    fig3.savefig(path3, dpi=220, bbox_inches="tight")
+    plt.close(fig3)
 
-    # x-axis: network without vs. with bridge links.
-    # y-axis: overall acting ratio after the social-threshold step. This shows
-    # whether bridges convert isolated motivation into broader collective uptake.
-    axes[3].bar(
+    # Figure 4: Bridge Effect on Collective Action
+    fig4, ax4 = plt.subplots(figsize=(10, 8))
+    ax4.bar(
         ["Without bridge", "With bridge"],
         [
             bridge_metrics["without_bridge"]["acting_ratio"],
@@ -297,16 +301,18 @@ def test_generate_emotion_direction_and_bridge_diffusion_figure(tmp_path):
         ],
         color=["#8d99ae", "#e76f51"],
     )
-    axes[3].set_title("Bridge Effect on Collective Action")
-    axes[3].set_ylabel("Acting Ratio")
+    ax4.set_title("Bridge Effect on Collective Action", fontsize=16)
+    ax4.set_ylabel("Acting Ratio", fontsize=12)
+    ax4.grid(True, alpha=0.2)
+    path4 = output_dir / "bridge_action_effect.png"
+    fig4.savefig(path4, dpi=220, bbox_inches="tight")
+    plt.close(fig4)
 
-    for axis in axes:
-        axis.grid(True, alpha=0.2)
-
-    fig.suptitle("Emotion Direction and Bridge Diffusion", fontsize=18)
-    fig.tight_layout(rect=(0, 0, 1, 0.98))
-    fig.savefig(output_path, dpi=220, bbox_inches="tight")
-    plt.close(fig)
-
-    assert output_path.exists()
-    assert output_path.stat().st_size > 0
+    assert path1.exists()
+    assert path2.exists()
+    assert path3.exists()
+    assert path4.exists()
+    assert path1.stat().st_size > 0
+    assert path2.stat().st_size > 0
+    assert path3.stat().st_size > 0
+    assert path4.stat().st_size > 0

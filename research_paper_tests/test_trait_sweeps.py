@@ -132,37 +132,34 @@ def test_trait_sweeps_reveal_monotonic_behavioral_gradients():
 
 
 def test_generate_trait_sweeps_figure(tmp_path):
-    output_dir = Path(__file__).resolve().parent / "generated"
-    output_dir.mkdir(exist_ok=True)
-    output_path = output_dir / "trait_sweeps.png"
+    output_dir = Path(__file__).resolve().parent / "generated" / "trait_sweeps"
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     scenario = get_test_scenario("trait_sweeps")
     config = scenario.sim_config()
     settings = scenario.settings()
     trait_values, metrics = _trait_sweep_metrics(config, settings)
 
-    fig, axes = plt.subplots(2, 2, figsize=(18, 12))
-    axes = axes.flatten()
-
-    # x-axis: Openness value with all other traits fixed.
-    # y-axis: engagement under a worldview-misaligned event. Rising engagement means
-    # higher openness weakens selective suppression and lets contradictory input through.
-    axes[0].plot(
+    # Figure 1: Openness vs Engagement
+    fig1, ax1 = plt.subplots(figsize=(10, 8))
+    ax1.plot(
         trait_values,
         metrics["Openness"]["engagement"],
         marker="o",
         linewidth=2,
         color="#457b9d",
     )
-    axes[0].set_title("Openness vs Engagement")
-    axes[0].set_xlabel("Openness")
-    axes[0].set_ylabel("Engagement")
+    ax1.set_title("Openness vs Engagement", fontsize=16)
+    ax1.set_xlabel("Openness", fontsize=12)
+    ax1.set_ylabel("Engagement", fontsize=12)
+    ax1.grid(True, alpha=0.2)
+    path1 = output_dir / "openness_vs_engagement.png"
+    fig1.savefig(path1, dpi=220, bbox_inches="tight")
+    plt.close(fig1)
 
-    # x-axis: Extraversion and Conscientiousness sweeps separately.
-    # y-axis: engagement under the same threat event. In this setup both traits
-    # damp engagement, but for different reasons: thresholding for Extraversion
-    # and temperature/sharpening effects for Conscientiousness.
-    axes[1].plot(
+    # Figure 2: Threat Engagement by Trait
+    fig2, ax2 = plt.subplots(figsize=(10, 8))
+    ax2.plot(
         trait_values,
         metrics["Extraversion"]["engagement"],
         marker="o",
@@ -170,7 +167,7 @@ def test_generate_trait_sweeps_figure(tmp_path):
         label="Extraversion",
         color="#e76f51",
     )
-    axes[1].plot(
+    ax2.plot(
         trait_values,
         metrics["Conscientiousness"]["engagement"],
         marker="s",
@@ -178,30 +175,35 @@ def test_generate_trait_sweeps_figure(tmp_path):
         label="Conscientiousness",
         color="#6d597a",
     )
-    axes[1].set_title("Threat Engagement by Trait")
-    axes[1].set_xlabel("Trait Value")
-    axes[1].set_ylabel("Engagement")
-    axes[1].legend(fontsize=8)
+    ax2.set_title("Threat Engagement by Trait", fontsize=16)
+    ax2.set_xlabel("Trait Value", fontsize=12)
+    ax2.set_ylabel("Engagement", fontsize=12)
+    ax2.legend(fontsize=10)
+    ax2.grid(True, alpha=0.2)
+    path2 = output_dir / "threat_engagement_by_trait.png"
+    fig2.savefig(path2, dpi=220, bbox_inches="tight")
+    plt.close(fig2)
 
-    # x-axis: Extraversion value.
-    # y-axis: attention on the Short_Term dimension (index 10). Rising values show
-    # that the same threatening event allocates slightly more immediate attention
-    # as Extraversion increases.
-    axes[2].plot(
+    # Figure 3: Extraversion vs Short-Term Attention
+    fig3, ax3 = plt.subplots(figsize=(10, 8))
+    ax3.plot(
         trait_values,
         metrics["Extraversion"]["attention"][:, 10],
         marker="o",
         linewidth=2,
         color="#264653",
     )
-    axes[2].set_title("Extraversion vs Short-Term Attention")
-    axes[2].set_xlabel("Extraversion")
-    axes[2].set_ylabel("Attention Weight")
+    ax3.set_title("Extraversion vs Short-Term Attention", fontsize=16)
+    ax3.set_xlabel("Extraversion", fontsize=12)
+    ax3.set_ylabel("Attention Weight", fontsize=12)
+    ax3.grid(True, alpha=0.2)
+    path3 = output_dir / "extraversion_vs_attention.png"
+    fig3.savefig(path3, dpi=220, bbox_inches="tight")
+    plt.close(fig3)
 
-    # x-axis: trait value.
-    # y-axis: modeled action cost from the social-physics step. Lower curves mean
-    # the trait makes outward action easier once emotion is present.
-    axes[3].plot(
+    # Figure 4: Trait vs Action Cost
+    fig4, ax4 = plt.subplots(figsize=(10, 8))
+    ax4.plot(
         trait_values,
         metrics["Extraversion"]["action_cost"],
         marker="o",
@@ -209,7 +211,7 @@ def test_generate_trait_sweeps_figure(tmp_path):
         label="Extraversion",
         color="#f4a261",
     )
-    axes[3].plot(
+    ax4.plot(
         trait_values,
         metrics["Neuroticism"]["action_cost"],
         marker="s",
@@ -217,18 +219,20 @@ def test_generate_trait_sweeps_figure(tmp_path):
         label="Neuroticism",
         color="#2a9d8f",
     )
-    axes[3].set_title("Trait vs Action Cost")
-    axes[3].set_xlabel("Trait Value")
-    axes[3].set_ylabel("Action Cost")
-    axes[3].legend(fontsize=8)
+    ax4.set_title("Trait vs Action Cost", fontsize=16)
+    ax4.set_xlabel("Trait Value", fontsize=12)
+    ax4.set_ylabel("Action Cost", fontsize=12)
+    ax4.legend(fontsize=10)
+    ax4.grid(True, alpha=0.2)
+    path4 = output_dir / "trait_vs_action_cost.png"
+    fig4.savefig(path4, dpi=220, bbox_inches="tight")
+    plt.close(fig4)
 
-    for axis in axes:
-        axis.grid(True, alpha=0.2)
-
-    fig.suptitle("Trait Sweep Gradients", fontsize=18)
-    fig.tight_layout(rect=(0, 0, 1, 0.97))
-    fig.savefig(output_path, dpi=220, bbox_inches="tight")
-    plt.close(fig)
-
-    assert output_path.exists()
-    assert output_path.stat().st_size > 0
+    assert path1.exists()
+    assert path2.exists()
+    assert path3.exists()
+    assert path4.exists()
+    assert path1.stat().st_size > 0
+    assert path2.stat().st_size > 0
+    assert path3.stat().st_size > 0
+    assert path4.stat().st_size > 0

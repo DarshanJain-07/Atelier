@@ -126,9 +126,8 @@ def test_low_salience_worlds_keep_reaction_bounded_before_escalation(tmp_path):
 
 
 def test_generate_response_boundaries_figure(tmp_path):
-    output_dir = Path(__file__).resolve().parent / "generated"
-    output_dir.mkdir(exist_ok=True)
-    output_path = output_dir / "response_boundaries.png"
+    output_dir = Path(__file__).resolve().parent / "generated" / "response_boundaries"
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     dose_scenario = get_test_scenario("boundary_dose_response")
     dose_config = dose_scenario.sim_config()
@@ -172,64 +171,69 @@ def test_generate_response_boundaries_figure(tmp_path):
         neutral_settings["urgency"],
     )
 
-    fig, axes = plt.subplots(2, 2, figsize=(20, 14))
-    axes = axes.flatten()
+    # Figure 1: Dose Response - Engagement
+    fig1, ax1 = plt.subplots(figsize=(10, 8))
+    ax1.plot(magnitudes, mean_engagement, marker="o", linewidth=2, color="#1d3557")
+    ax1.set_title("Dose Response: Engagement", fontsize=16)
+    ax1.set_xlabel("Event Magnitude", fontsize=12)
+    ax1.set_ylabel("Mean Engagement", fontsize=12)
+    ax1.grid(True, alpha=0.2)
+    path1 = output_dir / "dose_response_engagement.png"
+    fig1.savefig(path1, dpi=220, bbox_inches="tight")
+    plt.close(fig1)
 
-    # x-axis: event magnitude along a fixed threat direction.
-    # y-axis: mean engagement. The rise shows where weak events stop being ignored
-    # and begin consistently pulling the population into the cognitive pipeline.
-    axes[0].plot(magnitudes, mean_engagement, marker="o", linewidth=2, color="#1d3557")
-    axes[0].set_title("Dose Response: Engagement")
-    axes[0].set_xlabel("Event Magnitude")
-    axes[0].set_ylabel("Mean Engagement")
-
-    # x-axis: the same event magnitudes.
-    # y-axis: acting ratio after aggregation. This marks the behavioral boundary
-    # between internal attention and outward collective action.
-    axes[1].plot(magnitudes, acting_ratio, marker="o", linewidth=2, color="#e76f51")
-    axes[1].set_title("Dose Response: Collective Action")
-    axes[1].set_xlabel("Event Magnitude")
-    axes[1].set_ylabel("Acting Ratio")
+    # Figure 2: Dose Response - Collective Action
+    fig2, ax2 = plt.subplots(figsize=(10, 8))
+    ax2.plot(magnitudes, acting_ratio, marker="o", linewidth=2, color="#e76f51")
+    ax2.set_title("Dose Response: Collective Action", fontsize=16)
+    ax2.set_xlabel("Event Magnitude", fontsize=12)
+    ax2.set_ylabel("Acting Ratio", fontsize=12)
+    ax2.grid(True, alpha=0.2)
+    path2 = output_dir / "dose_response_action.png"
+    fig2.savefig(path2, dpi=220, bbox_inches="tight")
+    plt.close(fig2)
 
     labels = list(neutral_settings["worlds"])
     x = np.arange(len(labels))
     width = 0.38
 
-    # x-axis: low-salience and salient comparison worlds.
-    # y-axis: grouped reaction metrics. Weak worlds should stay near the floor,
-    # while the salient control shows where escalation begins.
-    axes[2].bar(
+    # Figure 3: Low-Salience Reaction Boundary
+    fig3, ax3 = plt.subplots(figsize=(10, 8))
+    ax3.bar(
         x - width / 2,
         [neutral_results[label]["mean_engagement"] for label in labels],
         width=width,
         label="Mean engagement",
         color="#457b9d",
     )
-    axes[2].bar(
+    ax3.bar(
         x + width / 2,
         [neutral_results[label]["acting_ratio"] for label in labels],
         width=width,
         label="Acting ratio",
         color="#f4a261",
     )
-    axes[2].set_xticks(x, labels, rotation=15)
-    axes[2].set_title("Low-Salience Reaction Boundary")
-    axes[2].set_ylabel("Reaction Strength")
-    axes[2].legend(fontsize=8)
+    ax3.set_xticks(x, labels, rotation=15)
+    ax3.set_title("Low-Salience Reaction Boundary", fontsize=16)
+    ax3.set_ylabel("Reaction Strength", fontsize=12)
+    ax3.legend(fontsize=10)
+    ax3.grid(True, alpha=0.2)
+    path3 = output_dir / "low_salience_boundary.png"
+    fig3.savefig(path3, dpi=220, bbox_inches="tight")
+    plt.close(fig3)
 
+    # Figure 4: Low-Salience Sentiment Composition
+    fig4, ax4 = plt.subplots(figsize=(10, 8))
     sentiment_colors = ["#d62828", "#adb5bd", "#2a9d8f"]
     sentiment_labels = ["Negative", "Neutral", "Positive"]
     bottoms = np.zeros(len(labels), dtype=np.float64)
 
-    # x-axis: the same comparison worlds.
-    # y-axis: sentiment composition of the aggregate state. This lets us inspect
-    # whether "low salience" really stays centered or already leans negative/positive.
     for idx, sentiment_label in enumerate(sentiment_labels):
         heights = np.array(
             [neutral_results[label]["sentiment"][idx] for label in labels],
             dtype=np.float64,
         )
-        axes[3].bar(
+        ax4.bar(
             x,
             heights,
             bottom=bottoms,
@@ -237,19 +241,17 @@ def test_generate_response_boundaries_figure(tmp_path):
             label=sentiment_label,
         )
         bottoms += heights
-    axes[3].set_xticks(x, labels, rotation=15)
-    axes[3].set_ylim(0.0, 1.0)
-    axes[3].set_title("Low-Salience Sentiment Composition")
-    axes[3].set_ylabel("Share")
-    axes[3].legend(fontsize=8)
+    ax4.set_xticks(x, labels, rotation=15)
+    ax4.set_ylim(0.0, 1.0)
+    ax4.set_title("Low-Salience Sentiment Composition", fontsize=16)
+    ax4.set_ylabel("Share", fontsize=12)
+    ax4.legend(fontsize=10)
+    ax4.grid(True, alpha=0.2)
+    path4 = output_dir / "low_salience_sentiment.png"
+    fig4.savefig(path4, dpi=220, bbox_inches="tight")
+    plt.close(fig4)
 
-    for axis in axes:
-        axis.grid(True, alpha=0.2)
-
-    fig.suptitle("Response Boundaries", fontsize=18)
-    fig.tight_layout(rect=(0, 0, 1, 0.98))
-    fig.savefig(output_path, dpi=220, bbox_inches="tight")
-    plt.close(fig)
-
-    assert output_path.exists()
-    assert output_path.stat().st_size > 0
+    assert path1.exists()
+    assert path2.exists()
+    assert path3.exists()
+    assert path4.exists()

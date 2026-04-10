@@ -52,9 +52,8 @@ def test_viral_scaling_has_sigmoid_regime_and_cap():
 
 
 def test_generate_viral_scaling_figure(tmp_path):
-    output_dir = Path(__file__).resolve().parent / "generated"
-    output_dir.mkdir(exist_ok=True)
-    output_path = output_dir / "viral_scaling.png"
+    output_dir = Path(__file__).resolve().parent / "generated" / "viral_scaling"
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     scenario = get_test_scenario("viral_scaling")
     config = scenario.sim_config()
@@ -63,42 +62,41 @@ def test_generate_viral_scaling_figure(tmp_path):
     max_allowed = 1.0 + config.max_viral_multiplier
     slopes = np.diff(mean_multiplier) / np.diff(amplitudes)
 
-    fig, axes = plt.subplots(1, 2, figsize=(16, 6))
-
-    # x-axis: emotional amplitude injected into the same aligned population.
-    # y-axis: outrage multiplier. The curve should accelerate through the sigmoid
-    # middle region and then flatten near the configured cap.
-    axes[0].plot(amplitudes, mean_multiplier, marker="o", linewidth=2, label="Mean")
-    axes[0].plot(amplitudes, max_multiplier, marker="s", linewidth=2, label="Max")
-    axes[0].axhline(
+    # Figure 1: Viral Scaling Curve
+    fig1, ax1 = plt.subplots(figsize=(10, 8))
+    ax1.plot(amplitudes, mean_multiplier, marker="o", linewidth=2, label="Mean")
+    ax1.plot(amplitudes, max_multiplier, marker="s", linewidth=2, label="Max")
+    ax1.axhline(
         max_allowed,
         color="#e63946",
         linestyle="--",
         linewidth=2,
         label="Configured cap",
     )
-    axes[0].set_title("Viral Scaling Curve")
-    axes[0].set_xlabel("Emotion Amplitude")
-    axes[0].set_ylabel("Outrage Multiplier")
-    axes[0].legend(fontsize=8)
+    ax1.set_title("Viral Scaling Curve", fontsize=16)
+    ax1.set_xlabel("Emotion Amplitude", fontsize=12)
+    ax1.set_ylabel("Outrage Multiplier", fontsize=12)
+    ax1.legend(fontsize=10)
+    ax1.grid(True, alpha=0.2)
+    
+    path1 = output_dir / "viral_scaling_curve.png"
+    fig1.savefig(path1, dpi=220, bbox_inches="tight")
+    plt.close(fig1)
 
+    # Figure 2: Steepest Viral Growth Region
+    fig2, ax2 = plt.subplots(figsize=(10, 8))
     slope_x = 0.5 * (amplitudes[:-1] + amplitudes[1:])
+    ax2.plot(slope_x, slopes, marker="o", linewidth=2, color="#457b9d")
+    ax2.set_title("Steepest Viral Growth Region", fontsize=16)
+    ax2.set_xlabel("Emotion Amplitude", fontsize=12)
+    ax2.set_ylabel("d(Multiplier)/d(Amplitude)", fontsize=12)
+    ax2.grid(True, alpha=0.2)
 
-    # x-axis: midpoint of each adjacent amplitude segment.
-    # y-axis: local slope of the multiplier curve. The peak marks the regime where
-    # small changes in arousal produce the fastest growth in virality.
-    axes[1].plot(slope_x, slopes, marker="o", linewidth=2, color="#457b9d")
-    axes[1].set_title("Steepest Viral Growth Region")
-    axes[1].set_xlabel("Emotion Amplitude")
-    axes[1].set_ylabel("d(Multiplier)/d(Amplitude)")
+    path2 = output_dir / "steepest_growth_region.png"
+    fig2.savefig(path2, dpi=220, bbox_inches="tight")
+    plt.close(fig2)
 
-    for axis in axes:
-        axis.grid(True, alpha=0.2)
-
-    fig.suptitle("Viral Scaling", fontsize=18)
-    fig.tight_layout(rect=(0, 0, 1, 0.96))
-    fig.savefig(output_path, dpi=220, bbox_inches="tight")
-    plt.close(fig)
-
-    assert output_path.exists()
-    assert output_path.stat().st_size > 0
+    assert path1.exists()
+    assert path2.exists()
+    assert path1.stat().st_size > 0
+    assert path2.stat().st_size > 0

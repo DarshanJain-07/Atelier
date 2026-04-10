@@ -8,6 +8,13 @@ from scipy.stats import spearmanr
 
 from generate_society import generate_society
 from research_paper_tests.config_schema import get_test_scenario
+from research_paper_tests.plotting_utils import (
+    PAPER_PALETTE,
+    apply_paper_style,
+    save_paper_figure,
+)
+
+apply_paper_style()
 
 
 def visualize(seed=42):
@@ -52,7 +59,6 @@ def visualize(seed=42):
     )
 
     # 5. Plotting
-    sns.set_theme(style="whitegrid")
     fig, axes = plt.subplots(1, 3, figsize=(24, 8))
     
     # Plot 1: Wealth vs Influence (Scatter)
@@ -60,36 +66,36 @@ def visualize(seed=42):
         x=raw_wealth,
         y=influence,
         alpha=settings["scatter_alpha"],
-        color="teal",
+        color=PAPER_PALETTE["primary"],
         ax=axes[0],
         edgecolor=None
     )
-    axes[0].set_title(f"Wealth vs Influence\nSynergy Model", fontsize=14, fontweight="bold")
-    axes[0].set_xlabel("Raw Wealth", fontsize=12)
-    axes[0].set_ylabel("Influence Score", fontsize=12)
+    axes[0].set_title("Wealth vs Influence\nSynergy Model")
+    axes[0].set_xlabel("Raw Wealth")
+    axes[0].set_ylabel("Influence Score")
 
     # Plot 2: Wealth Density Distribution
     sns.histplot(
         raw_wealth,
         kde=True,
         ax=axes[1],
-        color="purple",
+        color=PAPER_PALETTE["tertiary"],
         bins=settings["hist_bins"],
     )
-    axes[1].set_title("Wealth Distribution (Network Clustered)", fontsize=14, fontweight="bold")
-    axes[1].set_xlabel("Raw Wealth", fontsize=12)
-    axes[1].set_ylabel("Frequency", fontsize=12)
+    axes[1].set_title("Wealth Distribution (Network Clustered)")
+    axes[1].set_xlabel("Raw Wealth")
+    axes[1].set_ylabel("Frequency")
     axes[1].set_xlim(0, np.percentile(raw_wealth, settings["x_axis_percentile"])) # Focus on the bulk
 
     # Plot 3: Box Plot (Outliers)
-    sns.boxplot(x=raw_wealth, ax=axes[2], color="gold", fliersize=2)
-    axes[2].set_title("Wealth Outlier Analysis", fontsize=14, fontweight="bold")
-    axes[2].set_xlabel("Raw Wealth", fontsize=12)
+    sns.boxplot(x=raw_wealth, ax=axes[2], color=PAPER_PALETTE["accent"], fliersize=2)
+    axes[2].set_title("Wealth Outlier Analysis")
+    axes[2].set_xlabel("Raw Wealth")
     # ax2.set_xscale('log') # Optional: log scale to see billionaires better
 
     plt.tight_layout()
     output_filename = settings["output_template"].format(seed=seed)
-    plt.savefig(output_filename, dpi=300, bbox_inches="tight")
+    save_paper_figure(fig, output_filename)
     plt.close()
 
     print(f"\nSuccess: Verification visualization saved to {output_filename}")

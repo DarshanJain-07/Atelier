@@ -14,8 +14,18 @@ from research_paper_tests.config_schema import (
     set_emotions,
     zero_emotions,
 )
+from research_paper_tests.plotting_utils import (
+    COMPARISON_COLORS,
+    PAPER_PALETTE,
+    SENTIMENT_COLORS,
+    apply_paper_style,
+    compose_panel_grid,
+    save_paper_figure,
+    setup_plot,
+)
 
 matplotlib.use("Agg")
+apply_paper_style()
 
 
 def _row_normalized_adjacency(node_count: int, undirected_edges: list[tuple[int, int]]) -> torch.Tensor:
@@ -223,10 +233,18 @@ def test_generate_emotion_direction_and_bridge_diffusion_figure(tmp_path):
     x = np.arange(len(labels))
     width = 0.25
     key_emotions = ["Joy", "Fear", "Anger"]
-    key_colors = ["#2a9d8f", "#457b9d", "#d62828"]
+    key_colors = [
+        PAPER_PALETTE["positive"], 
+        PAPER_PALETTE["secondary"], 
+        PAPER_PALETTE["negative"],
+    ]
 
     # Figure 1: Emotion Directionality
-    fig1, ax1 = plt.subplots(figsize=(10, 8))
+    fig1, ax1 = setup_plot(
+        title="Emotion Directionality",
+        xlabel="World",
+        ylabel="Objective-Center Weight",
+    )
     for offset, emotion_name, color in zip([-width, 0.0, width], key_emotions, key_colors):
         emotion_idx = EMOTION_INDICES[emotion_name]
         ax1.bar(
@@ -237,17 +255,18 @@ def test_generate_emotion_direction_and_bridge_diffusion_figure(tmp_path):
             color=color,
         )
     ax1.set_xticks(x, labels)
-    ax1.set_title("Emotion Directionality", fontsize=16)
-    ax1.set_ylabel("Objective-Center Weight", fontsize=12)
-    ax1.legend(fontsize=10)
-    ax1.grid(True, alpha=0.2)
+    ax1.legend()
     path1 = output_dir / "emotion_directionality.png"
-    fig1.savefig(path1, dpi=220, bbox_inches="tight")
+    save_paper_figure(fig1, path1)
     plt.close(fig1)
 
     # Figure 2: Emotion-to-Sentiment Mapping
-    fig2, ax2 = plt.subplots(figsize=(10, 8))
-    sentiment_colors = ["#d62828", "#adb5bd", "#2a9d8f"]
+    fig2, ax2 = setup_plot(
+        title="Emotion-to-Sentiment Mapping",
+        xlabel="World",
+        ylabel="Share",
+    )
+    sentiment_colors = SENTIMENT_COLORS
     sentiment_labels = ["Negative", "Neutral", "Positive"]
     bottoms = np.zeros(len(labels), dtype=np.float64)
 
@@ -266,47 +285,53 @@ def test_generate_emotion_direction_and_bridge_diffusion_figure(tmp_path):
         bottoms += heights
     ax2.set_xticks(x, labels)
     ax2.set_ylim(0.0, 1.0)
-    ax2.set_title("Emotion-to-Sentiment Mapping", fontsize=16)
-    ax2.set_ylabel("Share", fontsize=12)
-    ax2.legend(fontsize=10)
-    ax2.grid(True, alpha=0.2)
+    ax2.legend()
     path2 = output_dir / "sentiment_mapping.png"
-    fig2.savefig(path2, dpi=220, bbox_inches="tight")
+    save_paper_figure(fig2, path2)
     plt.close(fig2)
 
     # Figure 3: Bridge Effect on Remote Community
-    fig3, ax3 = plt.subplots(figsize=(10, 8))
+    fig3, ax3 = setup_plot(
+        title="Bridge Effect on Remote Community",
+        xlabel="Topology",
+        ylabel="Mean Local Arousal in Community B",
+    )
     ax3.bar(
         ["Without bridge", "With bridge"],
         [
             bridge_metrics["without_b_local_arousal"],
             bridge_metrics["with_b_local_arousal"],
         ],
-        color=["#adb5bd", "#264653"],
+        color=COMPARISON_COLORS,
     )
-    ax3.set_title("Bridge Effect on Remote Community", fontsize=16)
-    ax3.set_ylabel("Mean Local Arousal in Community B", fontsize=12)
-    ax3.grid(True, alpha=0.2)
     path3 = output_dir / "bridge_arousal_effect.png"
-    fig3.savefig(path3, dpi=220, bbox_inches="tight")
+    save_paper_figure(fig3, path3)
     plt.close(fig3)
 
     # Figure 4: Bridge Effect on Collective Action
-    fig4, ax4 = plt.subplots(figsize=(10, 8))
+    fig4, ax4 = setup_plot(
+        title="Bridge Effect on Collective Action",
+        xlabel="Topology",
+        ylabel="Acting Ratio",
+    )
     ax4.bar(
         ["Without bridge", "With bridge"],
         [
             bridge_metrics["without_bridge"]["acting_ratio"],
             bridge_metrics["with_bridge"]["acting_ratio"],
         ],
-        color=["#8d99ae", "#e76f51"],
+        color=COMPARISON_COLORS,
     )
-    ax4.set_title("Bridge Effect on Collective Action", fontsize=16)
-    ax4.set_ylabel("Acting Ratio", fontsize=12)
-    ax4.grid(True, alpha=0.2)
     path4 = output_dir / "bridge_action_effect.png"
-    fig4.savefig(path4, dpi=220, bbox_inches="tight")
+    save_paper_figure(fig4, path4)
     plt.close(fig4)
+
+    compose_panel_grid(
+        [path1, path2, path3, path4],
+        output_dir.parent / "emotion_direction_and_bridge_diffusion.png",
+        title="Emotion Direction and Bridge Diffusion",
+        columns=2,
+    )
 
     assert path1.exists()
     assert path2.exists()

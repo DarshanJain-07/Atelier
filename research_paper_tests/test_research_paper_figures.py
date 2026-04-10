@@ -42,8 +42,20 @@ from research_paper_tests.config_schema import (
     zero_emotions,
     zero_personalities,
 )
+from research_paper_tests.plotting_utils import (
+    CATEGORICAL_COLORS,
+    COMPARISON_COLORS,
+    PAPER_DIVERGING_CMAP,
+    PAPER_PALETTE,
+    SENTIMENT_COLORS,
+    apply_paper_style,
+    compose_panel_grid,
+    save_paper_figure,
+    setup_plot,
+)
 
 matplotlib.use("Agg")
+apply_paper_style()
 
 
 def _line_of_best_fit(x: np.ndarray, y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
@@ -130,8 +142,16 @@ def _plot_seed_lines(
     # The x-axis is the random seed used to regenerate the full scenario, not time.
     # Each point is one independent rerun. If lines stay flat across seeds, the
     # result is robust; if they swing a lot, the metric is seed-sensitive.
-    for label, values in series.items():
-        ax.plot(seeds, values, marker="o", linewidth=2, label=label)
+    markers = ["o", "s", "^", "D", "P"]
+    for idx, (label, values) in enumerate(series.items()):
+        ax.plot(
+            seeds,
+            values,
+            marker=markers[idx % len(markers)],
+            color=CATEGORICAL_COLORS[idx % len(CATEGORICAL_COLORS)],
+            linewidth=2,
+            label=label,
+        )
     ax.set_title(title)
     ax.set_xlabel("Seed")
     ax.set_ylabel(ylabel)
@@ -187,14 +207,14 @@ def test_generate_research_paper_summary_figure(tmp_path):
     )
     xs, ys = _line_of_best_fit(neuroticism, distortion)
     
-    fig, ax = plt.subplots(figsize=(10, 8))
-    ax.scatter(neuroticism, distortion, s=10, alpha=0.3, color="#457b9d")
-    ax.plot(xs, ys, color="#e63946", linewidth=2)
-    ax.set_title("Signal Distortion", fontsize=16)
-    ax.set_xlabel("Neuroticism", fontsize=12)
-    ax.set_ylabel("Threat Exaggeration", fontsize=12)
-    ax.grid(True, alpha=0.2)
-    fig.savefig(output_dir / "01_signal_distortion.png", dpi=220, bbox_inches="tight")
+    fig, ax = setup_plot(
+        title="Signal Distortion",
+        xlabel="Neuroticism",
+        ylabel="Threat Exaggeration",
+    )
+    ax.scatter(neuroticism, distortion, s=10, alpha=0.3, color=PAPER_PALETTE["primary"])
+    ax.plot(xs, ys, color=PAPER_PALETTE["threshold"], linewidth=2)
+    save_paper_figure(fig, output_dir / "01_signal_distortion.png")
     plt.close(fig)
 
     # 2. Memory rehearsal decay
@@ -235,15 +255,27 @@ def test_generate_research_paper_summary_figure(tmp_path):
         rehearsed_curve.append(torch.norm(rehearsed).item())
     steps = np.arange(len(isolated_curve))
     
-    fig, ax = plt.subplots(figsize=(10, 8))
-    ax.plot(steps, isolated_curve, marker="o", label="Isolated")
-    ax.plot(steps, rehearsed_curve, marker="s", label="Rehearsed")
-    ax.set_title("Memory Rehearsal", fontsize=16)
-    ax.set_xlabel("Step", fontsize=12)
-    ax.set_ylabel("Memory Norm", fontsize=12)
-    ax.legend(fontsize=10)
-    ax.grid(True, alpha=0.2)
-    fig.savefig(output_dir / "02_memory_rehearsal.png", dpi=220, bbox_inches="tight")
+    fig, ax = setup_plot(
+        title="Memory Rehearsal",
+        xlabel="Step",
+        ylabel="Memory Norm",
+    )
+    ax.plot(
+        steps,
+        isolated_curve,
+        marker="o",
+        color=PAPER_PALETTE["baseline"],
+        label="Isolated",
+    )
+    ax.plot(
+        steps,
+        rehearsed_curve,
+        marker="s",
+        color=PAPER_PALETTE["primary"],
+        label="Rehearsed",
+    )
+    ax.legend()
+    save_paper_figure(fig, output_dir / "02_memory_rehearsal.png")
     plt.close(fig)
 
     # 3. Cognitive gate distributions
@@ -262,22 +294,22 @@ def test_generate_research_paper_summary_figure(tmp_path):
     gate_openness = gate_society.personalities[:, PERSONALITY_INDICES["Openness"]].numpy()
     xs, ys = _line_of_best_fit(gate_openness, gate_engagement)
     
-    fig, ax = plt.subplots(figsize=(10, 8))
+    fig, ax = setup_plot(
+        title="Cognitive Gate",
+        xlabel="Openness",
+        ylabel="Engagement",
+    )
     ax.scatter(
         gate_openness,
         gate_engagement,
         s=10,
         alpha=0.35,
-        color="#457b9d",
+        color=PAPER_PALETTE["primary"],
         label="Agent outcomes",
     )
-    ax.plot(xs, ys, color="#f4a261", linewidth=2, label="Trend line")
-    ax.set_title("Cognitive Gate", fontsize=16)
-    ax.set_xlabel("Openness", fontsize=12)
-    ax.set_ylabel("Engagement", fontsize=12)
-    ax.legend(fontsize=10)
-    ax.grid(True, alpha=0.2)
-    fig.savefig(output_dir / "03_cognitive_gate.png", dpi=220, bbox_inches="tight")
+    ax.plot(xs, ys, color=PAPER_PALETTE["accent"], linewidth=2, label="Trend line")
+    ax.legend()
+    save_paper_figure(fig, output_dir / "03_cognitive_gate.png")
     plt.close(fig)
 
     # 4. Algorithmic amplification
@@ -315,19 +347,20 @@ def test_generate_research_paper_summary_figure(tmp_path):
         urgency=algo_settings["urgency"],
     )
     
-    fig, ax = plt.subplots(figsize=(10, 8))
+    fig, ax = setup_plot(
+        title="Algorithmic Amplification",
+        xlabel="Condition",
+        ylabel="Mean Engagement",
+    )
     ax.bar(
         ["Baseline", "Amplified"],
         [
             base_result.engagement_scores.mean().item(),
             algo_result.engagement_scores.mean().item(),
         ],
-        color=["#a8dadc", "#1d3557"],
+        color=COMPARISON_COLORS,
     )
-    ax.set_title("Algorithmic Amplification", fontsize=16)
-    ax.set_ylabel("Mean Engagement", fontsize=12)
-    ax.grid(True, alpha=0.2)
-    fig.savefig(output_dir / "04_algorithmic_amplification.png", dpi=220, bbox_inches="tight")
+    save_paper_figure(fig, output_dir / "04_algorithmic_amplification.png")
     plt.close(fig)
 
     # 5. Social consensus
@@ -359,7 +392,11 @@ def test_generate_research_paper_summary_figure(tmp_path):
         * torch.sparse.mm(consensus_society.adjacency_matrix, baseline_perceived)
     )
     
-    fig, ax = plt.subplots(figsize=(10, 8))
+    fig, ax = setup_plot(
+        title="Perception Consensus",
+        xlabel="Condition",
+        ylabel="Neighbor Distance",
+    )
     ax.bar(
         ["Baseline", "Consensus"],
         [
@@ -370,12 +407,9 @@ def test_generate_research_paper_summary_figure(tmp_path):
                 consensus_perceived, consensus_society.adjacency_matrix
             ),
         ],
-        color=["#f1fa8c", "#2a9d8f"],
+        color=COMPARISON_COLORS,
     )
-    ax.set_title("Perception Consensus", fontsize=16)
-    ax.set_ylabel("Neighbor Distance", fontsize=12)
-    ax.grid(True, alpha=0.2)
-    fig.savefig(output_dir / "05_perception_consensus.png", dpi=220, bbox_inches="tight")
+    save_paper_figure(fig, output_dir / "05_perception_consensus.png")
     plt.close(fig)
 
     # 6. Granovetter cascade
@@ -424,16 +458,17 @@ def test_generate_research_paper_summary_figure(tmp_path):
         personalities=granovetter_society.personalities,
     )
     
-    fig, ax = plt.subplots(figsize=(10, 8))
+    fig, ax = setup_plot(
+        title="Granovetter Cascade",
+        xlabel="Condition",
+        ylabel="Acting Ratio",
+    )
     ax.bar(
         ["Baseline", "Cascade"],
         [baseline_granovetter["acting_ratio"], cascade_granovetter["acting_ratio"]],
-        color=["#bde0fe", "#ef476f"],
+        color=COMPARISON_COLORS,
     )
-    ax.set_title("Granovetter Cascade", fontsize=16)
-    ax.set_ylabel("Acting Ratio", fontsize=12)
-    ax.grid(True, alpha=0.2)
-    fig.savefig(output_dir / "06_granovetter_cascade.png", dpi=220, bbox_inches="tight")
+    save_paper_figure(fig, output_dir / "06_granovetter_cascade.png")
     plt.close(fig)
 
     # 7-8. Homophily and modularity share the same societies
@@ -456,7 +491,11 @@ def test_generate_research_paper_summary_figure(tmp_path):
     assert low_society.adjacency_matrix is not None
     assert high_society.adjacency_matrix is not None
     
-    fig, ax = plt.subplots(figsize=(10, 8))
+    fig, ax = setup_plot(
+        title="Echo Chambers",
+        xlabel="Homophily",
+        ylabel="Topology Similarity",
+    )
     ax.bar(
         ["Low", "High"],
         [
@@ -471,12 +510,9 @@ def test_generate_research_paper_summary_figure(tmp_path):
                 high_society.adjacency_matrix,
             ),
         ],
-        color=["#ced4da", "#6d597a"],
+        color=COMPARISON_COLORS,
     )
-    ax.set_title("Echo Chambers", fontsize=16)
-    ax.set_ylabel("Topology Similarity", fontsize=12)
-    ax.grid(True, alpha=0.2)
-    fig.savefig(output_dir / "07_echo_chambers.png", dpi=220, bbox_inches="tight")
+    save_paper_figure(fig, output_dir / "07_echo_chambers.png")
     plt.close(fig)
 
     low_graph = adjacency_to_graph(low_society.adjacency_matrix)
@@ -496,16 +532,17 @@ def test_generate_research_paper_summary_figure(tmp_path):
         high_graph,
     )
     
-    fig, ax = plt.subplots(figsize=(10, 8))
+    fig, ax = setup_plot(
+        title="Louvain Modularity",
+        xlabel="Homophily",
+        ylabel="Q",
+    )
     ax.bar(
         ["Low", "High"],
         [low_modularity, high_modularity],
-        color=["#adb5bd", "#264653"],
+        color=COMPARISON_COLORS,
     )
-    ax.set_title("Louvain Modularity", fontsize=16)
-    ax.set_ylabel("Q", fontsize=12)
-    ax.grid(True, alpha=0.2)
-    fig.savefig(output_dir / "08_louvain_modularity.png", dpi=220, bbox_inches="tight")
+    save_paper_figure(fig, output_dir / "08_louvain_modularity.png")
     plt.close(fig)
 
     # 9. Personality correlation heatmap
@@ -518,13 +555,13 @@ def test_generate_research_paper_summary_figure(tmp_path):
     )
     observed_corr = np.corrcoef(corr_society.personalities.numpy().T)
     
-    fig, ax = plt.subplots(figsize=(10, 8))
-    im = ax.imshow(observed_corr, vmin=-1.0, vmax=1.0, cmap="coolwarm")
-    ax.set_title("Personality Correlations", fontsize=16)
+    fig, ax = setup_plot(title="Personality Correlations")
+    im = ax.imshow(observed_corr, vmin=-1.0, vmax=1.0, cmap=PAPER_DIVERGING_CMAP)
+    ax.grid(False)
     ax.set_xticks(range(5), ["O", "C", "E", "A", "N"])
     ax.set_yticks(range(5), ["O", "C", "E", "A", "N"])
     fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
-    fig.savefig(output_dir / "09_personality_correlations.png", dpi=220, bbox_inches="tight")
+    save_paper_figure(fig, output_dir / "09_personality_correlations.png")
     plt.close(fig)
 
     # 10. Wealth inequality
@@ -543,19 +580,20 @@ def test_generate_research_paper_summary_figure(tmp_path):
         output_name="evolved_wealth",
     )
     
-    fig, ax = plt.subplots(figsize=(10, 8))
+    fig, ax = setup_plot(
+        title="Wealth Gini",
+        xlabel="Condition",
+        ylabel="Gini",
+    )
     ax.bar(
         ["Baseline", "Evolved"],
         [
             gini(base_wealth.exposures[:, DIMENSION_INDICES["Wealth"]].numpy()),
             gini(evolved_wealth.exposures[:, DIMENSION_INDICES["Wealth"]].numpy()),
         ],
-        color=["#8ecae6", "#fb8500"],
+        color=COMPARISON_COLORS,
     )
-    ax.set_title("Wealth Gini", fontsize=16)
-    ax.set_ylabel("Gini", fontsize=12)
-    ax.grid(True, alpha=0.2)
-    fig.savefig(output_dir / "10_wealth_gini.png", dpi=220, bbox_inches="tight")
+    save_paper_figure(fig, output_dir / "10_wealth_gini.png")
     plt.close(fig)
 
     # 11. Relative deprivation
@@ -596,19 +634,20 @@ def test_generate_research_paper_summary_figure(tmp_path):
     )
     anger = relative_result.final_emotions[:, EMOTION_INDICES["Anger"]]
     
-    fig, ax = plt.subplots(figsize=(10, 8))
+    fig, ax = setup_plot(
+        title="Relative Deprivation",
+        xlabel="Group",
+        ylabel="Mean Anger",
+    )
     ax.bar(
         ["Marginalized", "Elites"],
         [
             anger[: relative_settings["group_size"]].mean().item(),
             anger[relative_settings["group_size"] :].mean().item(),
         ],
-        color=["#d62828", "#577590"],
+        color=[PAPER_PALETTE["negative"], PAPER_PALETTE["baseline"]],
     )
-    ax.set_title("Relative Deprivation", fontsize=16)
-    ax.set_ylabel("Mean Anger", fontsize=12)
-    ax.grid(True, alpha=0.2)
-    fig.savefig(output_dir / "11_relative_deprivation.png", dpi=220, bbox_inches="tight")
+    save_paper_figure(fig, output_dir / "11_relative_deprivation.png")
     plt.close(fig)
 
     # 12. Sentiment profile comparison
@@ -651,14 +690,28 @@ def test_generate_research_paper_summary_figure(tmp_path):
     x = np.arange(3)
     width = 0.35
     
-    fig, ax = plt.subplots(figsize=(10, 8))
-    ax.bar(x - width / 2, pos, width=width, label="Prosperity")
-    ax.bar(x + width / 2, neg, width=width, label="Threat")
+    fig, ax = setup_plot(
+        title="Semantic Sentiment Profile",
+        xlabel="Sentiment Class",
+        ylabel="Share",
+    )
+    ax.bar(
+        x - width / 2,
+        pos,
+        width=width,
+        color=PAPER_PALETTE["positive"],
+        label="Prosperity",
+    )
+    ax.bar(
+        x + width / 2,
+        neg,
+        width=width,
+        color=PAPER_PALETTE["negative"],
+        label="Threat",
+    )
     ax.set_xticks(x, ["Negative", "Neutral", "Positive"])
-    ax.set_title("Semantic Sentiment Profile", fontsize=16)
-    ax.legend(fontsize=10)
-    ax.grid(True, alpha=0.2)
-    fig.savefig(output_dir / "12_semantic_sentiment.png", dpi=220, bbox_inches="tight")
+    ax.legend()
+    save_paper_figure(fig, output_dir / "12_semantic_sentiment.png")
     plt.close(fig)
 
     # 13. Triadic closure increases clustering
@@ -694,16 +747,17 @@ def test_generate_research_paper_summary_figure(tmp_path):
         torch.set_rng_state(torch_state)
         np.random.set_state(numpy_state)
 
-    fig, ax = plt.subplots(figsize=(10, 8))
+    fig, ax = setup_plot(
+        title="Network Clustering",
+        xlabel="Network",
+        ylabel="Average Clustering",
+    )
     ax.bar(
         ["Backbone", "Closure"],
         [average_clustering(backbone), average_clustering(refined)],
-        color=["#adb5bd", "#2a9d8f"],
+        color=COMPARISON_COLORS,
     )
-    ax.set_title("Network Clustering", fontsize=16)
-    ax.set_ylabel("Average Clustering", fontsize=12)
-    ax.grid(True, alpha=0.2)
-    fig.savefig(output_dir / "13_network_clustering.png", dpi=220, bbox_inches="tight")
+    save_paper_figure(fig, output_dir / "13_network_clustering.png")
     plt.close(fig)
 
     # 14. Personality socialization
@@ -724,7 +778,11 @@ def test_generate_research_paper_summary_figure(tmp_path):
         output_name="socialized",
     )
     
-    fig, ax = plt.subplots(figsize=(10, 8))
+    fig, ax = setup_plot(
+        title="Personality Socialization",
+        xlabel="Condition",
+        ylabel="Neighbor Trait Distance",
+    )
     ax.bar(
         ["Base", "Socialized"],
         [
@@ -737,12 +795,9 @@ def test_generate_research_paper_summary_figure(tmp_path):
                 socialized_society.adjacency_matrix,
             ),
         ],
-        color=["#f4a261", "#2a9d8f"],
+        color=COMPARISON_COLORS,
     )
-    ax.set_title("Personality Socialization", fontsize=16)
-    ax.set_ylabel("Neighbor Trait Distance", fontsize=12)
-    ax.grid(True, alpha=0.2)
-    fig.savefig(output_dir / "14_personality_socialization.png", dpi=220, bbox_inches="tight")
+    save_paper_figure(fig, output_dir / "14_personality_socialization.png")
     plt.close(fig)
 
     # 15. Influence concentration
@@ -765,12 +820,16 @@ def test_generate_research_paper_summary_figure(tmp_path):
     flat_population, flat_cumulative = _lorenz_curve(flat_influence)
     power_population, power_cumulative = _lorenz_curve(power_influence)
     
-    fig, ax = plt.subplots(figsize=(10, 8))
+    fig, ax = setup_plot(
+        title="Influence Tail",
+        xlabel="Population Share",
+        ylabel="Influence Share",
+    )
     ax.plot(
         [0.0, 1.0],
         [0.0, 1.0],
         linestyle="--",
-        color="#adb5bd",
+        color=PAPER_PALETTE["reference"],
         linewidth=1.5,
         label="Perfect equality",
     )
@@ -778,22 +837,18 @@ def test_generate_research_paper_summary_figure(tmp_path):
         flat_population,
         flat_cumulative,
         linewidth=2,
-        color="#457b9d",
+        color=PAPER_PALETTE["primary"],
         label=f"Flat (G={gini(flat_influence):.2f})",
     )
     ax.plot(
         power_population,
         power_cumulative,
         linewidth=2,
-        color="#e76f51",
+        color=PAPER_PALETTE["negative"],
         label=f"Power law (G={gini(power_influence):.2f})",
     )
-    ax.set_title("Influence Tail", fontsize=16)
-    ax.set_xlabel("Population Share", fontsize=12)
-    ax.set_ylabel("Influence Share", fontsize=12)
-    ax.legend(fontsize=10)
-    ax.grid(True, alpha=0.2)
-    fig.savefig(output_dir / "15_influence_tail.png", dpi=220, bbox_inches="tight")
+    ax.legend()
+    save_paper_figure(fig, output_dir / "15_influence_tail.png")
     plt.close(fig)
 
     # 16. Structural influence and realized reach
@@ -848,20 +903,20 @@ def test_generate_research_paper_summary_figure(tmp_path):
     sampled_influence = reach_influence[reach_indices]
     xs, ys = _line_of_best_fit(sampled_influence, realized_reach)
     
-    fig, ax = plt.subplots(figsize=(10, 8))
+    fig, ax = setup_plot(
+        title="Influence vs. Reach",
+        xlabel="Structural Influence",
+        ylabel="Realized Reach",
+    )
     ax.scatter(
         sampled_influence,
         realized_reach,
         s=18,
         alpha=0.6,
-        color="#457b9d",
+        color=PAPER_PALETTE["primary"],
     )
-    ax.plot(xs, ys, color="#e63946", linewidth=2)
-    ax.set_title("Influence vs. Reach", fontsize=16)
-    ax.set_xlabel("Structural Influence", fontsize=12)
-    ax.set_ylabel("Realized Reach", fontsize=12)
-    ax.grid(True, alpha=0.2)
-    fig.savefig(output_dir / "16_influence_vs_reach.png", dpi=220, bbox_inches="tight")
+    ax.plot(xs, ys, color=PAPER_PALETTE["threshold"], linewidth=2)
+    save_paper_figure(fig, output_dir / "16_influence_vs_reach.png")
     plt.close(fig)
 
     # 17. Fairness polarization
@@ -876,15 +931,24 @@ def test_generate_research_paper_summary_figure(tmp_path):
     fairness = polarization_society.exposures[:, DIMENSION_INDICES["Fairness"]].numpy()
     fairness_bc = bimodality_coefficient(fairness)
     
-    fig, ax = plt.subplots(figsize=(10, 8))
+    fig, ax = setup_plot(
+        title="Fairness Polarization",
+        xlabel="Fairness Exposure",
+        ylabel="Agent Count",
+    )
     ax.hist(
         fairness,
         bins=24,
-        color="#6d597a",
+        color=PAPER_PALETTE["tertiary"],
         alpha=0.8,
         edgecolor="white",
     )
-    ax.axvline(fairness.mean(), color="#f4a261", linestyle="--", linewidth=2)
+    ax.axvline(
+        fairness.mean(),
+        color=PAPER_PALETTE["threshold"],
+        linestyle="--",
+        linewidth=2,
+    )
     ax.text(
         0.04,
         0.95,
@@ -893,11 +957,7 @@ def test_generate_research_paper_summary_figure(tmp_path):
         va="top",
         bbox={"boxstyle": "round", "facecolor": "white", "alpha": 0.8},
     )
-    ax.set_title("Fairness Polarization", fontsize=16)
-    ax.set_xlabel("Fairness Exposure", fontsize=12)
-    ax.set_ylabel("Agent Count", fontsize=12)
-    ax.grid(True, alpha=0.2)
-    fig.savefig(output_dir / "17_fairness_polarization.png", dpi=220, bbox_inches="tight")
+    save_paper_figure(fig, output_dir / "17_fairness_polarization.png")
     plt.close(fig)
 
     # 18. Truth refinement attention split
@@ -924,27 +984,28 @@ def test_generate_research_paper_summary_figure(tmp_path):
     truth_x = np.arange(truth_config.num_agents)
     width = 0.35
     
-    fig, ax = plt.subplots(figsize=(10, 8))
+    fig, ax = setup_plot(
+        title="Truth Refinement",
+        xlabel="Agent Archetype",
+        ylabel="Attention Weight",
+    )
     ax.bar(
         truth_x - width / 2,
         truth_attention[:, 10].numpy(),
         width=width,
         label="Short term",
-        color="#8ecae6",
+        color=PAPER_PALETTE["primary"],
     )
     ax.bar(
         truth_x + width / 2,
         truth_attention[:, 11].numpy(),
         width=width,
         label="Long term",
-        color="#ffb703",
+        color=PAPER_PALETTE["accent"],
     )
     ax.set_xticks(truth_x, ["Populist", "Skeptical"])
-    ax.set_title("Truth Refinement", fontsize=16)
-    ax.set_ylabel("Attention Weight", fontsize=12)
-    ax.legend(fontsize=10)
-    ax.grid(True, alpha=0.2)
-    fig.savefig(output_dir / "18_truth_refinement.png", dpi=220, bbox_inches="tight")
+    ax.legend()
+    save_paper_figure(fig, output_dir / "18_truth_refinement.png")
     plt.close(fig)
 
     # 19. Agent memory stacking
@@ -989,34 +1050,34 @@ def test_generate_research_paper_summary_figure(tmp_path):
     )
     memory_steps = np.arange(1, len(repeated_curve) + 1)
     
-    fig, ax = plt.subplots(figsize=(10, 8))
+    fig, ax = setup_plot(
+        title="Agent Memory",
+        xlabel="Repeat Exposure",
+        ylabel="Mean Engagement",
+    )
     ax.plot(
         memory_steps,
         repeated_curve,
         marker="o",
-        color="#264653",
+        color=PAPER_PALETTE["primary"],
         label="Repeated threat",
     )
     ax.axhline(
         stacked_result.engagement_scores.mean().item(),
-        color="#e76f51",
+        color=PAPER_PALETTE["negative"],
         linestyle="--",
         linewidth=2,
         label="Stacked new threat",
     )
     ax.axhline(
         fresh_result.engagement_scores.mean().item(),
-        color="#8d99ae",
+        color=PAPER_PALETTE["baseline"],
         linestyle=":",
         linewidth=2,
         label="Fresh new threat",
     )
-    ax.set_title("Agent Memory", fontsize=16)
-    ax.set_xlabel("Repeat Exposure", fontsize=12)
-    ax.set_ylabel("Mean Engagement", fontsize=12)
-    ax.legend(fontsize=10)
-    ax.grid(True, alpha=0.2)
-    fig.savefig(output_dir / "19_agent_memory.png", dpi=220, bbox_inches="tight")
+    ax.legend()
+    save_paper_figure(fig, output_dir / "19_agent_memory.png")
     plt.close(fig)
 
     # 20. Virality stays bounded
@@ -1063,7 +1124,11 @@ def test_generate_research_paper_summary_figure(tmp_path):
     )
     virality_x = np.arange(2)
     
-    fig, ax = plt.subplots(figsize=(10, 8))
+    fig, ax = setup_plot(
+        title="Virality Bounds",
+        xlabel="Emotion Scenario",
+        ylabel="Outrage Multiplier",
+    )
     ax.bar(
         virality_x - width / 2,
         [
@@ -1072,7 +1137,7 @@ def test_generate_research_paper_summary_figure(tmp_path):
         ],
         width=width,
         label="Mean",
-        color="#a8dadc",
+        color=PAPER_PALETTE["primary"],
     )
     ax.bar(
         virality_x + width / 2,
@@ -1082,22 +1147,26 @@ def test_generate_research_paper_summary_figure(tmp_path):
         ],
         width=width,
         label="Max",
-        color="#1d3557",
+        color=PAPER_PALETTE["secondary"],
     )
     ax.axhline(
         1.0 + virality_config.max_viral_multiplier,
-        color="#e63946",
+        color=PAPER_PALETTE["threshold"],
         linestyle="--",
         linewidth=2,
         label="Configured cap",
     )
     ax.set_xticks(virality_x, ["Consensus", "Outliers"])
-    ax.set_title("Virality Bounds", fontsize=16)
-    ax.set_ylabel("Outrage Multiplier", fontsize=12)
-    ax.legend(fontsize=10)
-    ax.grid(True, alpha=0.2)
-    fig.savefig(output_dir / "20_virality_bounds.png", dpi=220, bbox_inches="tight")
+    ax.legend()
+    save_paper_figure(fig, output_dir / "20_virality_bounds.png")
     plt.close(fig)
+
+    compose_panel_grid(
+        sorted(output_dir.glob("*.png")),
+        output_dir.parent / "research_paper_summary.png",
+        title="Expanded Research Paper Summary Panels",
+        columns=4,
+    )
 
 
 def test_generate_research_paper_advanced_visualizations(tmp_path):
@@ -1150,12 +1219,12 @@ def test_generate_research_paper_advanced_visualizations(tmp_path):
     influence_sizes = 16.0 + 48.0 * (
         (influence - influence.min()) / max(np.ptp(influence), 1e-6)
     )
-    cluster_colors = plt.get_cmap("tab10")(
-        np.linspace(0.0, 1.0, cluster_settings["cluster_count"])
-    )
-
     # Figure 1: Personality Cluster UMAP
-    fig1, ax1 = plt.subplots(figsize=(10, 8))
+    fig1, ax1 = setup_plot(
+        title="Personality Cluster UMAP",
+        xlabel="UMAP 1",
+        ylabel="UMAP 2",
+    )
     for cluster_idx in range(cluster_settings["cluster_count"]):
         mask = cluster_labels == cluster_idx
         ax1.scatter(
@@ -1163,15 +1232,11 @@ def test_generate_research_paper_advanced_visualizations(tmp_path):
             embedding[mask, 1],
             s=influence_sizes[mask],
             alpha=0.65,
-            color=cluster_colors[cluster_idx],
+            color=CATEGORICAL_COLORS[cluster_idx % len(CATEGORICAL_COLORS)],
             label=f"C{cluster_idx + 1}",
         )
-    ax1.set_title("Personality Cluster UMAP", fontsize=16)
-    ax1.set_xlabel("UMAP 1", fontsize=12)
-    ax1.set_ylabel("UMAP 2", fontsize=12)
-    ax1.legend(fontsize=10, ncol=2)
-    ax1.grid(True, alpha=0.2)
-    fig1.savefig(output_dir / "01_cluster_umap.png", dpi=220, bbox_inches="tight")
+    ax1.legend(ncol=2)
+    save_paper_figure(fig1, output_dir / "01_cluster_umap.png")
     plt.close(fig1)
 
     # Figure 2: Cluster Trait Profiles
@@ -1181,22 +1246,22 @@ def test_generate_research_paper_advanced_visualizations(tmp_path):
             for cluster_idx in range(cluster_settings["cluster_count"])
         ]
     )
-    fig2, ax2 = plt.subplots(figsize=(10, 8))
+    fig2, ax2 = setup_plot(title="Cluster Trait Profiles")
     im = ax2.imshow(
         cluster_centers,
         aspect="auto",
         vmin=0.0,
         vmax=1.0,
-        cmap="coolwarm",
+        cmap=PAPER_DIVERGING_CMAP,
     )
-    ax2.set_title("Cluster Trait Profiles", fontsize=16)
+    ax2.grid(False)
     ax2.set_xticks(range(5), ["O", "C", "E", "A", "N"])
     ax2.set_yticks(
         range(cluster_settings["cluster_count"]),
         [f"C{i + 1}" for i in range(cluster_settings["cluster_count"])],
     )
     fig2.colorbar(im, ax=ax2, fraction=0.046, pad=0.04)
-    fig2.savefig(output_dir / "02_cluster_profiles.png", dpi=220, bbox_inches="tight")
+    save_paper_figure(fig2, output_dir / "02_cluster_profiles.png")
     plt.close(fig2)
 
     # Figure 3: Cluster Neuroticism Spread
@@ -1204,20 +1269,21 @@ def test_generate_research_paper_advanced_visualizations(tmp_path):
         cluster_personalities[cluster_labels == cluster_idx, neuroticism_idx]
         for cluster_idx in range(cluster_settings["cluster_count"])
     ]
-    fig3, ax3 = plt.subplots(figsize=(10, 8))
+    fig3, ax3 = setup_plot(
+        title="Cluster Neuroticism Spread",
+        xlabel="Cluster",
+        ylabel="Neuroticism",
+    )
     neuroticism_boxplot = ax3.boxplot(
         neuroticism_by_cluster,
         tick_labels=[f"C{i + 1}" for i in range(cluster_settings["cluster_count"])],
         patch_artist=True,
         showfliers=False,
     )
-    for patch, color in zip(neuroticism_boxplot["boxes"], cluster_colors):
-        patch.set_facecolor(color)
+    for idx, patch in enumerate(neuroticism_boxplot["boxes"]):
+        patch.set_facecolor(CATEGORICAL_COLORS[idx % len(CATEGORICAL_COLORS)])
         patch.set_alpha(0.7)
-    ax3.set_title("Cluster Neuroticism Spread", fontsize=16)
-    ax3.set_ylabel("Neuroticism", fontsize=12)
-    ax3.grid(True, alpha=0.2)
-    fig3.savefig(output_dir / "03_neuroticism_spread.png", dpi=220, bbox_inches="tight")
+    save_paper_figure(fig3, output_dir / "03_neuroticism_spread.png")
     plt.close(fig3)
 
     # 4. Polarization as a distribution rather than a single scalar
@@ -1232,20 +1298,26 @@ def test_generate_research_paper_advanced_visualizations(tmp_path):
     fairness_mean = fairness.mean()
     fairness_bc = bimodality_coefficient(fairness)
     
-    fig4, ax4 = plt.subplots(figsize=(10, 8))
+    fig4, ax4 = setup_plot(
+        title="Fairness Polarization",
+        xlabel="Fairness Exposure",
+        ylabel="Agent Count",
+    )
     ax4.hist(
         [fairness[fairness < fairness_mean], fairness[fairness >= fairness_mean]],
         bins=26,
         stacked=True,
-        color=["#8ecae6", "#ef476f"],
+        color=[PAPER_PALETTE["primary"], PAPER_PALETTE["negative"]],
         alpha=0.85,
         label=["Lower fairness pole", "Upper fairness pole"],
     )
-    ax4.axvline(fairness_mean, color="#1d3557", linestyle="--", linewidth=2)
-    ax4.set_title("Fairness Polarization", fontsize=16)
-    ax4.set_xlabel("Fairness Exposure", fontsize=12)
-    ax4.set_ylabel("Agent Count", fontsize=12)
-    ax4.legend(fontsize=10)
+    ax4.axvline(
+        fairness_mean,
+        color=PAPER_PALETTE["threshold"],
+        linestyle="--",
+        linewidth=2,
+    )
+    ax4.legend()
     ax4.text(
         0.03,
         0.95,
@@ -1254,8 +1326,7 @@ def test_generate_research_paper_advanced_visualizations(tmp_path):
         va="top",
         bbox={"boxstyle": "round", "facecolor": "white", "alpha": 0.85},
     )
-    ax4.grid(True, alpha=0.2)
-    fig4.savefig(output_dir / "04_fairness_polarization.png", dpi=220, bbox_inches="tight")
+    save_paper_figure(fig4, output_dir / "04_fairness_polarization.png")
     plt.close(fig4)
 
     # 5. Class composition stacked by wealth quartile
@@ -1294,18 +1365,20 @@ def test_generate_research_paper_advanced_visualizations(tmp_path):
             )
         )
     
-    fig5, ax5 = plt.subplots(figsize=(10, 8))
+    fig5, ax5 = setup_plot(
+        title="Class Mix by Wealth Quartile",
+        xlabel="Wealth Quartile",
+        ylabel="Share",
+    )
     _stacked_share_bars(
         ax5,
         ["Q1", "Q2", "Q3", "Q4"],
         class_mix,
         ordered_classes,
-        ["#8d99ae", "#adb5bd", "#90be6d", "#f4a261", "#e76f51"][: len(ordered_classes)],
+        CATEGORICAL_COLORS[: len(ordered_classes)],
     )
-    ax5.set_title("Class Mix by Wealth Quartile", fontsize=16)
-    ax5.legend(fontsize=10, ncol=2)
-    ax5.grid(True, alpha=0.2)
-    fig5.savefig(output_dir / "05_class_mix_by_wealth.png", dpi=220, bbox_inches="tight")
+    ax5.legend(ncol=2)
+    save_paper_figure(fig5, output_dir / "05_class_mix_by_wealth.png")
     plt.close(fig5)
 
     # 6. Sentiment shown as stacked composition
@@ -1331,7 +1404,11 @@ def test_generate_research_paper_advanced_visualizations(tmp_path):
         urgency=semantic_settings["urgency"],
     )
     
-    fig6, ax6 = plt.subplots(figsize=(10, 8))
+    fig6, ax6 = setup_plot(
+        title="Semantic Sentiment Composition",
+        xlabel="World",
+        ylabel="Share",
+    )
     _stacked_share_bars(
         ax6,
         ["Prosperity", "Threat"],
@@ -1348,12 +1425,10 @@ def test_generate_research_paper_advanced_visualizations(tmp_path):
             ),
         ],
         ["Negative", "Neutral", "Positive"],
-        ["#d62828", "#adb5bd", "#2a9d8f"],
+        SENTIMENT_COLORS,
     )
-    ax6.set_title("Semantic Sentiment Composition", fontsize=16)
-    ax6.legend(fontsize=10)
-    ax6.grid(True, alpha=0.2)
-    fig6.savefig(output_dir / "06_sentiment_composition.png", dpi=220, bbox_inches="tight")
+    ax6.legend()
+    save_paper_figure(fig6, output_dir / "06_sentiment_composition.png")
     plt.close(fig6)
 
     # 7. Endogenous events as stacked social-state sentiment
@@ -1386,7 +1461,11 @@ def test_generate_research_paper_advanced_visualizations(tmp_path):
         endogenous_influence,
     )
     
-    fig7, ax7 = plt.subplots(figsize=(10, 8))
+    fig7, ax7 = setup_plot(
+        title="Endogenous Event Trigger",
+        xlabel="Social State",
+        ylabel="Share",
+    )
     _stacked_share_bars(
         ax7,
         ["Stable", "Polarized"],
@@ -1403,10 +1482,9 @@ def test_generate_research_paper_advanced_visualizations(tmp_path):
             ),
         ],
         ["Negative", "Neutral", "Positive"],
-        ["#d62828", "#adb5bd", "#2a9d8f"],
+        SENTIMENT_COLORS,
     )
-    ax7.set_title("Endogenous Event Trigger", fontsize=16)
-    ax7.legend(fontsize=10)
+    ax7.legend()
     ax7.text(
         0.03,
         0.95,
@@ -1415,8 +1493,7 @@ def test_generate_research_paper_advanced_visualizations(tmp_path):
         va="top",
         bbox={"boxstyle": "round", "facecolor": "white", "alpha": 0.85},
     )
-    ax7.grid(True, alpha=0.2)
-    fig7.savefig(output_dir / "07_endogenous_event_trigger.png", dpi=220, bbox_inches="tight")
+    save_paper_figure(fig7, output_dir / "07_endogenous_event_trigger.png")
     plt.close(fig7)
 
     # 8. Personal shocks stay more local
@@ -1445,7 +1522,11 @@ def test_generate_research_paper_advanced_visualizations(tmp_path):
         is_personal=True,
     )
     
-    fig8, ax8 = plt.subplots(figsize=(10, 8))
+    fig8, ax8 = setup_plot(
+        title="Event Scope Localization",
+        xlabel="Event Scope",
+        ylabel="Engagement",
+    )
     scope_boxplot = ax8.boxplot(
         [
             general_result.engagement_scores.numpy(),
@@ -1455,13 +1536,10 @@ def test_generate_research_paper_advanced_visualizations(tmp_path):
         patch_artist=True,
         showfliers=False,
     )
-    for patch, color in zip(scope_boxplot["boxes"], ["#457b9d", "#f4a261"]):
+    for patch, color in zip(scope_boxplot["boxes"], COMPARISON_COLORS):
         patch.set_facecolor(color)
         patch.set_alpha(0.7)
-    ax8.set_title("Event Scope Localization", fontsize=16)
-    ax8.set_ylabel("Engagement", fontsize=12)
-    ax8.grid(True, alpha=0.2)
-    fig8.savefig(output_dir / "08_event_scope_localization.png", dpi=220, bbox_inches="tight")
+    save_paper_figure(fig8, output_dir / "08_event_scope_localization.png")
     plt.close(fig8)
 
     # 9. Cascade-size distribution from sampled seeds
@@ -1494,21 +1572,33 @@ def test_generate_research_paper_advanced_visualizations(tmp_path):
     cascade_sizes = np.asarray(cascade_sizes, dtype=np.int64)
     cascade_bins = np.arange(cascade_sizes.max() + 2) - 0.5
     
-    fig9, ax9 = plt.subplots(figsize=(10, 8))
+    fig9, ax9 = setup_plot(
+        title="Cascade Size Distribution",
+        xlabel="Secondary Engagement Count",
+        ylabel="Sample Count",
+    )
     ax9.hist(
         cascade_sizes,
         bins=cascade_bins,
-        color="#6d597a",
+        color=PAPER_PALETTE["primary"],
         alpha=0.85,
         edgecolor="white",
     )
-    ax9.axvline(cascade_sizes.mean(), color="#e76f51", linestyle="--", linewidth=2)
-    ax9.set_title("Cascade Size Distribution", fontsize=16)
-    ax9.set_xlabel("Secondary Engagement Count", fontsize=12)
-    ax9.set_ylabel("Sample Count", fontsize=12)
-    ax9.grid(True, alpha=0.2)
-    fig9.savefig(output_dir / "09_cascade_size_distribution.png", dpi=220, bbox_inches="tight")
+    ax9.axvline(
+        cascade_sizes.mean(),
+        color=PAPER_PALETTE["threshold"],
+        linestyle="--",
+        linewidth=2,
+    )
+    save_paper_figure(fig9, output_dir / "09_cascade_size_distribution.png")
     plt.close(fig9)
+
+    compose_panel_grid(
+        sorted(output_dir.glob("*.png")),
+        output_dir.parent / "research_paper_advanced_visualizations.png",
+        title="Advanced Research Paper Visualizations",
+        columns=3,
+    )
 
 
 def test_generate_research_paper_multiseed_debug_figure(tmp_path):
@@ -1666,7 +1756,7 @@ def test_generate_research_paper_multiseed_debug_figure(tmp_path):
         )
 
     # Figure 1: Wealth Gini by Seed
-    fig1, ax1 = plt.subplots(figsize=(10, 8))
+    fig1, ax1 = setup_plot()
     _plot_seed_lines(
         ax1,
         seeds,
@@ -1677,12 +1767,11 @@ def test_generate_research_paper_multiseed_debug_figure(tmp_path):
         title="Wealth Gini by Seed",
         ylabel="Gini",
     )
-    ax1.grid(True, alpha=0.2)
-    fig1.savefig(output_dir / "01_wealth_gini_by_seed.png", dpi=220, bbox_inches="tight")
+    save_paper_figure(fig1, output_dir / "01_wealth_gini_by_seed.png")
     plt.close(fig1)
 
     # Figure 2: Echo Similarity by Seed
-    fig2, ax2 = plt.subplots(figsize=(10, 8))
+    fig2, ax2 = setup_plot()
     _plot_seed_lines(
         ax2,
         seeds,
@@ -1693,12 +1782,11 @@ def test_generate_research_paper_multiseed_debug_figure(tmp_path):
         title="Echo Similarity by Seed",
         ylabel="Topology Similarity",
     )
-    ax2.grid(True, alpha=0.2)
-    fig2.savefig(output_dir / "02_echo_similarity_by_seed.png", dpi=220, bbox_inches="tight")
+    save_paper_figure(fig2, output_dir / "02_echo_similarity_by_seed.png")
     plt.close(fig2)
 
     # Figure 3: Influence Inequality by Seed
-    fig3, ax3 = plt.subplots(figsize=(10, 8))
+    fig3, ax3 = setup_plot()
     _plot_seed_lines(
         ax3,
         seeds,
@@ -1709,12 +1797,11 @@ def test_generate_research_paper_multiseed_debug_figure(tmp_path):
         title="Influence Inequality by Seed",
         ylabel="Influence Gini",
     )
-    ax3.grid(True, alpha=0.2)
-    fig3.savefig(output_dir / "03_influence_inequality_by_seed.png", dpi=220, bbox_inches="tight")
+    save_paper_figure(fig3, output_dir / "03_influence_inequality_by_seed.png")
     plt.close(fig3)
 
     # Figure 4: Consensus Distance by Seed
-    fig4, ax4 = plt.subplots(figsize=(10, 8))
+    fig4, ax4 = setup_plot()
     _plot_seed_lines(
         ax4,
         seeds,
@@ -1725,12 +1812,11 @@ def test_generate_research_paper_multiseed_debug_figure(tmp_path):
         title="Consensus Distance by Seed",
         ylabel="Neighbor Distance",
     )
-    ax4.grid(True, alpha=0.2)
-    fig4.savefig(output_dir / "04_consensus_distance_by_seed.png", dpi=220, bbox_inches="tight")
+    save_paper_figure(fig4, output_dir / "04_consensus_distance_by_seed.png")
     plt.close(fig4)
 
     # Figure 5: Trait Friction by Seed
-    fig5, ax5 = plt.subplots(figsize=(10, 8))
+    fig5, ax5 = setup_plot()
     _plot_seed_lines(
         ax5,
         seeds,
@@ -1741,12 +1827,11 @@ def test_generate_research_paper_multiseed_debug_figure(tmp_path):
         title="Trait Friction by Seed",
         ylabel="Neighbor Trait Distance",
     )
-    ax5.grid(True, alpha=0.2)
-    fig5.savefig(output_dir / "05_trait_friction_by_seed.png", dpi=220, bbox_inches="tight")
+    save_paper_figure(fig5, output_dir / "05_trait_friction_by_seed.png")
     plt.close(fig5)
 
     # Figure 6: Polarization by Seed
-    fig6, ax6 = plt.subplots(figsize=(10, 8))
+    fig6, ax6 = setup_plot()
     _plot_seed_lines(
         ax6,
         seeds,
@@ -1756,12 +1841,17 @@ def test_generate_research_paper_multiseed_debug_figure(tmp_path):
     )
     ax6.axhline(
         0.555,
-        color="#e63946",
+        color=PAPER_PALETTE["threshold"],
         linestyle="--",
-        linewidth=2,
         label="Polarized threshold",
     )
-    ax6.legend(fontsize=10)
-    ax6.grid(True, alpha=0.2)
-    fig6.savefig(output_dir / "06_polarization_by_seed.png", dpi=220, bbox_inches="tight")
+    ax6.legend()
+    save_paper_figure(fig6, output_dir / "06_polarization_by_seed.png")
     plt.close(fig6)
+
+    compose_panel_grid(
+        sorted(output_dir.glob("*.png")),
+        output_dir.parent / "research_paper_multiseed_debug.png",
+        title="Multi-Seed Robustness Checks",
+        columns=3,
+    )

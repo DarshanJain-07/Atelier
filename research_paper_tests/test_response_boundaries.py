@@ -10,8 +10,17 @@ from research_paper_tests.config_schema import (
     get_test_scenario,
     prepare_scenario_society,
 )
+from research_paper_tests.plotting_utils import (
+    PAPER_PALETTE,
+    SENTIMENT_COLORS,
+    apply_paper_style,
+    compose_panel_grid,
+    save_paper_figure,
+    setup_plot,
+)
 
 matplotlib.use("Agg")
+apply_paper_style()
 
 
 def _scaled_world(direction: dict[str, float], magnitude: float):
@@ -172,25 +181,35 @@ def test_generate_response_boundaries_figure(tmp_path):
     )
 
     # Figure 1: Dose Response - Engagement
-    fig1, ax1 = plt.subplots(figsize=(10, 8))
-    ax1.plot(magnitudes, mean_engagement, marker="o", linewidth=2, color="#1d3557")
-    ax1.set_title("Dose Response: Engagement", fontsize=16)
-    ax1.set_xlabel("Event Magnitude", fontsize=12)
-    ax1.set_ylabel("Mean Engagement", fontsize=12)
-    ax1.grid(True, alpha=0.2)
+    fig1, ax1 = setup_plot(
+        title="Dose Response: Engagement",
+        xlabel="Event Magnitude",
+        ylabel="Mean Engagement",
+    )
+    ax1.plot(
+        magnitudes, 
+        mean_engagement, 
+        marker="o", 
+        color=PAPER_PALETTE["primary"],
+    )
     path1 = output_dir / "dose_response_engagement.png"
-    fig1.savefig(path1, dpi=220, bbox_inches="tight")
+    save_paper_figure(fig1, path1)
     plt.close(fig1)
 
     # Figure 2: Dose Response - Collective Action
-    fig2, ax2 = plt.subplots(figsize=(10, 8))
-    ax2.plot(magnitudes, acting_ratio, marker="o", linewidth=2, color="#e76f51")
-    ax2.set_title("Dose Response: Collective Action", fontsize=16)
-    ax2.set_xlabel("Event Magnitude", fontsize=12)
-    ax2.set_ylabel("Acting Ratio", fontsize=12)
-    ax2.grid(True, alpha=0.2)
+    fig2, ax2 = setup_plot(
+        title="Dose Response: Collective Action",
+        xlabel="Event Magnitude",
+        ylabel="Acting Ratio",
+    )
+    ax2.plot(
+        magnitudes, 
+        acting_ratio, 
+        marker="o", 
+        color=PAPER_PALETTE["negative"],
+    )
     path2 = output_dir / "dose_response_action.png"
-    fig2.savefig(path2, dpi=220, bbox_inches="tight")
+    save_paper_figure(fig2, path2)
     plt.close(fig2)
 
     labels = list(neutral_settings["worlds"])
@@ -198,33 +217,38 @@ def test_generate_response_boundaries_figure(tmp_path):
     width = 0.38
 
     # Figure 3: Low-Salience Reaction Boundary
-    fig3, ax3 = plt.subplots(figsize=(10, 8))
+    fig3, ax3 = setup_plot(
+        title="Low-Salience Reaction Boundary",
+        xlabel="World",
+        ylabel="Reaction Strength",
+    )
     ax3.bar(
         x - width / 2,
         [neutral_results[label]["mean_engagement"] for label in labels],
         width=width,
         label="Mean engagement",
-        color="#457b9d",
+        color=PAPER_PALETTE["secondary"],
     )
     ax3.bar(
         x + width / 2,
         [neutral_results[label]["acting_ratio"] for label in labels],
         width=width,
         label="Acting ratio",
-        color="#f4a261",
+        color=PAPER_PALETTE["accent"],
     )
     ax3.set_xticks(x, labels, rotation=15)
-    ax3.set_title("Low-Salience Reaction Boundary", fontsize=16)
-    ax3.set_ylabel("Reaction Strength", fontsize=12)
-    ax3.legend(fontsize=10)
-    ax3.grid(True, alpha=0.2)
+    ax3.legend()
     path3 = output_dir / "low_salience_boundary.png"
-    fig3.savefig(path3, dpi=220, bbox_inches="tight")
+    save_paper_figure(fig3, path3)
     plt.close(fig3)
 
     # Figure 4: Low-Salience Sentiment Composition
-    fig4, ax4 = plt.subplots(figsize=(10, 8))
-    sentiment_colors = ["#d62828", "#adb5bd", "#2a9d8f"]
+    fig4, ax4 = setup_plot(
+        title="Low-Salience Sentiment Composition",
+        xlabel="World",
+        ylabel="Share",
+    )
+    sentiment_colors = SENTIMENT_COLORS
     sentiment_labels = ["Negative", "Neutral", "Positive"]
     bottoms = np.zeros(len(labels), dtype=np.float64)
 
@@ -243,13 +267,17 @@ def test_generate_response_boundaries_figure(tmp_path):
         bottoms += heights
     ax4.set_xticks(x, labels, rotation=15)
     ax4.set_ylim(0.0, 1.0)
-    ax4.set_title("Low-Salience Sentiment Composition", fontsize=16)
-    ax4.set_ylabel("Share", fontsize=12)
-    ax4.legend(fontsize=10)
-    ax4.grid(True, alpha=0.2)
+    ax4.legend()
     path4 = output_dir / "low_salience_sentiment.png"
-    fig4.savefig(path4, dpi=220, bbox_inches="tight")
+    save_paper_figure(fig4, path4)
     plt.close(fig4)
+
+    compose_panel_grid(
+        [path1, path2, path3, path4],
+        output_dir.parent / "response_boundaries.png",
+        title="Response Boundaries",
+        columns=2,
+    )
 
     assert path1.exists()
     assert path2.exists()

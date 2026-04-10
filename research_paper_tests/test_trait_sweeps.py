@@ -14,8 +14,16 @@ from research_paper_tests.config_schema import (
     set_dimensions,
     zero_personalities,
 )
+from research_paper_tests.plotting_utils import (
+    PAPER_PALETTE,
+    apply_paper_style,
+    compose_panel_grid,
+    save_paper_figure,
+    setup_plot,
+)
 
 matplotlib.use("Agg")
+apply_paper_style()
 
 
 def _sweep_society(config, trait_name: str, trait_values: list[float], exposure_values: dict[str, float], fill: float):
@@ -141,92 +149,93 @@ def test_generate_trait_sweeps_figure(tmp_path):
     trait_values, metrics = _trait_sweep_metrics(config, settings)
 
     # Figure 1: Openness vs Engagement
-    fig1, ax1 = plt.subplots(figsize=(10, 8))
+    fig1, ax1 = setup_plot(
+        title="Openness vs Engagement",
+        xlabel="Openness",
+        ylabel="Engagement",
+    )
     ax1.plot(
         trait_values,
         metrics["Openness"]["engagement"],
         marker="o",
-        linewidth=2,
-        color="#457b9d",
+        color=PAPER_PALETTE["secondary"],
     )
-    ax1.set_title("Openness vs Engagement", fontsize=16)
-    ax1.set_xlabel("Openness", fontsize=12)
-    ax1.set_ylabel("Engagement", fontsize=12)
-    ax1.grid(True, alpha=0.2)
     path1 = output_dir / "openness_vs_engagement.png"
-    fig1.savefig(path1, dpi=220, bbox_inches="tight")
+    save_paper_figure(fig1, path1)
     plt.close(fig1)
 
     # Figure 2: Threat Engagement by Trait
-    fig2, ax2 = plt.subplots(figsize=(10, 8))
+    fig2, ax2 = setup_plot(
+        title="Threat Engagement by Trait",
+        xlabel="Trait Value",
+        ylabel="Engagement",
+    )
     ax2.plot(
         trait_values,
         metrics["Extraversion"]["engagement"],
         marker="o",
-        linewidth=2,
         label="Extraversion",
-        color="#e76f51",
+        color=PAPER_PALETTE["primary"],
     )
     ax2.plot(
         trait_values,
         metrics["Conscientiousness"]["engagement"],
         marker="s",
-        linewidth=2,
         label="Conscientiousness",
-        color="#6d597a",
+        color=PAPER_PALETTE["secondary"],
     )
-    ax2.set_title("Threat Engagement by Trait", fontsize=16)
-    ax2.set_xlabel("Trait Value", fontsize=12)
-    ax2.set_ylabel("Engagement", fontsize=12)
-    ax2.legend(fontsize=10)
-    ax2.grid(True, alpha=0.2)
+    ax2.legend()
     path2 = output_dir / "threat_engagement_by_trait.png"
-    fig2.savefig(path2, dpi=220, bbox_inches="tight")
+    save_paper_figure(fig2, path2)
     plt.close(fig2)
 
     # Figure 3: Extraversion vs Short-Term Attention
-    fig3, ax3 = plt.subplots(figsize=(10, 8))
+    fig3, ax3 = setup_plot(
+        title="Extraversion vs Short-Term Attention",
+        xlabel="Extraversion",
+        ylabel="Attention Weight",
+    )
     ax3.plot(
         trait_values,
         metrics["Extraversion"]["attention"][:, 10],
         marker="o",
-        linewidth=2,
-        color="#264653",
+        color=PAPER_PALETTE["primary"],
     )
-    ax3.set_title("Extraversion vs Short-Term Attention", fontsize=16)
-    ax3.set_xlabel("Extraversion", fontsize=12)
-    ax3.set_ylabel("Attention Weight", fontsize=12)
-    ax3.grid(True, alpha=0.2)
     path3 = output_dir / "extraversion_vs_attention.png"
-    fig3.savefig(path3, dpi=220, bbox_inches="tight")
+    save_paper_figure(fig3, path3)
     plt.close(fig3)
 
     # Figure 4: Trait vs Action Cost
-    fig4, ax4 = plt.subplots(figsize=(10, 8))
+    fig4, ax4 = setup_plot(
+        title="Trait vs Action Cost",
+        xlabel="Trait Value",
+        ylabel="Action Cost",
+    )
     ax4.plot(
         trait_values,
         metrics["Extraversion"]["action_cost"],
         marker="o",
-        linewidth=2,
         label="Extraversion",
-        color="#f4a261",
+        color=PAPER_PALETTE["accent"],
     )
     ax4.plot(
         trait_values,
         metrics["Neuroticism"]["action_cost"],
         marker="s",
-        linewidth=2,
         label="Neuroticism",
-        color="#2a9d8f",
+        color=PAPER_PALETTE["negative"],
     )
-    ax4.set_title("Trait vs Action Cost", fontsize=16)
-    ax4.set_xlabel("Trait Value", fontsize=12)
-    ax4.set_ylabel("Action Cost", fontsize=12)
-    ax4.legend(fontsize=10)
-    ax4.grid(True, alpha=0.2)
+    ax4.legend()
     path4 = output_dir / "trait_vs_action_cost.png"
-    fig4.savefig(path4, dpi=220, bbox_inches="tight")
+    save_paper_figure(fig4, path4)
     plt.close(fig4)
+
+    compose_panel_grid(
+        [path1, path2, path3, path4],
+        output_dir.parent / "trait_sweeps.png",
+        title="Trait Sweeps",
+        columns=2,
+    )
 
     assert path1.exists()
     assert path2.exists()

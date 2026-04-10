@@ -12,9 +12,17 @@ from research_paper_tests.config_schema import (
     get_test_scenario,
     prepare_scenario_society,
 )
+from research_paper_tests.plotting_utils import (
+    CATEGORICAL_COLORS,
+    apply_paper_style,
+    compose_panel_grid,
+    save_paper_figure,
+    setup_plot,
+)
 from schema import DIMENSIONS
 
 matplotlib.use("Agg")
+apply_paper_style()
 
 
 def _reconstruct_action_ready_mask(config, society, result) -> np.ndarray:
@@ -159,56 +167,46 @@ def test_same_event_produces_distinct_subgroup_response_profiles(tmp_path):
 
 
 def test_generate_population_segmentation_figure(tmp_path):
-    output_dir = Path(__file__).resolve().parent / "generated"
-    output_dir.mkdir(exist_ok=True)
-    output_path = output_dir / "population_segmentation.png"
+    output_dir = Path(__file__).resolve().parent / "generated" / "population_segmentation"
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     settings, profiles, class_order = _class_stress_profiles(tmp_path)
+    panel_paths = []
 
-    fig, axes = plt.subplots(3, 4, figsize=(22, 16), sharex=True, sharey=True)
-    palette = ["#d62828", "#f77f00", "#457b9d", "#2a9d8f", "#6d597a"]
-
-    for axis, dimension_name in zip(axes.flatten(), DIMENSIONS, strict=True):
+    for dimension_name in DIMENSIONS:
+        fig, ax = setup_plot(
+            title=f"Class Engagement: {dimension_name}",
+            xlabel="Dimension Magnitude",
+            ylabel="Mean Engagement",
+        )
         dimension_rows = profiles[profiles["dimension"] == dimension_name]
 
-        # x-axis: magnitude of one world dimension with every other dimension fixed at 0.
-        # y-axis: mean engagement for one social class. Higher curves mean that class
-        # is more reactive to that isolated dimension as its intensity increases.
-        # Comparing the five curves shows whether the dimension amplifies class
-        # differences or keeps the society relatively uniform.
-        for color, class_name in zip(palette, class_order, strict=False):
+        for color, class_name in zip(CATEGORICAL_COLORS, class_order, strict=False):
             class_rows = (
                 dimension_rows[dimension_rows["class_name"] == class_name]
                 .sort_values("magnitude")
             )
-            axis.plot(
+            ax.plot(
                 class_rows["magnitude"].to_numpy(),
                 class_rows["engagement"].to_numpy(),
                 marker="o",
-                linewidth=2,
                 label=class_name,
                 color=color,
             )
 
-        axis.set_title(dimension_name)
-        axis.grid(True, alpha=0.2)
+        ax.legend(loc="upper left")
+        
+        safe_name = dimension_name.lower().replace(" ", "_")
+        path = output_dir / f"segmentation_{safe_name}.png"
+        save_paper_figure(fig, path)
+        plt.close(fig)
+        panel_paths.append(path)
+        assert path.exists()
+        assert path.stat().st_size > 0
 
-    for axis in axes[-1]:
-        axis.set_xlabel("Dimension Magnitude")
-    for axis in axes[:, 0]:
-        axis.set_ylabel("Mean Engagement")
-
-    axes[0, 0].legend(fontsize=8, loc="upper left")
-    fig.suptitle(
-        (
-            "Population Segmentation Stress Test\n"
-            f"Per-dimension sweep across magnitudes {settings['magnitudes']} for the five social classes"
-        ),
-        fontsize=18,
+    compose_panel_grid(
+        panel_paths,
+        output_dir.parent / "population_segmentation.png",
+        title="Population Segmentation",
+        columns=4,
     )
-    fig.tight_layout(rect=(0, 0, 1, 0.96))
-    fig.savefig(output_path, dpi=220, bbox_inches="tight")
-    plt.close(fig)
-
-    assert output_path.exists()
-    assert output_path.stat().st_size > 0

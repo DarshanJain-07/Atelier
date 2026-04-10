@@ -7,8 +7,16 @@ import torch
 
 from main import aggregate_social_state
 from research_paper_tests.config_schema import EMOTION_INDICES, get_test_scenario, zero_emotions
+from research_paper_tests.plotting_utils import (
+    PAPER_PALETTE,
+    apply_paper_style,
+    compose_panel_grid,
+    save_paper_figure,
+    setup_plot,
+)
 
 matplotlib.use("Agg")
+apply_paper_style()
 
 
 def _viral_scaling_curve(config, settings):
@@ -63,38 +71,61 @@ def test_generate_viral_scaling_figure(tmp_path):
     slopes = np.diff(mean_multiplier) / np.diff(amplitudes)
 
     # Figure 1: Viral Scaling Curve
-    fig1, ax1 = plt.subplots(figsize=(10, 8))
-    ax1.plot(amplitudes, mean_multiplier, marker="o", linewidth=2, label="Mean")
-    ax1.plot(amplitudes, max_multiplier, marker="s", linewidth=2, label="Max")
+    fig1, ax1 = setup_plot(
+        title="Viral Scaling Curve",
+        xlabel="Emotion Amplitude",
+        ylabel="Outrage Multiplier",
+    )
+    ax1.plot(
+        amplitudes, 
+        mean_multiplier, 
+        marker="o", 
+        label="Mean", 
+        color=PAPER_PALETTE["primary"],
+    )
+    ax1.plot(
+        amplitudes, 
+        max_multiplier, 
+        marker="s", 
+        label="Max", 
+        color=PAPER_PALETTE["secondary"],
+    )
     ax1.axhline(
         max_allowed,
-        color="#e63946",
+        color=PAPER_PALETTE["threshold"],
         linestyle="--",
-        linewidth=2,
         label="Configured cap",
     )
-    ax1.set_title("Viral Scaling Curve", fontsize=16)
-    ax1.set_xlabel("Emotion Amplitude", fontsize=12)
-    ax1.set_ylabel("Outrage Multiplier", fontsize=12)
-    ax1.legend(fontsize=10)
-    ax1.grid(True, alpha=0.2)
+    ax1.legend()
     
     path1 = output_dir / "viral_scaling_curve.png"
-    fig1.savefig(path1, dpi=220, bbox_inches="tight")
+    save_paper_figure(fig1, path1)
     plt.close(fig1)
 
     # Figure 2: Steepest Viral Growth Region
-    fig2, ax2 = plt.subplots(figsize=(10, 8))
+    fig2, ax2 = setup_plot(
+        title="Steepest Viral Growth Region",
+        xlabel="Emotion Amplitude",
+        ylabel="d(Multiplier)/d(Amplitude)",
+    )
     slope_x = 0.5 * (amplitudes[:-1] + amplitudes[1:])
-    ax2.plot(slope_x, slopes, marker="o", linewidth=2, color="#457b9d")
-    ax2.set_title("Steepest Viral Growth Region", fontsize=16)
-    ax2.set_xlabel("Emotion Amplitude", fontsize=12)
-    ax2.set_ylabel("d(Multiplier)/d(Amplitude)", fontsize=12)
-    ax2.grid(True, alpha=0.2)
+    ax2.plot(
+        slope_x, 
+        slopes, 
+        marker="o", 
+        color=PAPER_PALETTE["secondary"],
+    )
 
     path2 = output_dir / "steepest_growth_region.png"
-    fig2.savefig(path2, dpi=220, bbox_inches="tight")
+    save_paper_figure(fig2, path2)
     plt.close(fig2)
+
+    compose_panel_grid(
+        [path1, path2],
+        output_dir.parent / "viral_scaling.png",
+        title="Viral Scaling",
+        columns=2,
+    )
 
     assert path1.exists()
     assert path2.exists()

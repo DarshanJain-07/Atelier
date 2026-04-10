@@ -92,7 +92,7 @@ def test_generate_viral_scaling_figure(tmp_path):
     )
     ax1.axhline(
         max_allowed,
-        color=PAPER_PALETTE["threshold"],
+        color=PAPER_PALETTE["tertiary"],
         linestyle="--",
         label="Configured cap",
     )
@@ -113,7 +113,7 @@ def test_generate_viral_scaling_figure(tmp_path):
         slope_x, 
         slopes, 
         marker="o", 
-        color=PAPER_PALETTE["secondary"],
+        color=PAPER_PALETTE["primary"],
     )
 
     path2 = output_dir / "steepest_growth_region.png"

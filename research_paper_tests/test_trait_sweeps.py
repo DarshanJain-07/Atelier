@@ -158,7 +158,7 @@ def test_generate_trait_sweeps_figure(tmp_path):
         trait_values,
         metrics["Openness"]["engagement"],
         marker="o",
-        color=PAPER_PALETTE["secondary"],
+        color=PAPER_PALETTE["primary"],
     )
     path1 = output_dir / "openness_vs_engagement.png"
     save_paper_figure(fig1, path1)
@@ -216,14 +216,14 @@ def test_generate_trait_sweeps_figure(tmp_path):
         metrics["Extraversion"]["action_cost"],
         marker="o",
         label="Extraversion",
-        color=PAPER_PALETTE["accent"],
+        color=PAPER_PALETTE["primary"],
     )
     ax4.plot(
         trait_values,
         metrics["Neuroticism"]["action_cost"],
         marker="s",
         label="Neuroticism",
-        color=PAPER_PALETTE["negative"],
+        color=PAPER_PALETTE["secondary"],
     )
     ax4.legend()
     path4 = output_dir / "trait_vs_action_cost.png"

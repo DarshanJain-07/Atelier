@@ -7,51 +7,45 @@ from matplotlib.colors import LinearSegmentedColormap
 PAPER_FIGSIZE = (10, 8)
 PAPER_DPI = 220
 
-# One restrained, colorblind-friendly palette for every generated paper figure.
 PAPER_PALETTE = {
-    "primary": "#0072B2",       # blue
-    "secondary": "#009E73",     # green
-    "tertiary": "#CC79A7",      # purple
-    "accent": "#E69F00",        # orange
-    "negative": "#D55E00",      # vermillion
-    "positive": "#009E73",      # green
-    "neutral": "#7A7F87",       # graphite
-    "baseline": "#7A7F87",
-    "comparison": "#0072B2",
-    "treatment": "#009E73",
-    "threshold": "#D55E00",
-    "reference": "#B7BBC2",
-    "dark": "#222222",
-    "light": "#F7F8FA",
+    "primary": "#2f6f9f",    # ordered data color 1
+    "secondary": "#d9822b",  # ordered data color 2
+    "tertiary": "#4c956c",   # ordered data color 3
+    "accent": "#7b5ea7",     # ordered data color 4
+    "highlight": "#c44e52",  # ordered data color 5
+    "muted": "#6c757d",      # ordered data color 6
+    "sand": "#c9a66b",       # ordered data color 7
+    "reference": "#d8dee9",
+    "dark": "#2e3440",
+    "light": "#f7f8fa",
 }
 
-CATEGORICAL_COLORS = [
+PAPER_COLOR_SEQUENCE = [
     PAPER_PALETTE["primary"],
     PAPER_PALETTE["secondary"],
-    PAPER_PALETTE["accent"],
-    PAPER_PALETTE["negative"],
     PAPER_PALETTE["tertiary"],
-    "#56B4E9",
-    "#F0E442",
-    "#8A5A44",
-    "#6C757D",
-    "#111111",
+    PAPER_PALETTE["accent"],
+    PAPER_PALETTE["highlight"],
+    PAPER_PALETTE["muted"],
+    PAPER_PALETTE["sand"],
 ]
 
+CATEGORICAL_COLORS = PAPER_COLOR_SEQUENCE
+
 SENTIMENT_COLORS = [
-    PAPER_PALETTE["negative"],
-    PAPER_PALETTE["neutral"],
-    PAPER_PALETTE["positive"],
+    PAPER_PALETTE["primary"],
+    PAPER_PALETTE["secondary"],
+    PAPER_PALETTE["tertiary"],
 ]
 
 COMPARISON_COLORS = [
-    PAPER_PALETTE["baseline"],
-    PAPER_PALETTE["treatment"],
+    PAPER_PALETTE["primary"],
+    PAPER_PALETTE["secondary"],
 ]
 
 PAPER_DIVERGING_CMAP = LinearSegmentedColormap.from_list(
     "paper_diverging",
-    [PAPER_PALETTE["negative"], "white", PAPER_PALETTE["primary"]],
+    [PAPER_PALETTE["primary"], PAPER_PALETTE["light"], PAPER_PALETTE["secondary"]],
 )
 
 
@@ -79,6 +73,7 @@ def apply_paper_style():
             "figure.facecolor": "white",
             "savefig.facecolor": "white",
             "savefig.dpi": PAPER_DPI,
+            "axes.prop_cycle": plt.cycler("color", PAPER_COLOR_SEQUENCE),
             "axes.spines.top": False,
             "axes.spines.right": False,
             "lines.linewidth": 2,

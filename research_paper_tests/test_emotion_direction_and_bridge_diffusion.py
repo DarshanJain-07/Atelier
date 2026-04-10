@@ -234,9 +234,9 @@ def test_generate_emotion_direction_and_bridge_diffusion_figure(tmp_path):
     width = 0.25
     key_emotions = ["Joy", "Fear", "Anger"]
     key_colors = [
-        PAPER_PALETTE["positive"], 
-        PAPER_PALETTE["secondary"], 
-        PAPER_PALETTE["negative"],
+        PAPER_PALETTE["primary"],
+        PAPER_PALETTE["secondary"],
+        PAPER_PALETTE["tertiary"],
     ]
 
     # Figure 1: Emotion Directionality

@@ -79,7 +79,7 @@ def visualize(seed=42):
         raw_wealth,
         kde=True,
         ax=axes[1],
-        color=PAPER_PALETTE["tertiary"],
+        color=PAPER_PALETTE["secondary"],
         bins=settings["hist_bins"],
     )
     axes[1].set_title("Wealth Distribution (Network Clustered)")
@@ -88,7 +88,7 @@ def visualize(seed=42):
     axes[1].set_xlim(0, np.percentile(raw_wealth, settings["x_axis_percentile"])) # Focus on the bulk
 
     # Plot 3: Box Plot (Outliers)
-    sns.boxplot(x=raw_wealth, ax=axes[2], color=PAPER_PALETTE["accent"], fliersize=2)
+    sns.boxplot(x=raw_wealth, ax=axes[2], color=PAPER_PALETTE["tertiary"], fliersize=2)
     axes[2].set_title("Wealth Outlier Analysis")
     axes[2].set_xlabel("Raw Wealth")
     # ax2.set_xscale('log') # Optional: log scale to see billionaires better

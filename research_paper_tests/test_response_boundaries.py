@@ -206,7 +206,7 @@ def test_generate_response_boundaries_figure(tmp_path):
         magnitudes, 
         acting_ratio, 
         marker="o", 
-        color=PAPER_PALETTE["negative"],
+        color=PAPER_PALETTE["primary"],
     )
     path2 = output_dir / "dose_response_action.png"
     save_paper_figure(fig2, path2)
@@ -227,14 +227,14 @@ def test_generate_response_boundaries_figure(tmp_path):
         [neutral_results[label]["mean_engagement"] for label in labels],
         width=width,
         label="Mean engagement",
-        color=PAPER_PALETTE["secondary"],
+        color=PAPER_PALETTE["primary"],
     )
     ax3.bar(
         x + width / 2,
         [neutral_results[label]["acting_ratio"] for label in labels],
         width=width,
         label="Acting ratio",
-        color=PAPER_PALETTE["accent"],
+        color=PAPER_PALETTE["secondary"],
     )
     ax3.set_xticks(x, labels, rotation=15)
     ax3.legend()

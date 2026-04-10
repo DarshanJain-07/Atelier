@@ -213,7 +213,7 @@ def test_generate_research_paper_summary_figure(tmp_path):
         ylabel="Threat Exaggeration",
     )
     ax.scatter(neuroticism, distortion, s=10, alpha=0.3, color=PAPER_PALETTE["primary"])
-    ax.plot(xs, ys, color=PAPER_PALETTE["threshold"], linewidth=2)
+    ax.plot(xs, ys, color=PAPER_PALETTE["secondary"], linewidth=2)
     save_paper_figure(fig, output_dir / "01_signal_distortion.png")
     plt.close(fig)
 
@@ -264,14 +264,14 @@ def test_generate_research_paper_summary_figure(tmp_path):
         steps,
         isolated_curve,
         marker="o",
-        color=PAPER_PALETTE["baseline"],
+        color=PAPER_PALETTE["primary"],
         label="Isolated",
     )
     ax.plot(
         steps,
         rehearsed_curve,
         marker="s",
-        color=PAPER_PALETTE["primary"],
+        color=PAPER_PALETTE["secondary"],
         label="Rehearsed",
     )
     ax.legend()
@@ -307,7 +307,7 @@ def test_generate_research_paper_summary_figure(tmp_path):
         color=PAPER_PALETTE["primary"],
         label="Agent outcomes",
     )
-    ax.plot(xs, ys, color=PAPER_PALETTE["accent"], linewidth=2, label="Trend line")
+    ax.plot(xs, ys, color=PAPER_PALETTE["secondary"], linewidth=2, label="Trend line")
     ax.legend()
     save_paper_figure(fig, output_dir / "03_cognitive_gate.png")
     plt.close(fig)
@@ -645,7 +645,7 @@ def test_generate_research_paper_summary_figure(tmp_path):
             anger[: relative_settings["group_size"]].mean().item(),
             anger[relative_settings["group_size"] :].mean().item(),
         ],
-        color=[PAPER_PALETTE["negative"], PAPER_PALETTE["baseline"]],
+        color=COMPARISON_COLORS,
     )
     save_paper_figure(fig, output_dir / "11_relative_deprivation.png")
     plt.close(fig)
@@ -699,14 +699,14 @@ def test_generate_research_paper_summary_figure(tmp_path):
         x - width / 2,
         pos,
         width=width,
-        color=PAPER_PALETTE["positive"],
+        color=PAPER_PALETTE["primary"],
         label="Prosperity",
     )
     ax.bar(
         x + width / 2,
         neg,
         width=width,
-        color=PAPER_PALETTE["negative"],
+        color=PAPER_PALETTE["secondary"],
         label="Threat",
     )
     ax.set_xticks(x, ["Negative", "Neutral", "Positive"])
@@ -844,7 +844,7 @@ def test_generate_research_paper_summary_figure(tmp_path):
         power_population,
         power_cumulative,
         linewidth=2,
-        color=PAPER_PALETTE["negative"],
+        color=PAPER_PALETTE["secondary"],
         label=f"Power law (G={gini(power_influence):.2f})",
     )
     ax.legend()
@@ -915,7 +915,7 @@ def test_generate_research_paper_summary_figure(tmp_path):
         alpha=0.6,
         color=PAPER_PALETTE["primary"],
     )
-    ax.plot(xs, ys, color=PAPER_PALETTE["threshold"], linewidth=2)
+    ax.plot(xs, ys, color=PAPER_PALETTE["secondary"], linewidth=2)
     save_paper_figure(fig, output_dir / "16_influence_vs_reach.png")
     plt.close(fig)
 
@@ -939,13 +939,13 @@ def test_generate_research_paper_summary_figure(tmp_path):
     ax.hist(
         fairness,
         bins=24,
-        color=PAPER_PALETTE["tertiary"],
+        color=PAPER_PALETTE["primary"],
         alpha=0.8,
         edgecolor="white",
     )
     ax.axvline(
         fairness.mean(),
-        color=PAPER_PALETTE["threshold"],
+        color=PAPER_PALETTE["secondary"],
         linestyle="--",
         linewidth=2,
     )
@@ -1001,7 +1001,7 @@ def test_generate_research_paper_summary_figure(tmp_path):
         truth_attention[:, 11].numpy(),
         width=width,
         label="Long term",
-        color=PAPER_PALETTE["accent"],
+        color=PAPER_PALETTE["secondary"],
     )
     ax.set_xticks(truth_x, ["Populist", "Skeptical"])
     ax.legend()
@@ -1064,14 +1064,14 @@ def test_generate_research_paper_summary_figure(tmp_path):
     )
     ax.axhline(
         stacked_result.engagement_scores.mean().item(),
-        color=PAPER_PALETTE["negative"],
+        color=PAPER_PALETTE["secondary"],
         linestyle="--",
         linewidth=2,
         label="Stacked new threat",
     )
     ax.axhline(
         fresh_result.engagement_scores.mean().item(),
-        color=PAPER_PALETTE["baseline"],
+        color=PAPER_PALETTE["tertiary"],
         linestyle=":",
         linewidth=2,
         label="Fresh new threat",
@@ -1151,7 +1151,7 @@ def test_generate_research_paper_summary_figure(tmp_path):
     )
     ax.axhline(
         1.0 + virality_config.max_viral_multiplier,
-        color=PAPER_PALETTE["threshold"],
+        color=PAPER_PALETTE["tertiary"],
         linestyle="--",
         linewidth=2,
         label="Configured cap",
@@ -1307,13 +1307,13 @@ def test_generate_research_paper_advanced_visualizations(tmp_path):
         [fairness[fairness < fairness_mean], fairness[fairness >= fairness_mean]],
         bins=26,
         stacked=True,
-        color=[PAPER_PALETTE["primary"], PAPER_PALETTE["negative"]],
+        color=COMPARISON_COLORS,
         alpha=0.85,
         label=["Lower fairness pole", "Upper fairness pole"],
     )
     ax4.axvline(
         fairness_mean,
-        color=PAPER_PALETTE["threshold"],
+        color=PAPER_PALETTE["tertiary"],
         linestyle="--",
         linewidth=2,
     )
@@ -1586,7 +1586,7 @@ def test_generate_research_paper_advanced_visualizations(tmp_path):
     )
     ax9.axvline(
         cascade_sizes.mean(),
-        color=PAPER_PALETTE["threshold"],
+        color=PAPER_PALETTE["secondary"],
         linestyle="--",
         linewidth=2,
     )
@@ -1841,7 +1841,7 @@ def test_generate_research_paper_multiseed_debug_figure(tmp_path):
     )
     ax6.axhline(
         0.555,
-        color=PAPER_PALETTE["threshold"],
+        color=PAPER_PALETTE["secondary"],
         linestyle="--",
         label="Polarized threshold",
     )

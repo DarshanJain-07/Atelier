@@ -22,7 +22,6 @@ The in-app documentation browser uses a small docs content API:
 | Method | Path | Purpose |
 | --- | --- | --- |
 | `GET` | `/api/docs/pages` | Returns the available markdown-backed docs pages and the default slug. |
-| `GET` | `/api/docs/pages/{slug}` | Returns one page as markdown plus rendered HTML. |
 | `GET` | `/docs/{slug}` | Loads the docs browser UI for a specific page slug. |
 
 ## `/simulate` Request Model

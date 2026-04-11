@@ -214,14 +214,6 @@
                             </button>
                             <button
                                 class="toggle-btn active"
-                                id="tog-maslow"
-                                onclick="this.classList.toggle('active')"
-                                data-tooltip="Enable Maslow gating (Survival Override / Fear Gating)"
-                            >
-                                Maslow Gate
-                            </button>
-                            <button
-                                class="toggle-btn active"
                                 id="tog-power-law"
                                 onclick="this.classList.toggle('active')"
                                 data-tooltip="Enable power law influence (Weighted Aggregation / Pareto Distribution)"
@@ -354,35 +346,6 @@
                             />
                             <span class="range-val" id="disp-emotion-temp"
                                 >0.2</span
-                            >
-                        </div>
-                    </div>
-
-                    <div class="config-section">
-                        <div class="section-header">
-                            <label
-                            class="section-title" tabindex="0"
-                            data-tooltip="Panic threshold. If safety falls below this, FEAR is triggered."
-                            >PANIC THRESHOLD</label
-                        >
-                            <button class="reset-section-btn" onclick="resetSection(this)" data-tooltip="Reset section" aria-label="Reset Defaults">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
-                                    <path d="M3 3v5h5"/>
-                                </svg>
-                            </button>
-                        </div>
-                        <div class="range-wrapper">
-                            <input
-                                type="range"
-                                id="param-panic-thresh"
-                                min="-3.0"
-                                max="0.0"
-                                step="0.1"
-                                value="-1.2"
-                            />
-                            <span class="range-val" id="disp-panic-thresh"
-                                >-1.2</span
                             >
                         </div>
                     </div>
@@ -1335,6 +1298,37 @@
                         class="icon-btn-small"
                         aria-label="Download Session Data"
                         title="Download Session Data"
+                    >
+                        <svg
+                            width="14"
+                            height="14"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                        >
+                            <path
+                                d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4m4-5l5 5 5-5m-5 5V3"
+                            />
+                        </svg>
+                    </button>
+                    <button id="close-history" class="close-btn" aria-label="Close history">
+                        &times;
+                    </button>
+                </div>
+            </div>
+            <div class="history-graph-container" id="history-graph">
+                <!-- Dynamically generated graph nodes -->
+                <div class="empty-history-msg">
+                    No simulations recorded in this session.
+                </div>
+            </div>
+        </div>
+
+        <script src="script.js"></script>
+    </body>
+</html>
+title="Download Session Data"
                     >
                         <svg
                             width="14"

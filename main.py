@@ -217,7 +217,6 @@ class _RunProfileBaseModel(BaseModel):
 _RUN_PROFILE_FIELD_CONSTRAINTS: dict[str, dict[str, Any]] = {
     "agent_count": {"gt": 0},
     "emotion_temperature": {"ge": 0.0, "le": 1.0},
-    "panic_threshold": {"le": 0.0},
     "sentiment_neutrality_acting_threshold": {"ge": 0.0},
     "sentiment_neutrality_leaky_slope": {"ge": 0.0},
     "temperature": {"ge": 0.0, "le": 1.0},

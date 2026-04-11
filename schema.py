@@ -347,8 +347,6 @@ class SimConfig:
     min_sentiment: float = -1.0  # Clamp min value
     max_sentiment: float = 1.0  # Clamp max value
 
-    panic_threshold: float = -1.2  # If Perceived Safety < this, trigger FEAR
-    EMOTION_GAIN = 5.0
 
     def __post_init__(self):
         """Validation to prevent invalid configs"""
@@ -366,9 +364,6 @@ class SimConfig:
             raise ValueError(
                 "sentiment_neutrality_activation must be one of: relu, leaky_relu"
             )
-        if self.panic_threshold > 0:
-            # Panic threshold is a safety score threshold, usually negative.
-            raise ValueError("panic_threshold must be <= 0")
 
 
 def sim_config_defaults() -> dict[str, Any]:

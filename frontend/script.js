@@ -106,7 +106,6 @@ function renderBatchUI() {
             <div class="batch-toggle-grid">
                 <button class="batch-tog ${run.use_distortion ? "active" : ""}" onclick="this.classList.toggle('active'); debouncedUpdateRun(${run.id}, 'use_distortion', this.classList.contains('active'))" title="Distortion">DIST</button>
                 <button class="batch-tog ${run.use_pressure ? "active" : ""}" onclick="this.classList.toggle('active'); debouncedUpdateRun(${run.id}, 'use_pressure', this.classList.contains('active'))" title="Time Pressure">TIME</button>
-                <button class="batch-tog ${run.use_maslow ? "active" : ""}" onclick="this.classList.toggle('active'); debouncedUpdateRun(${run.id}, 'use_maslow', this.classList.contains('active'))" title="Maslow Gate">MSLW</button>
                 <button class="batch-tog ${run.use_power_law ? "active" : ""}" onclick="this.classList.toggle('active'); debouncedUpdateRun(${run.id}, 'use_power_law', this.classList.contains('active'))" title="Power Law">PWR</button>
                 <button class="batch-tog ${run.use_agent_memory ? "active" : ""}" onclick="this.classList.toggle('active'); debouncedUpdateRun(${run.id}, 'use_agent_memory', this.classList.contains('active'))" title="Agent Memory">MEM</button>
                 <button class="batch-tog ${run.use_algorithmic_amplification ? "active" : ""}" onclick="this.classList.toggle('active'); debouncedUpdateRun(${run.id}, 'use_algorithmic_amplification', this.classList.contains('active'))" title="Algo Amplification">ALGO</button>
@@ -146,7 +145,6 @@ window.updateRun = (id, field, value) => {
         field === "seed" ||
         field === "temperature" ||
         field === "emotion_temperature" ||
-        field === "panic_threshold" ||
         field === "agent_count"
           ? Number(value)
           : value;
@@ -232,14 +230,13 @@ document.getElementById("btn-add-run").addEventListener("click", () => {
     defaults = {
         temperature: parseFloat(document.getElementById("param-temp").value),
         emotion_temperature: parseFloat(document.getElementById("param-emotion-temp").value || 0.2),
-        panic_threshold: parseFloat(document.getElementById("param-panic-thresh").value || -1.2),
         region: "All",
         social_class: document.getElementById("filter-class").value,
         agent_count: parseInt(document.getElementById("param-count").value),
         use_distortion: document.getElementById("tog-distortion").classList.contains("active"),
         use_pressure: document.getElementById("tog-pressure").classList.contains("active"),
-        use_maslow: document.getElementById("tog-maslow").classList.contains("active"),
         use_power_law: document.getElementById("tog-power-law").classList.contains("active"),
+
         use_agent_memory: document.getElementById("tog-memory").classList.contains("active"),
         use_algorithmic_amplification: document.getElementById("tog-algo-amp").classList.contains("active"),
         use_network_topology: document.getElementById("tog-network").classList.contains("active"),
@@ -768,9 +765,6 @@ async function runSimulation() {
     emotion_temperature: parseFloat(
       document.getElementById("param-emotion-temp").value || 0.2,
     ),
-    panic_threshold: parseFloat(
-      document.getElementById("param-panic-thresh").value || -1.2,
-    ),
     region: "All",
     social_class: document.getElementById("filter-class").value,
     agent_count: parseInt(document.getElementById("param-count").value),
@@ -779,9 +773,6 @@ async function runSimulation() {
       .classList.contains("active"),
     use_pressure: document
       .getElementById("tog-pressure")
-      .classList.contains("active"),
-    use_maslow: document
-      .getElementById("tog-maslow")
       .classList.contains("active"),
     use_power_law: document
       .getElementById("tog-power-law")
@@ -929,7 +920,6 @@ function renderHistory() {
                       [
                         cfg.use_distortion ? "DIST" : null,
                         cfg.use_pressure ? "TIME" : null,
-                        cfg.use_maslow ? "MSLW" : null,
                         cfg.use_power_law ? "PWR" : null,
                       ]
                         .filter(Boolean)
@@ -1210,13 +1200,6 @@ document
       e.target.value,
     ).toFixed(2);
   });
-document
-  .getElementById("param-panic-thresh")
-  ?.addEventListener("input", (e) => {
-    document.getElementById("disp-panic-thresh").textContent = parseFloat(
-      e.target.value,
-    ).toFixed(1);
-  });
 
 document.getElementById("tab-basic")?.addEventListener("click", () => {
   document.getElementById("tab-basic").classList.add("active");
@@ -1278,6 +1261,11 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 resize();
+initAgents();
+renderBatchUI();
+animate();
+checkBackendStatus();
+();
 initAgents();
 renderBatchUI();
 animate();

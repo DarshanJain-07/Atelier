@@ -33,7 +33,6 @@ def test_run_profile_accepts_sim_config_aliases():
         mutation_temperature=0.4,
         use_signal_distortion=False,
         use_time_pressure=False,
-        use_maslow_gating=False,
         use_power_law_influence=True,
     )
 
@@ -41,7 +40,6 @@ def test_run_profile_accepts_sim_config_aliases():
     assert run.temperature == 0.4
     assert run.use_distortion is False
     assert run.use_pressure is False
-    assert run.use_maslow is False
     assert run.use_power_law is True
 
     config = create_sim_config(**run_profile_to_sim_config_kwargs(run))
@@ -49,7 +47,6 @@ def test_run_profile_accepts_sim_config_aliases():
     assert config.mutation_temperature == 0.4
     assert config.use_signal_distortion is False
     assert config.use_time_pressure is False
-    assert config.use_maslow_gating is False
     assert config.use_power_law_influence is True
 
 

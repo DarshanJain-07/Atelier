@@ -60,7 +60,6 @@ The request body is modeled by `SimulationRequest`:
 | `agent_count` / `num_agents` | Requested population size for the run. |
 | `social_class` | Optional class filter applied before simulation. |
 | `emotion_temperature` | Controls emotional projection sharpness. |
-| `panic_threshold` | Threshold used in emotional/stress-related behavior. |
 
 #### Core Behavior Toggles
 
@@ -68,7 +67,6 @@ The request body is modeled by `SimulationRequest`:
 | --- | --- |
 | `use_distortion` / `use_signal_distortion` | Enables signal distortion in perception. |
 | `use_pressure` / `use_time_pressure` | Enables urgency-driven cognitive tunneling. |
-| `use_maslow` / `use_maslow_gating` | Enables survival-priority gating. |
 | `use_power_law` / `use_power_law_influence` | Enables more unequal influence weighting. |
 | `enable_evolution` | Enables long-horizon society evolution before the event run. |
 

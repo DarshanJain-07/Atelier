@@ -138,14 +138,22 @@ class SocietyEvolution:
         """
         shock_freq = self.config.shock_frequency  # e.g., 0.1 per generation
         shock_magnitude = self.config.shock_magnitude  # e.g., 0.2 (20%)
+        # Doc mentions positive/negative shocks, let's allow a chance for positive shocks
+        positive_shock_chance = getattr(self.config, "shock_probability_positive", 0.2)
 
         # Randomly determine if shock occurs this generation
         if np.random.rand() < shock_freq:
-            shock_impact = 1 - shock_magnitude * np.random.uniform(
-                0.5, 1.0
-            )  # Reduce wealth
+            is_positive = np.random.rand() < positive_shock_chance
+            
+            if is_positive:
+                shock_impact = 1 + shock_magnitude * np.random.uniform(0.5, 1.0)
+                msg = "Positive"
+            else:
+                shock_impact = 1 - shock_magnitude * np.random.uniform(0.5, 1.0)
+                msg = "Negative"
+                
             print(
-                f"Applying economic shock at generation {generation}, multiplier {shock_impact:.2f}"
+                f"Applying {msg} economic shock at generation {generation}, multiplier {shock_impact:.2f}"
             )
             self.raw_wealth *= shock_impact
 

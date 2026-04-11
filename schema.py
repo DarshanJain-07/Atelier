@@ -292,6 +292,7 @@ class SimConfig:
     reinvestment_noise_std: float = 0.02
     shock_frequency: float = 0.1
     shock_magnitude: float = 0.2
+    shock_probability_positive: float = 0.2
     mobility_rate: float = 0.05
     use_dynamic_classes: bool = True
     class_temperature: float = 0.5

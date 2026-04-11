@@ -1252,6 +1252,10 @@ async def run_simulation(req: SimulationRequest, background_tasks: BackgroundTas
                         debug_result.social_state.get("polarization") or 0.0,
                         3,
                     ),
+                    "elite_divergence": round(
+                        debug_result.social_state.get("elite_divergence") or 0.0,
+                        4,
+                    ),
                     "divergence": validation_result[
                         "wasserstein_distance"
                     ],  # Keep key for UI compatibility

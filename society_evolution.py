@@ -291,52 +291,6 @@ class SocietyEvolution:
             self.exposures[:, non_wealth_mask]
         )
 
-    def reassign_classes(self):
-
-        wealth = self.raw_wealth
-
-        # Normalize to percentiles (0–1)
-        wealth_rank = torch.argsort(torch.argsort(wealth))
-        wealth_norm = wealth_rank.float() / (self.num_agents - 1)
-
-        influence_rank = torch.argsort(torch.argsort(self.influence))
-        influence_norm = influence_rank.float() / (self.num_agents - 1)
-
-        # Simple power score (one scalar)
-        power_score = (
-            0.5 * wealth_norm
-            + 0.4 * influence_norm
-            + 0.1 * self.personalities.mean(dim=1)
-        )
-
-        # Define 5 structural classes
-        class_centers = torch.tensor([0.1, 0.3, 0.5, 0.75, 0.95])
-
-        # Compute fitness = closeness to each class center
-        fitness = -((power_score.unsqueeze(1) - class_centers) ** 2)
-
-        # Softmax
-        probs = torch.softmax(fitness / self.config.class_temperature, dim=1)
-
-        elite_mask = wealth_norm < self.config.elite_wealth_threshold
-        probs[elite_mask, 4] = 0
-        probs = probs / probs.sum(dim=1, keepdim=True)
-
-        # Sample new class
-        new_classes_indices = torch.multinomial(probs, 1).squeeze().numpy()
-
-        # Map indices to generic class names
-        class_map = {
-            0: "Underclass",
-            1: "Working Class",
-            2: "Middle Class",
-            3: "Upper Middle",
-            4: "Elite",
-        }
-        mapped_classes = [class_map.get(idx, "Unknown") for idx in new_classes_indices]
-
-        self.metadata["Class"] = mapped_classes
-
     def evolve(self):
         """
         Run the full evolution cycle for the configured number of generations

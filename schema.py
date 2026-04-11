@@ -267,7 +267,6 @@ class SimConfig:
     )
 
     use_power_law_influence: bool = False  # Enable Weighted Aggregation (Pareto)
-    use_maslow_gating: bool = True  # Enable Survival Override (Fear Gating)
 
     # Use robust lookup
     wealth_dim_idx: int = DIMENSION_INDICES["Wealth"]
@@ -389,7 +388,6 @@ RUN_PROFILE_TO_SIM_CONFIG_FIELD_MAP = {
     "temperature": "mutation_temperature",
     "use_distortion": "use_signal_distortion",
     "use_pressure": "use_time_pressure",
-    "use_maslow": "use_maslow_gating",
     "use_power_law": "use_power_law_influence",
 }
 SIM_CONFIG_TO_RUN_PROFILE_FIELD_MAP = {

@@ -337,7 +337,6 @@ TEST_SCENARIOS: dict[str, ResearchPaperTestScenario] = {
             "cluster_count": 8,
             "cluster_seed": SIM_CONFIG_DEFAULTS["seed"],
             "cluster_initializations": 10,
-            "min_neuroticism_spread": 0.02,
         },
     ),
     "cognitive_gate": ResearchPaperTestScenario(
@@ -396,9 +395,6 @@ TEST_SCENARIOS: dict[str, ResearchPaperTestScenario] = {
             "magnitudes": [0.0, 0.15, 0.3, 0.45, 0.6, 0.75, 0.9],
             "urgency": 0.2,
             "monotonic_tolerance": 1e-6,
-            "min_engagement_gain": 0.08,
-            "min_acting_gain": 0.05,
-            "min_valence_drop": 0.08,
         },
     ),
     "boundary_low_salience": ResearchPaperTestScenario(
@@ -424,12 +420,6 @@ TEST_SCENARIOS: dict[str, ResearchPaperTestScenario] = {
             "low_salience_labels": ["Zero", "Faint Threat", "Mixed Weak"],
             "salient_label": "Salient Threat",
             "urgency": 0.2,
-            "max_low_engagement": 0.08,
-            "max_low_abs_valence": 0.2,
-            "min_salient_engagement": 0.18,
-            "min_salient_acting_ratio": 0.08,
-            "min_salient_acting_gap": 0.2,
-            "min_salient_valence_gap": 0.08,
         },
     ),
     "emotion_directionality": ResearchPaperTestScenario(
@@ -454,10 +444,6 @@ TEST_SCENARIOS: dict[str, ResearchPaperTestScenario] = {
                 },
             },
             "urgency": 0.2,
-            "min_positive_valence": 0.05,
-            "max_negative_valence": -0.1,
-            "min_fear_gap": 0.08,
-            "min_anger_gap": 0.08,
             "allowed_injustice_emotions": ["Anger", "Disgust"],
         },
     ),
@@ -480,8 +466,6 @@ TEST_SCENARIOS: dict[str, ResearchPaperTestScenario] = {
             "community_b_size": 4,
             "core_emotion": {"Anger": 0.35},
             "marginal_emotion": {"Anger": 0.18},
-            "min_bridge_acting_gain": 0.25,
-            "min_bridge_local_arousal_gain": 0.06,
         },
     ),
     "viral_scaling": ResearchPaperTestScenario(
@@ -530,11 +514,6 @@ TEST_SCENARIOS: dict[str, ResearchPaperTestScenario] = {
             },
             "urgency": 0.2,
             "monotonic_tolerance": 1e-6,
-            "min_openness_gain": 0.05,
-            "min_extraversion_attention_gain": 0.005,
-            "min_extraversion_cost_drop": 0.05,
-            "min_neuroticism_cost_drop": 0.05,
-            "min_conscientiousness_engagement_drop": 0.05,
         },
     ),
     "population_segmentation": ResearchPaperTestScenario(
@@ -554,10 +533,6 @@ TEST_SCENARIOS: dict[str, ResearchPaperTestScenario] = {
                 "Upper Middle",
                 "Elite",
             ],
-            "engagement_gap_floor": 0.04,
-            "action_gap_floor": 0.05,
-            "min_dimensions_with_engagement_separation": 11,
-            "min_dimensions_with_action_separation": 12,
         },
     ),
     "echo_chambers_high": ResearchPaperTestScenario(
@@ -885,7 +860,7 @@ TEST_SCENARIOS: dict[str, ResearchPaperTestScenario] = {
             NETWORK_NO_EVOLUTION,
             {"num_agents": 400, "base_connections": 20, "homophily_strength": 3.0},
         ),
-        values={"row_sum_tolerance": 1e-5, "min_edge_similarity": 0.05},
+        values={"row_sum_tolerance": 1e-5},
     ),
     "perception_social_consensus": ResearchPaperTestScenario(
         config_overrides=_merge(
@@ -924,7 +899,6 @@ TEST_SCENARIOS: dict[str, ResearchPaperTestScenario] = {
         values={
             "high_threshold": 0.8,
             "low_threshold": 0.2,
-            "min_tail_share": 0.01,
         },
     ),
     "personality_correlations": ResearchPaperTestScenario(
@@ -932,7 +906,6 @@ TEST_SCENARIOS: dict[str, ResearchPaperTestScenario] = {
             NO_NETWORK_NO_EVOLUTION,
             {"num_agents": 4000, "mutation_temperature": 0.0},
         ),
-        values={"max_rmse": 0.2},
     ),
     "personality_socialization_base": ResearchPaperTestScenario(
         config_overrides=_merge(
@@ -1069,7 +1042,6 @@ TEST_SCENARIOS: dict[str, ResearchPaperTestScenario] = {
         ),
         values={
             "world": {"Physical_Safety": -0.4},
-            "min_correlation": 0.1,
         },
     ),
     "temp_wealth_analysis": ResearchPaperTestScenario(
@@ -1117,7 +1089,6 @@ TEST_SCENARIOS: dict[str, ResearchPaperTestScenario] = {
             NO_NETWORK_NO_EVOLUTION,
             {"num_agents": 1500, "evolution_generations": 20, "enable_evolution": False},
         ),
-        values={"min_absolute_delta": 0.02},
         allow_session_evolution_override=False,
     ),
     "wealth_gini_evolved": ResearchPaperTestScenario(

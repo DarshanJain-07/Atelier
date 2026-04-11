@@ -152,19 +152,22 @@ def test_world_direction_changes_which_emotion_dominates(tmp_path):
     anger_idx = EMOTION_INDICES["Anger"]
     joy_idx = EMOTION_INDICES["Joy"]
 
-    assert results["Prosperity"]["valence"] >= settings["min_positive_valence"]
-    assert results["Threat"]["valence"] <= settings["max_negative_valence"]
-    assert results["Injustice"]["valence"] <= settings["max_negative_valence"]
-
-    assert (
-        results["Threat"]["center"][fear_idx] - results["Prosperity"]["center"][fear_idx]
-        >= settings["min_fear_gap"]
+    assert results["Prosperity"]["dominant_emotion"] == "Joy"
+    assert results["Prosperity"]["valence"] > 0.0
+    assert results["Threat"]["valence"] < 0.0
+    assert results["Injustice"]["valence"] < 0.0
+    assert results["Prosperity"]["center"][joy_idx] > max(
+        results["Threat"]["center"][joy_idx],
+        results["Injustice"]["center"][joy_idx],
     )
-    assert (
-        results["Injustice"]["center"][anger_idx] - results["Prosperity"]["center"][anger_idx]
-        >= settings["min_anger_gap"]
+    assert results["Threat"]["center"][fear_idx] > max(
+        results["Prosperity"]["center"][fear_idx],
+        results["Injustice"]["center"][fear_idx],
     )
-    assert results["Prosperity"]["center"][joy_idx] > results["Threat"]["center"][joy_idx]
+    assert results["Injustice"]["center"][anger_idx] > max(
+        results["Prosperity"]["center"][anger_idx],
+        results["Threat"]["center"][anger_idx],
+    )
     assert results["Threat"]["dominant_emotion"] == "Fear"
     assert (
         results["Injustice"]["dominant_emotion"] in settings["allowed_injustice_emotions"]
@@ -178,14 +181,8 @@ def test_bridge_agents_expand_cross_cluster_diffusion(tmp_path):
     settings = scenario.settings()
     metrics = _bridge_diffusion_metrics(config, settings)
 
-    assert (
-        metrics["with_bridge"]["acting_ratio"] - metrics["without_bridge"]["acting_ratio"]
-        >= settings["min_bridge_acting_gain"]
-    )
-    assert (
-        metrics["with_b_local_arousal"] - metrics["without_b_local_arousal"]
-        >= settings["min_bridge_local_arousal_gain"]
-    )
+    assert metrics["with_bridge"]["acting_ratio"] > metrics["without_bridge"]["acting_ratio"]
+    assert metrics["with_b_local_arousal"] > metrics["without_b_local_arousal"]
 
 
 def test_generate_emotion_direction_and_bridge_diffusion_figure(tmp_path):

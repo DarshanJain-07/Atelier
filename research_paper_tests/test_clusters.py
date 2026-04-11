@@ -30,5 +30,18 @@ def test_personality_clusters_show_nontrivial_trait_spread(tmp_path):
         float(personalities[clusters == cluster_idx, PERSONALITY_INDICES["Neuroticism"]].mean())
         for cluster_idx in range(settings["cluster_count"])
     ]
+    actual_spread = float(np.std(neuroticism_means))
+    rng = np.random.default_rng(settings["cluster_seed"])
+    random_spreads = []
+    neuroticism = personalities[:, PERSONALITY_INDICES["Neuroticism"]]
 
-    assert np.std(neuroticism_means) > settings["min_neuroticism_spread"]
+    for _ in range(32):
+        shuffled_clusters = clusters.copy()
+        rng.shuffle(shuffled_clusters)
+        shuffled_means = [
+            float(neuroticism[shuffled_clusters == cluster_idx].mean())
+            for cluster_idx in range(settings["cluster_count"])
+        ]
+        random_spreads.append(float(np.std(shuffled_means)))
+
+    assert actual_spread > max(random_spreads)

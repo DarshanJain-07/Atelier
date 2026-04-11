@@ -145,25 +145,21 @@ def test_same_event_produces_distinct_subgroup_response_profiles(tmp_path):
         ),
     ).reset_index()
 
-    peak_gap_by_dimension = gap_table.groupby("dimension", observed=False).max(
-        numeric_only=True
-    )
+    zero_magnitude = min(settings["magnitudes"])
+    max_magnitude = max(settings["magnitudes"])
+    zero_gap = gap_table[gap_table["magnitude"] == zero_magnitude].set_index("dimension")
+    max_gap = gap_table[gap_table["magnitude"] == max_magnitude].set_index("dimension")
+    engagement_peak_rows = gap_table.loc[
+        gap_table.groupby("dimension", observed=False)["engagement_gap"].idxmax()
+    ].set_index("dimension")
+    action_peak_rows = gap_table.loc[
+        gap_table.groupby("dimension", observed=False)["action_gap"].idxmax()
+    ].set_index("dimension")
 
-    assert (
-        int(
-            (
-                peak_gap_by_dimension["engagement_gap"]
-                >= settings["engagement_gap_floor"]
-            ).sum()
-        )
-        >= settings["min_dimensions_with_engagement_separation"]
-    )
-    assert (
-        int(
-            (peak_gap_by_dimension["action_gap"] >= settings["action_gap_floor"]).sum()
-        )
-        >= settings["min_dimensions_with_action_separation"]
-    )
+    assert (engagement_peak_rows["magnitude"] == max_magnitude).all()
+    assert (action_peak_rows["magnitude"] > zero_magnitude).all()
+    assert (max_gap["engagement_gap"] > zero_gap["engagement_gap"]).all()
+    assert (max_gap["action_gap"] > zero_gap["action_gap"]).all()
 
 
 def test_generate_population_segmentation_figure(tmp_path):

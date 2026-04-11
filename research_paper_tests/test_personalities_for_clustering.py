@@ -1,3 +1,5 @@
+import numpy as np
+
 from research_paper_tests.config_schema import (
     PERSONALITY_INDICES,
     get_test_scenario,
@@ -17,8 +19,6 @@ def test_personality_distribution_keeps_high_and_low_neuroticism_tails(tmp_path)
     )
 
     neuroticism = society.personalities[:, PERSONALITY_INDICES["Neuroticism"]].numpy()
-    high_share = float((neuroticism > settings["high_threshold"]).mean())
-    low_share = float((neuroticism < settings["low_threshold"]).mean())
 
-    assert high_share > settings["min_tail_share"]
-    assert low_share > settings["min_tail_share"]
+    assert float(np.quantile(neuroticism, 0.9)) > settings["high_threshold"]
+    assert float(np.quantile(neuroticism, 0.1)) < settings["low_threshold"]

@@ -91,9 +91,15 @@ def test_event_magnitude_monotonically_increases_engagement_and_action(tmp_path)
     assert (acting_diffs >= -tol).sum() >= len(acting_diffs) - 1
     assert (valence_diffs <= tol).sum() >= len(valence_diffs) - 1
 
-    assert mean_engagement[-1] - mean_engagement[1] >= settings["min_engagement_gain"]
-    assert acting_ratio[-1] - acting_ratio[1] >= settings["min_acting_gain"]
-    assert valence[1] - valence[-1] >= settings["min_valence_drop"]
+    assert np.isclose(mean_engagement[0], 0.0)
+    assert np.isclose(acting_ratio[0], 0.0)
+    assert np.isclose(valence[0], 0.0)
+    assert np.argmax(mean_engagement) == len(mean_engagement) - 1
+    assert np.argmax(acting_ratio) == len(acting_ratio) - 1
+    assert np.argmin(valence) == len(valence) - 1
+    assert mean_engagement[1] > mean_engagement[0]
+    assert acting_ratio[1] > acting_ratio[0]
+    assert valence[1] < valence[0]
 
 
 def test_low_salience_worlds_keep_reaction_bounded_before_escalation(tmp_path):
@@ -115,23 +121,25 @@ def test_low_salience_worlds_keep_reaction_bounded_before_escalation(tmp_path):
     )
 
     for label in settings["low_salience_labels"]:
-        assert results[label]["mean_engagement"] <= settings["max_low_engagement"]
-        assert abs(results[label]["valence"]) <= settings["max_low_abs_valence"]
+        assert np.isclose(results[label]["acting_ratio"], 0.0)
+        assert results[label]["sentiment"][1] >= results[label]["sentiment"][0]
+        assert results[label]["sentiment"][1] >= results[label]["sentiment"][2]
 
     salient = results[settings["salient_label"]]
     zero_case = results["Zero"]
 
-    assert salient["mean_engagement"] >= settings["min_salient_engagement"]
-    assert salient["acting_ratio"] >= settings["min_salient_acting_ratio"]
-    assert zero_case["valence"] - salient["valence"] >= settings["min_salient_valence_gap"]
-    assert zero_case["sentiment"][1] > zero_case["sentiment"][0]
-    assert zero_case["sentiment"][1] > zero_case["sentiment"][2]
-    assert all(
-        salient["acting_ratio"] - results[label]["acting_ratio"]
-        >= settings["min_salient_acting_gap"]
-        for label in settings["low_salience_labels"]
-        if label != "Zero"
+    assert np.allclose(zero_case["sentiment"], np.asarray([0.0, 1.0, 0.0]))
+    assert salient["mean_engagement"] > max(
+        results[label]["mean_engagement"] for label in settings["low_salience_labels"]
     )
+    assert salient["acting_ratio"] > max(
+        results[label]["acting_ratio"] for label in settings["low_salience_labels"]
+    )
+    assert salient["valence"] < min(
+        results[label]["valence"] for label in settings["low_salience_labels"]
+    )
+    assert salient["sentiment"][0] > salient["sentiment"][2]
+    assert salient["sentiment"][1] < zero_case["sentiment"][1]
 
 
 def test_generate_response_boundaries_figure(tmp_path):

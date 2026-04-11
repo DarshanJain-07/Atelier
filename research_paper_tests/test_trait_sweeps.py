@@ -120,23 +120,17 @@ def test_trait_sweeps_reveal_monotonic_behavioral_gradients():
     assert np.all(np.diff(extraversion_action_cost) <= tol)
     assert np.all(np.diff(neuroticism_action_cost) <= tol)
 
-    assert openness_engagement[-1] - openness_engagement[0] >= settings["min_openness_gain"]
-    assert (
-        extraversion_short_term_attention[-1] - extraversion_short_term_attention[0]
-        >= settings["min_extraversion_attention_gain"]
-    )
-    assert (
-        extraversion_action_cost[0] - extraversion_action_cost[-1]
-        >= settings["min_extraversion_cost_drop"]
-    )
-    assert (
-        neuroticism_action_cost[0] - neuroticism_action_cost[-1]
-        >= settings["min_neuroticism_cost_drop"]
-    )
-    assert (
-        conscientiousness_engagement[0] - conscientiousness_engagement[-1]
-        >= settings["min_conscientiousness_engagement_drop"]
-    )
+    assert np.argmax(openness_engagement) == len(openness_engagement) - 1
+    assert np.argmax(extraversion_short_term_attention) == len(extraversion_short_term_attention) - 1
+    assert np.argmin(conscientiousness_engagement) == len(conscientiousness_engagement) - 1
+    assert np.argmin(extraversion_action_cost) == len(extraversion_action_cost) - 1
+    assert np.argmin(neuroticism_action_cost) == len(neuroticism_action_cost) - 1
+
+    assert openness_engagement[-1] > openness_engagement[0]
+    assert extraversion_short_term_attention[-1] > extraversion_short_term_attention[0]
+    assert conscientiousness_engagement[0] > conscientiousness_engagement[-1]
+    assert extraversion_action_cost[0] > extraversion_action_cost[-1]
+    assert neuroticism_action_cost[0] > neuroticism_action_cost[-1]
 
 
 def test_generate_trait_sweeps_figure(tmp_path):

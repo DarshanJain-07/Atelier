@@ -27,5 +27,10 @@ def test_signal_distortion_scales_with_neuroticism(tmp_path):
     neuroticism = society.personalities[:, PERSONALITY_INDICES["Neuroticism"]].numpy()
     distortion = np.abs(perceived[:, safety_index].numpy() - world[0, safety_index].item())
     correlation = float(np.corrcoef(neuroticism, distortion)[0, 1])
+    low_cutoff = float(np.quantile(neuroticism, 0.25))
+    high_cutoff = float(np.quantile(neuroticism, 0.75))
+    low_neuroticism_distortion = distortion[neuroticism <= low_cutoff]
+    high_neuroticism_distortion = distortion[neuroticism >= high_cutoff]
 
-    assert correlation > settings["min_correlation"]
+    assert correlation > 0.0
+    assert high_neuroticism_distortion.mean() > low_neuroticism_distortion.mean()

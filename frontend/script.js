@@ -52,23 +52,11 @@ const filmstripToggleBtn = document.getElementById("filmstrip-toggle-btn");
 let isFilmstripManuallyHidden = false;
 
 // --- BATCH UI RENDERER ---
-function renderBatchUI() {
-  const container = document.getElementById("batch-container");
-  container.innerHTML = "";
-
-  if (batchRuns.length === 0) {
-    const emptyMsg = document.createElement("div");
-    emptyMsg.className = "empty-history-msg";
-    emptyMsg.style.padding = "10px 0";
-    emptyMsg.textContent = "No extra experiments added.";
-    container.appendChild(emptyMsg);
-    return;
-  }
-
-  batchRuns.forEach((run, index) => {
-    const item = document.createElement("div");
-    item.className = "batch-item";
-    item.innerHTML = `
+function createBatchItem(run, index) {
+  const item = document.createElement("div");
+  item.className = "batch-item";
+  item.dataset.id = run.id;
+  item.innerHTML = `
             <div class="batch-header">
                 <span class="batch-title">EXPERIMENT ${index + 1}</span>
                 <button class="batch-remove" onclick="removeRun(${run.id})">&times;</button>
@@ -76,11 +64,11 @@ function renderBatchUI() {
             <div class="sidebar-grid">
                 <div class="sidebar-field">
                     <label data-tooltip="Random seed for deterministic outcomes.">Seed</label>
-                    <input type="number" class="sidebar-input" value="${run.seed}" onchange="debouncedUpdateRun(${run.id}, 'seed', this.value)">
+                    <input type="number" class="sidebar-input" value="${run.seed}" oninput="debouncedUpdateRun(${run.id}, 'seed', this.value)">
                 </div>
                 <div class="sidebar-field">
                     <label data-tooltip="Controls the mutation rate. Higher values increase randomness.">Temp</label>
-                    <input type="number" class="sidebar-input" step="0.1" min="0" max="1" value="${run.temperature}" onchange="debouncedUpdateRun(${run.id}, 'temperature', this.value)">
+                    <input type="number" class="sidebar-input" step="0.1" min="0" max="1" value="${run.temperature}" oninput="debouncedUpdateRun(${run.id}, 'temperature', this.value)">
                 </div>
             </div>
             <div class="sidebar-grid">
@@ -114,6 +102,24 @@ function renderBatchUI() {
                 <button class="batch-tog ${run.use_granovetter_thresholds ? "active" : ""}" onclick="this.classList.toggle('active'); debouncedUpdateRun(${run.id}, 'use_granovetter_thresholds', this.classList.contains('active'))" title="Granovetter Model">GRAN</button>
             </div>
         `;
+  return item;
+}
+
+function renderBatchUI() {
+  const container = document.getElementById("batch-container");
+  container.innerHTML = "";
+
+  if (batchRuns.length === 0) {
+    container.innerHTML = `
+      <div class="empty-history-msg" style="padding: 10px 0;">
+        No extra experiments added.
+      </div>
+    `;
+    return;
+  }
+
+  batchRuns.forEach((run, index) => {
+    const item = createBatchItem(run, index);
     container.appendChild(item);
   });
 }
@@ -246,8 +252,8 @@ document.getElementById("btn-add-run").addEventListener("click", () => {
   }
 
   batchRuns.push({
-    id: Date.now(),
     ...defaults,
+    id: Date.now(),
     seed: defaults.seed || 42,
   });
   renderBatchUI();
@@ -273,7 +279,7 @@ function renderFilmstrip(results) {
 
     card.innerHTML = `
             <div class="filmstrip-header">
-                <span class="filmstrip-tag">RUN ${idx + 1}</span>
+                <span class="filmstrip-tag">${idx === 0 ? "MAIN" : `EXPERIMENT ${idx}`}</span>
                 <div class="emotion-indicator" style="background: ${PALETTE[res.dominant_emotion] || "#333"}"></div>
             </div>
             <div class="filmstrip-emotion" style="color: ${PALETTE[res.dominant_emotion]}">${res.dominant_emotion.toUpperCase()}</div>
@@ -937,7 +943,6 @@ function renderHistory() {
                                 <div class="run-stats">
                                     POL: ${run.polarization} | POP: ${(cfg.agent_count / 1000).toFixed(1)}k | ${cfg.social_class}
                                 </div>
-                                </div>
                             </div>
                             <div class="node-action" onclick="event.stopPropagation(); downloadData(${sIdx}, ${rIdx})">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4m4-5l5 5 5-5m-5 5V3"/></svg>
@@ -1261,11 +1266,6 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 resize();
-initAgents();
-renderBatchUI();
-animate();
-checkBackendStatus();
-();
 initAgents();
 renderBatchUI();
 animate();

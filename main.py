@@ -285,6 +285,11 @@ class DebugSimulationResult:
     final_emotions: torch.Tensor
     social_state: dict[str, Any]
     validation_result: dict[str, Any] | None = None
+    official_world_tensor: torch.Tensor | None = None
+    skeptical_world_tensor: torch.Tensor | None = None
+    backlash_potential: float = 0.0
+    narrative_frame: str = "official"
+    backlash_diagnostics: dict[str, Any] | None = None
     followup_context_vector: torch.Tensor | None = None
     followup_attention_weights: torch.Tensor | None = None
     followup_engagement_scores: torch.Tensor | None = None
@@ -515,10 +520,28 @@ def run_cognitive_cycle(
     affinities: torch.Tensor,
     memory: torch.Tensor | None = None,
     adjacency_matrix: Any | None = None,
+    *,
+    world_tensor_skp: torch.Tensor | None = None,
+    backlash_potential: float = 0.0,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     engine = CognitiveEngine(clone_sim_config(config))
+    chosen_world_tensor = world_tensor_raw
+    if world_tensor_skp is not None and getattr(config, "use_backlash_ab_testing", False):
+        decision = engine.run_backlash_ab_test(
+            world_tensor_off=world_tensor_raw,
+            world_tensor_skp=world_tensor_skp,
+            backlash_potential=backlash_potential,
+            urgency=urgency,
+            is_personal=is_personal,
+            exposures=exposures,
+            personalities=personalities,
+            agent_affinities=affinities,
+            agent_memory=memory,
+            adjacency_matrix=adjacency_matrix,
+        )
+        chosen_world_tensor = decision.world_tensor
     return engine.run(
-        world_tensor_raw=world_tensor_raw,
+        world_tensor_raw=chosen_world_tensor,
         urgency=urgency,
         is_personal=is_personal,
         exposures=exposures,
@@ -684,6 +707,8 @@ def execute_simulation_cycle(
     urgency: float = 0.5,
     is_personal: bool = False,
     baseline_probs: torch.Tensor | np.ndarray | list[float] | None = None,
+    world_tensor_skp: torch.Tensor | None = None,
+    backlash_potential: float = 0.0,
 ) -> DebugSimulationResult:
     active_society = society
     seed_everything(active_society.config.seed)
@@ -692,8 +717,46 @@ def execute_simulation_cycle(
     phys_engine = SocialPhysicsEngine(clone_sim_config(active_society.config))
     memory = active_society.memory.clone()
     input_world_tensor = world_tensor_raw.clone()
+    skeptical_world_tensor = (
+        world_tensor_skp.clone() if world_tensor_skp is not None else None
+    )
 
-    final_world_tensor = input_world_tensor.clone()
+    backlash_decision = None
+    if world_tensor_skp is not None and getattr(
+        active_society.config, "use_backlash_ab_testing", False
+    ):
+        backlash_decision = cog_engine.run_backlash_ab_test(
+            world_tensor_off=input_world_tensor,
+            world_tensor_skp=world_tensor_skp,
+            backlash_potential=backlash_potential,
+            urgency=urgency,
+            is_personal=is_personal,
+            exposures=active_society.exposures,
+            personalities=active_society.personalities,
+            agent_affinities=active_society.affinities,
+            agent_memory=memory,
+            adjacency_matrix=active_society.adjacency_matrix,
+        )
+        final_world_tensor = backlash_decision.world_tensor.clone()
+        if active_society.config.use_agent_memory:
+            if (
+                backlash_decision.sample_indices is not None
+                and backlash_decision.sample_context is not None
+                and backlash_decision.sample_indices.numel() > 0
+            ):
+                updated_sample_memory = cog_engine.consolidate_memory(
+                    agent_memory=memory.index_select(0, backlash_decision.sample_indices),
+                    context_vector=backlash_decision.sample_context,
+                    social_rehearsal_factor=min(0.5, backlash_potential),
+                )
+                memory.index_copy_(
+                    0,
+                    backlash_decision.sample_indices,
+                    updated_sample_memory,
+                )
+    else:
+        final_world_tensor = input_world_tensor.clone()
+
     context_vector, attention_weights, engagement_scores = cog_engine.run(
         world_tensor_raw=final_world_tensor,
         urgency=urgency,
@@ -711,7 +774,7 @@ def execute_simulation_cycle(
             int(len(active_society.exposures) * active_society.config.algo_sample_size),
         )
         _, ab_attention, ab_engagement = cog_engine.run(
-            world_tensor_raw=input_world_tensor,
+            world_tensor_raw=final_world_tensor,
             urgency=urgency,
             is_personal=is_personal,
             exposures=active_society.exposures[:sample_size],
@@ -728,7 +791,7 @@ def execute_simulation_cycle(
         avg_attention_per_dim = engagement_weighted_attention.mean(dim=0)
         top_dims = torch.topk(avg_attention_per_dim, k=2).indices
 
-        final_world_tensor = input_world_tensor.clone()
+        final_world_tensor = final_world_tensor.clone()
         exaggeration = active_society.config.algo_exaggeration_factor
         signal_floor = 0.05
         for dim_idx in top_dims:
@@ -843,6 +906,15 @@ def execute_simulation_cycle(
         final_emotions=primary_final_emotions,
         social_state=primary_social_state,
         validation_result=validation_result,
+        official_world_tensor=input_world_tensor,
+        skeptical_world_tensor=skeptical_world_tensor,
+        backlash_potential=backlash_potential,
+        narrative_frame=(
+            backlash_decision.chosen_frame if backlash_decision is not None else "official"
+        ),
+        backlash_diagnostics=(
+            backlash_decision.as_dict() if backlash_decision is not None else None
+        ),
         followup_context_vector=followup_context_vector,
         followup_attention_weights=followup_attention_weights,
         followup_engagement_scores=followup_engagement_scores,
@@ -859,6 +931,8 @@ def run_debug_simulation(
     urgency: float = 0.5,
     is_personal: bool = False,
     baseline_probs: torch.Tensor | np.ndarray | list[float] | None = None,
+    world_tensor_skp: torch.Tensor | None = None,
+    backlash_potential: float = 0.0,
 ) -> DebugSimulationResult:
     effective_config = clone_sim_config(config)
     active_society = society or prepare_society_for_debug(effective_config)
@@ -868,6 +942,8 @@ def run_debug_simulation(
         urgency=urgency,
         is_personal=is_personal,
         baseline_probs=baseline_probs,
+        world_tensor_skp=world_tensor_skp,
+        backlash_potential=backlash_potential,
     )
 
 
@@ -1123,8 +1199,19 @@ async def run_simulation(req: SimulationRequest, background_tasks: BackgroundTas
         if isinstance(llm_result, Exception):
             raise llm_result
 
-        llm_result = cast(Tuple[torch.Tensor, float, bool, list[str], str], llm_result)
-        world_tensor, urgency, is_personal, detected_biases, reasoning = llm_result
+        llm_result = cast(
+            Tuple[torch.Tensor, torch.Tensor, float, bool, list[str], str, float],
+            llm_result,
+        )
+        (
+            world_tensor,
+            world_tensor_skp,
+            urgency,
+            is_personal,
+            detected_biases,
+            reasoning,
+            backlash_potential,
+        ) = llm_result
 
         # Parse Baseline results
         baseline_result = results[1]
@@ -1209,6 +1296,8 @@ async def run_simulation(req: SimulationRequest, background_tasks: BackgroundTas
                 urgency=urgency,
                 is_personal=is_personal,
                 baseline_probs=baseline_result,
+                world_tensor_skp=world_tensor_skp,
+                backlash_potential=backlash_potential,
             )
 
             if debug_result.social_state.get("endogenous_event") is not None:
@@ -1232,6 +1321,11 @@ async def run_simulation(req: SimulationRequest, background_tasks: BackgroundTas
                 personalities=personalities,
                 final_emotions=debug_result.final_emotions,
                 attention_weights=debug_result.attention_weights,
+                narrative_frame=debug_result.narrative_frame,
+                backlash_potential=debug_result.backlash_potential,
+                backlash_diagnostics=debug_result.backlash_diagnostics,
+                official_world_tensor=debug_result.official_world_tensor,
+                skeptical_world_tensor=debug_result.skeptical_world_tensor,
             )
 
             current_agent_emotions = describe_agent_emotions(

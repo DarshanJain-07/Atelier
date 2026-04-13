@@ -73,6 +73,68 @@ class ExplainabilityEngine:
 
         return " ".join(story_parts)
 
+    def _generate_narrative_competition(
+        self,
+        narrative_frame: str | None = None,
+        backlash_potential: float | None = None,
+        backlash_diagnostics: Dict[str, Any] | None = None,
+        official_world_tensor: torch.Tensor | None = None,
+        skeptical_world_tensor: torch.Tensor | None = None,
+    ) -> str:
+        """Explains whether a backlash A/B test selected the official or skeptical narrative."""
+        if backlash_diagnostics is None:
+            return ""
+
+        sample_size = int(backlash_diagnostics.get("sample_size") or 0)
+        skeptical_count = int(backlash_diagnostics.get("skeptical_count") or 0)
+        official_count = int(backlash_diagnostics.get("official_count") or 0)
+        skeptical_energy = float(backlash_diagnostics.get("skeptical_energy") or 0.0)
+        official_energy = float(backlash_diagnostics.get("official_energy") or 0.0)
+        selected_frame = narrative_frame or backlash_diagnostics.get("chosen_frame") or "official"
+        potential = float(
+            backlash_potential
+            if backlash_potential is not None
+            else backlash_diagnostics.get("backlash_potential") or 0.0
+        )
+
+        if selected_frame == "skeptical":
+            base = (
+                f"A vanguard sample of **{sample_size}** agents internally A/B tested the event, and the "
+                f"**skeptical backlash frame won**. Skeptical agents generated **{skeptical_energy:.2f}** "
+                f"engagement energy versus **{official_energy:.2f}** for the official frame, so the broader "
+                f"population was exposed to the cynical narrative."
+            )
+        else:
+            base = (
+                f"A vanguard sample of **{sample_size}** agents internally A/B tested the event, but the "
+                f"**official frame held**. Official-facing agents generated **{official_energy:.2f}** "
+                f"engagement energy versus **{skeptical_energy:.2f}** for the backlash frame, so the wider "
+                f"population stayed on the intended narrative."
+            )
+
+        routing = (
+            f" The sample split into **{skeptical_count}** skeptical-prone agents and "
+            f"**{official_count}** conformist/trusting agents, with an overall backlash potential of "
+            f"**{potential:.2f}**."
+        )
+
+        frame_gap = ""
+        if official_world_tensor is not None and skeptical_world_tensor is not None:
+            off = official_world_tensor.squeeze().detach().cpu()
+            skp = skeptical_world_tensor.squeeze().detach().cpu()
+            gap = torch.abs(off - skp)
+            top_gap = torch.topk(gap, k=min(2, gap.numel())).indices.tolist()
+            if top_gap:
+                labels = [DIMENSIONS[idx] for idx in top_gap if gap[idx].item() > 0.05]
+                if labels:
+                    frame_gap = (
+                        " The sharpest disagreement between frames centered on **"
+                        + "** and **".join(labels)
+                        + "**."
+                    )
+
+        return f"{base}{routing}{frame_gap}"
+
     def _generate_tug_of_war(self, social_state: Dict[str, Any]) -> str:
         """Explains the polarization, fragmentation, and sentiment of the society."""
         polarization = social_state.get("polarization") or 0.0
@@ -308,12 +370,29 @@ class ExplainabilityEngine:
         personalities: torch.Tensor,
         final_emotions: torch.Tensor,
         attention_weights: torch.Tensor,
+        narrative_frame: str | None = None,
+        backlash_potential: float | None = None,
+        backlash_diagnostics: Dict[str, Any] | None = None,
+        official_world_tensor: torch.Tensor | None = None,
+        skeptical_world_tensor: torch.Tensor | None = None,
     ) -> Dict[str, Any]:
         """
         Main entry point to generate the full multi-layered explainability package.
         """
+        narrative_competition = self._generate_narrative_competition(
+            narrative_frame=narrative_frame,
+            backlash_potential=backlash_potential,
+            backlash_diagnostics=backlash_diagnostics,
+            official_world_tensor=official_world_tensor,
+            skeptical_world_tensor=skeptical_world_tensor,
+        )
+        shift_story = self._generate_shift_story(social_state)
+        if narrative_competition:
+            shift_story = f"{narrative_competition} {shift_story}"
+
         return {
-            "shift_story": self._generate_shift_story(social_state),
+            "shift_story": shift_story,
+            "narrative_competition": narrative_competition,
             "tug_of_war": self._generate_tug_of_war(social_state),
             "cognitive_drivers": self._generate_cognitive_drivers(attention_weights),
             "viral_dynamics": self._generate_viral_dynamics(social_state),

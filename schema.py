@@ -1,5 +1,5 @@
 from copy import deepcopy
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, field, fields
 from typing import Any, List
 
 import torch
@@ -264,6 +264,22 @@ class SimConfig:
     algo_sample_size: float = 0.1  # Fraction of population used for initial A/B test
     algo_exaggeration_factor: float = (
         1.5  # How much to amplify the dimensions that cause highest engagement
+    )
+
+    # --- Backlash Routing / Dual-Frame Narrative Selection ---
+    use_backlash_ab_testing: bool = False
+    backlash_sample_size: float = 0.1
+    backlash_decision_threshold: float = 1.15
+    backlash_skepticism_threshold: float = 0.55
+    backlash_trait_routing_weights: dict[str, float] = field(
+        default_factory=lambda: {
+            "Openness": 1.0,
+            "Conscientiousness": -0.2,
+            "Extraversion": 0.0,
+            "Agreeableness": -1.0,
+            "Neuroticism": 1.0,
+            "bias": 0.1,
+        }
     )
 
     use_power_law_influence: bool = False  # Enable Weighted Aggregation (Pareto)

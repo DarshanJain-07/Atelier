@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from typing import Optional
 
 import torch
@@ -5,6 +6,33 @@ import torch.nn.functional as F
 
 from attention_context import AttentionContext
 from schema import PSYCH_PROJECTION, SimConfig
+
+
+@dataclass
+class BacklashDecision:
+    world_tensor: torch.Tensor
+    chosen_frame: str
+    triggered: bool
+    sample_size: int
+    skeptical_count: int
+    official_count: int
+    skeptical_energy: float
+    official_energy: float
+    backlash_potential: float
+    sample_indices: Optional[torch.Tensor] = None
+    sample_context: Optional[torch.Tensor] = None
+
+    def as_dict(self) -> dict[str, float | int | bool | str]:
+        return {
+            "chosen_frame": self.chosen_frame,
+            "triggered": self.triggered,
+            "sample_size": self.sample_size,
+            "skeptical_count": self.skeptical_count,
+            "official_count": self.official_count,
+            "skeptical_energy": self.skeptical_energy,
+            "official_energy": self.official_energy,
+            "backlash_potential": self.backlash_potential,
+        }
 
 
 class CognitiveEngine:
@@ -214,6 +242,231 @@ class CognitiveEngine:
 
         return biased
 
+    def prepare_perceived_world(
+        self,
+        world_tensor_raw: torch.Tensor,
+        personalities: torch.Tensor,
+        agent_affinities: torch.Tensor,
+        agent_memory: Optional[torch.Tensor] = None,
+        adjacency_matrix: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
+        device = personalities.device
+
+        distorted_world = self.perceive_world(
+            world_tensor_raw,
+            personalities,
+            adjacency_matrix=adjacency_matrix,
+        )
+
+        if agent_memory is not None and getattr(self.config, "use_agent_memory", False):
+            mem = agent_memory.to(device)
+            alignment = mem * distorted_world
+            fatigue_mask = torch.clamp(alignment, min=0.0)
+            fatigue_penalty = 1.0 - torch.exp(
+                -fatigue_mask
+                * getattr(self.config, "memory_desensitization_gain", 2.0)
+            )
+
+            threat_mask = (distorted_world < 0).float()
+            total_stress = torch.sum(torch.abs(mem), dim=1, keepdim=True)
+            fresh_threat_mask = threat_mask * (fatigue_mask < 0.1).float()
+            trigger_stack_boost = (
+                torch.log1p(total_stress)
+                * fresh_threat_mask
+                * getattr(self.config, "memory_trigger_stacking_gain", 3.0)
+            )
+
+            perceived_world = distorted_world * (
+                1.0 - torch.clamp(fatigue_penalty, max=0.95)
+            ) + (distorted_world * trigger_stack_boost)
+        else:
+            perceived_world = distorted_world
+
+        return perceived_world * agent_affinities.to(device)
+
+    def build_context_vector(
+        self,
+        perceived_world: torch.Tensor,
+        attention_weights: torch.Tensor,
+    ) -> torch.Tensor:
+        residual_gain = getattr(self.config, "attention_residual_gain", 0.35)
+        modulated_gain = getattr(self.config, "attention_modulated_gain", 1.0)
+        context_scale = residual_gain + (attention_weights * modulated_gain)
+
+        context_vector = perceived_world * context_scale
+
+        original_norm = torch.norm(perceived_world, dim=1, keepdim=True)
+        new_norm = torch.norm(context_vector, dim=1, keepdim=True) + 1e-9
+        context_vector = context_vector * (original_norm / new_norm)
+
+        return torch.clamp(context_vector, -2.0, 2.0)
+
+    def simulate_frame_response(
+        self,
+        world_tensor_raw: torch.Tensor,
+        urgency: float,
+        is_personal: bool,
+        exposures: torch.Tensor,
+        personalities: torch.Tensor,
+        agent_affinities: torch.Tensor,
+        agent_memory: Optional[torch.Tensor] = None,
+        adjacency_matrix: Optional[torch.Tensor] = None,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        perceived_world = self.prepare_perceived_world(
+            world_tensor_raw,
+            personalities,
+            agent_affinities,
+            agent_memory=agent_memory,
+            adjacency_matrix=adjacency_matrix,
+        )
+        attention_weights, engagement_scores = self.calculate_attention(
+            exposures,
+            personalities,
+            perceived_world,
+            is_personal,
+        )
+        attention_weights = self.apply_stress_bias(
+            attention_weights,
+            personalities,
+            urgency,
+        )
+        context_vector = self.build_context_vector(perceived_world, attention_weights)
+        return context_vector, attention_weights, engagement_scores
+
+    def compute_skepticism_scores(self, personalities: torch.Tensor) -> torch.Tensor:
+        weights = getattr(self.config, "backlash_trait_routing_weights", {})
+        weighted_sum = (
+            personalities[:, 0] * float(weights.get("Openness", 0.0))
+            + personalities[:, 1] * float(weights.get("Conscientiousness", 0.0))
+            + personalities[:, 2] * float(weights.get("Extraversion", 0.0))
+            + personalities[:, 3] * float(weights.get("Agreeableness", 0.0))
+            + personalities[:, 4] * float(weights.get("Neuroticism", 0.0))
+            + float(weights.get("bias", 0.0))
+        )
+        norm = (
+            abs(float(weights.get("Openness", 0.0)))
+            + abs(float(weights.get("Conscientiousness", 0.0)))
+            + abs(float(weights.get("Extraversion", 0.0)))
+            + abs(float(weights.get("Agreeableness", 0.0)))
+            + abs(float(weights.get("Neuroticism", 0.0)))
+        )
+        norm = max(norm, 1.0)
+        return torch.sigmoid((weighted_sum / norm) * 4.0)
+
+    def run_backlash_ab_test(
+        self,
+        world_tensor_off: torch.Tensor,
+        world_tensor_skp: Optional[torch.Tensor],
+        backlash_potential: float,
+        urgency: float,
+        is_personal: bool,
+        exposures: torch.Tensor,
+        personalities: torch.Tensor,
+        agent_affinities: torch.Tensor,
+        agent_memory: Optional[torch.Tensor] = None,
+        adjacency_matrix: Optional[torch.Tensor] = None,
+    ) -> BacklashDecision:
+        default_decision = BacklashDecision(
+            world_tensor=world_tensor_off,
+            chosen_frame="official",
+            triggered=False,
+            sample_size=0,
+            skeptical_count=0,
+            official_count=0,
+            skeptical_energy=0.0,
+            official_energy=0.0,
+            backlash_potential=float(backlash_potential),
+        )
+        if (
+            world_tensor_skp is None
+            or not getattr(self.config, "use_backlash_ab_testing", False)
+        ):
+            return default_decision
+
+        total_agents = personalities.shape[0]
+        device = personalities.device
+        sample_size = int(total_agents * self.config.backlash_sample_size)
+        if sample_size < 1:
+            return default_decision
+
+        sample_indices = torch.randperm(total_agents, device=device)[:sample_size]
+        sample_personalities = personalities.index_select(0, sample_indices)
+        skepticism_scores = self.compute_skepticism_scores(sample_personalities)
+        skeptical_mask = (
+            skepticism_scores >= self.config.backlash_skepticism_threshold
+        )
+
+        skeptical_local = torch.nonzero(skeptical_mask, as_tuple=False).flatten()
+        official_local = torch.nonzero(~skeptical_mask, as_tuple=False).flatten()
+        sample_context = torch.zeros(
+            sample_size,
+            world_tensor_off.shape[1],
+            dtype=exposures.dtype,
+            device=device,
+        )
+
+        skeptical_energy = torch.tensor(0.0, device=device)
+        official_energy = torch.tensor(0.0, device=device)
+
+        if skeptical_local.numel() > 0:
+            skeptical_indices = sample_indices.index_select(0, skeptical_local)
+            skeptical_context, _, skeptical_raw_energy = self.simulate_frame_response(
+                world_tensor_skp,
+                urgency=urgency,
+                is_personal=is_personal,
+                exposures=exposures.index_select(0, skeptical_indices),
+                personalities=personalities.index_select(0, skeptical_indices),
+                agent_affinities=agent_affinities.index_select(0, skeptical_indices),
+                agent_memory=(
+                    agent_memory.index_select(0, skeptical_indices)
+                    if agent_memory is not None
+                    else None
+                ),
+                adjacency_matrix=None,
+            )
+            sample_context.index_copy_(0, skeptical_local, skeptical_context)
+            skeptical_energy = skeptical_raw_energy.mean() * float(backlash_potential)
+
+        if official_local.numel() > 0:
+            official_indices = sample_indices.index_select(0, official_local)
+            official_context, _, official_raw_energy = self.simulate_frame_response(
+                world_tensor_off,
+                urgency=urgency,
+                is_personal=is_personal,
+                exposures=exposures.index_select(0, official_indices),
+                personalities=personalities.index_select(0, official_indices),
+                agent_affinities=agent_affinities.index_select(0, official_indices),
+                agent_memory=(
+                    agent_memory.index_select(0, official_indices)
+                    if agent_memory is not None
+                    else None
+                ),
+                adjacency_matrix=None,
+            )
+            sample_context.index_copy_(0, official_local, official_context)
+            official_energy = official_raw_energy.mean()
+
+        triggered = bool(
+            skeptical_energy
+            > official_energy * self.config.backlash_decision_threshold
+        )
+        chosen_frame = "skeptical" if triggered else "official"
+        chosen_world = world_tensor_skp if triggered else world_tensor_off
+
+        return BacklashDecision(
+            world_tensor=chosen_world,
+            chosen_frame=chosen_frame,
+            triggered=triggered,
+            sample_size=sample_size,
+            skeptical_count=int(skeptical_local.numel()),
+            official_count=int(official_local.numel()),
+            skeptical_energy=float(skeptical_energy.item()),
+            official_energy=float(official_energy.item()),
+            backlash_potential=float(backlash_potential),
+            sample_indices=sample_indices,
+            sample_context=sample_context,
+        )
+
     @torch.inference_mode()
     def run(
         self,
@@ -235,95 +488,18 @@ class CognitiveEngine:
             updated_memory: (N, 12) or None
         """
 
-        device = exposures.device
-
-        # ---------------------------------
-        # 1. Stage 1: Individual Signal Distortion
-        # ---------------------------------
-        distorted_world = self.perceive_world(
-            world_tensor_raw,
-            personalities,
-            adjacency_matrix=adjacency_matrix,
-        )  # (N,12)
-
-        # ---------------------------------
-        # 3. Memory Layer (Desensitization & Trigger Stacking)
-        # ---------------------------------
-        if agent_memory is not None and getattr(self.config, "use_agent_memory", False):
-            mem = agent_memory.to(device)
-
-            # Desensitization (Fatigue): If current event aligns with recent memory, reduce impact
-            # We use an exponential scaling so repeated hits rapidly approach 1.0 (total fatigue)
-            alignment = mem * distorted_world
-            fatigue_mask = torch.clamp(alignment, min=0.0)
-            fatigue_penalty = 1.0 - torch.exp(
-                -fatigue_mask * getattr(self.config, "memory_desensitization_gain", 2.0)
+        context_vector, attention_weights, engagement_scores = (
+            self.simulate_frame_response(
+                world_tensor_raw,
+                urgency=urgency,
+                is_personal=is_personal,
+                exposures=exposures,
+                personalities=personalities,
+                agent_affinities=agent_affinities,
+                agent_memory=agent_memory,
+                adjacency_matrix=adjacency_matrix,
             )
-
-            # Trigger Stacking: Total past stress makes them hyper-reactive to NEW threats
-            threat_mask = (distorted_world < 0).float()
-            # Calculate total past stress across ALL dimensions
-            total_stress = torch.sum(torch.abs(mem), dim=1, keepdim=True)
-
-            # Only stack triggers on dimensions that aren't currently fatiguing them
-            fresh_threat_mask = threat_mask * (fatigue_mask < 0.1).float()
-
-            # Logarithmic scaling so it doesn't break the math, but still gives a massive boost
-            trigger_stack_boost = (
-                torch.log1p(total_stress)
-                * fresh_threat_mask
-                * getattr(self.config, "memory_trigger_stacking_gain", 3.0)
-            )
-
-            # Apply memory modifications:
-            # 1. Fatigue multiplies the raw signal down toward 0.
-            # 2. Trigger stacking adds an amplification if it's a fresh threat.
-            perceived_world = distorted_world * (
-                1.0 - torch.clamp(fatigue_penalty, max=0.95)
-            ) + (distorted_world * trigger_stack_boost)
-        else:
-            perceived_world = distorted_world
-
-        # ---------------------------------
-        # 3. Affinity Modulation
-        # ---------------------------------
-        # Raw volume is scaled by the agent's specific cognitive bandwidth and affinities
-        perceived_world = perceived_world * agent_affinities.to(device)
-
-        # ---------------------------------
-        # 4. Attention Computation
-        # ---------------------------------
-        attention_weights, engagement_scores = self.calculate_attention(
-            exposures,
-            personalities,
-            perceived_world,
-            is_personal,
         )
-
-        # ---------------------------------
-        # 5. Stress Bias
-        # ---------------------------------
-        attention_weights = self.apply_stress_bias(
-            attention_weights,
-            personalities,
-            urgency,
-        )
-
-        # ---------------------------------
-        # 6. Context Construction
-        # ---------------------------------
-        residual_gain = getattr(self.config, "attention_residual_gain", 0.35)
-        modulated_gain = getattr(self.config, "attention_modulated_gain", 1.0)
-        context_scale = residual_gain + (attention_weights * modulated_gain)
-        
-        context_vector = perceived_world * context_scale
-        
-        # Restore energy norm to prevent signal attenuation
-        original_norm = torch.norm(perceived_world, dim=1, keepdim=True)
-        new_norm = torch.norm(context_vector, dim=1, keepdim=True) + 1e-9
-        context_vector = context_vector * (original_norm / new_norm)
-        
-        context_vector = torch.clamp(context_vector, -2.0, 2.0)
 
         return context_vector, attention_weights, engagement_scores
 

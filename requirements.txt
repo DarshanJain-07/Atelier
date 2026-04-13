@@ -14,3 +14,5 @@ requests
 scikit-learn
 python-louvain
 aiohttp
+pytest
+umap-learn

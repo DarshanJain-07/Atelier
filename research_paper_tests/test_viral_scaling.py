@@ -92,7 +92,7 @@ def test_generate_viral_scaling_figure(tmp_path):
     )
     ax1.axhline(
         max_allowed,
-        color=PAPER_PALETTE["tertiary"],
+        color=PAPER_PALETTE["neutral"],
         linestyle="--",
         label="Configured cap",
     )

@@ -829,7 +829,7 @@ def test_generate_research_paper_summary_figure(tmp_path):
         [0.0, 1.0],
         [0.0, 1.0],
         linestyle="--",
-        color=PAPER_PALETTE["reference"],
+        color=PAPER_PALETTE["neutral"],
         linewidth=1.5,
         label="Perfect equality",
     )
@@ -1071,7 +1071,7 @@ def test_generate_research_paper_summary_figure(tmp_path):
     )
     ax.axhline(
         fresh_result.engagement_scores.mean().item(),
-        color=PAPER_PALETTE["tertiary"],
+        color=PAPER_PALETTE["neutral"],
         linestyle=":",
         linewidth=2,
         label="Fresh new threat",
@@ -1151,7 +1151,7 @@ def test_generate_research_paper_summary_figure(tmp_path):
     )
     ax.axhline(
         1.0 + virality_config.max_viral_multiplier,
-        color=PAPER_PALETTE["tertiary"],
+        color=PAPER_PALETTE["neutral"],
         linestyle="--",
         linewidth=2,
         label="Configured cap",
@@ -1313,7 +1313,7 @@ def test_generate_research_paper_advanced_visualizations(tmp_path):
     )
     ax4.axvline(
         fairness_mean,
-        color=PAPER_PALETTE["tertiary"],
+        color=PAPER_PALETTE["neutral"],
         linestyle="--",
         linewidth=2,
     )

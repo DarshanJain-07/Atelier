@@ -8,34 +8,28 @@ PAPER_FIGSIZE = (10, 8)
 PAPER_DPI = 220
 
 PAPER_PALETTE = {
-    "primary": "#2f6f9f",    # ordered data color 1
-    "secondary": "#d9822b",  # ordered data color 2
-    "tertiary": "#4c956c",   # ordered data color 3
-    "accent": "#7b5ea7",     # ordered data color 4
-    "highlight": "#c44e52",  # ordered data color 5
-    "muted": "#6c757d",      # ordered data color 6
-    "sand": "#c9a66b",       # ordered data color 7
-    "reference": "#d8dee9",
-    "dark": "#2e3440",
-    "light": "#f7f8fa",
+    "primary": "#1565C0",
+    "secondary": "#EF6C00",
+    "light": "#6A1B9A",
+    "positive": "#2E7D32",
+    "neutral": "#757575",
+    "negative": "#C62828",
 }
 
 PAPER_COLOR_SEQUENCE = [
     PAPER_PALETTE["primary"],
     PAPER_PALETTE["secondary"],
-    PAPER_PALETTE["tertiary"],
-    PAPER_PALETTE["accent"],
-    PAPER_PALETTE["highlight"],
-    PAPER_PALETTE["muted"],
-    PAPER_PALETTE["sand"],
+    PAPER_PALETTE["positive"],
+    PAPER_PALETTE["neutral"],
+    PAPER_PALETTE["negative"],
 ]
 
 CATEGORICAL_COLORS = PAPER_COLOR_SEQUENCE
 
 SENTIMENT_COLORS = [
-    PAPER_PALETTE["primary"],
-    PAPER_PALETTE["secondary"],
-    PAPER_PALETTE["tertiary"],
+    PAPER_PALETTE["negative"],
+    PAPER_PALETTE["neutral"],
+    PAPER_PALETTE["positive"],
 ]
 
 COMPARISON_COLORS = [
@@ -45,7 +39,7 @@ COMPARISON_COLORS = [
 
 PAPER_DIVERGING_CMAP = LinearSegmentedColormap.from_list(
     "paper_diverging",
-    [PAPER_PALETTE["primary"], PAPER_PALETTE["light"], PAPER_PALETTE["secondary"]],
+    [PAPER_PALETTE["negative"], PAPER_PALETTE["light"], PAPER_PALETTE["positive"]],
 )
 
 
@@ -58,7 +52,7 @@ def apply_paper_style():
             "axes.titlesize": 16,
             "axes.titleweight": "semibold",
             "axes.labelsize": 12,
-            "axes.labelcolor": PAPER_PALETTE["dark"],
+            "axes.labelcolor": PAPER_PALETTE["primary"],
             "xtick.labelsize": 10,
             "ytick.labelsize": 10,
             "legend.fontsize": 10,
@@ -66,9 +60,9 @@ def apply_paper_style():
             "axes.grid": True,
             "axes.axisbelow": True,
             "grid.alpha": 0.18,
-            "grid.color": PAPER_PALETTE["reference"],
+            "grid.color": PAPER_PALETTE["light"],
             "grid.linestyle": "--",
-            "axes.edgecolor": PAPER_PALETTE["reference"],
+            "axes.edgecolor": PAPER_PALETTE["light"],
             "axes.facecolor": "white",
             "figure.facecolor": "white",
             "savefig.facecolor": "white",
@@ -92,8 +86,8 @@ def style_axis(ax, title=None, xlabel=None, ylabel=None):
         ax.set_xlabel(xlabel)
     if ylabel:
         ax.set_ylabel(ylabel)
-    ax.tick_params(axis="both", colors=PAPER_PALETTE["dark"])
-    ax.grid(True, alpha=0.18, linestyle="--", color=PAPER_PALETTE["reference"])
+    ax.tick_params(axis="both", colors=PAPER_PALETTE["primary"])
+    ax.grid(True, alpha=0.18, linestyle="--", color=PAPER_PALETTE["light"])
     return ax
 
 

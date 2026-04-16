@@ -259,6 +259,10 @@ class SimConfig:
     )
     memory_social_rehearsal_gain: float = 0.4 # Stage 2: Social Consolidation
 
+    # --- Hybrid Attention (Local + Global) ---
+    use_hybrid_attention: bool = False
+    hybrid_attention_global_weight: float = 0.2
+
     # --- Algorithmic Amplification (2-Pass Filter Bubble) ---
     use_algorithmic_amplification: bool = False
     algo_sample_size: float = 0.1  # Fraction of population used for initial A/B test

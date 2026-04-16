@@ -228,6 +228,30 @@ class AttentionContext:
         
         return self
 
+    def hybrid_attention_layer(self):
+        """
+        Inspired by Gemma's hybrid local/global attention.
+        Blends the individual agent's attention query (local) with
+        the society's mean attention query (global) to simulate
+        a broader context awareness (attending to the global zeitgeist).
+        """
+        if not getattr(self.config, "use_hybrid_attention", False):
+            return self
+            
+        if self.Q is None:
+            raise ValueError("hybrid_attention_layer called before Q is initialized")
+
+        global_weight = getattr(self.config, "hybrid_attention_global_weight", 0.2)
+        
+        # Local attention: The agent's current specific Query state (self.Q)
+        # Global attention: The society's mean Query state
+        Q_global = self.Q.mean(dim=0, keepdim=True)
+        
+        # Blend local and global
+        self.Q = (1.0 - global_weight) * self.Q + global_weight * Q_global
+        
+        return self
+
     def key_processing_layer(self):
         personalities = self.personalities
         neuroticism = personalities[:, 4:5]

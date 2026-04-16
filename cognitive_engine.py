@@ -151,6 +151,7 @@ class CognitiveEngine:
             .logic_consistency_layer()
             .personal_event_layer()
             .selective_exposure_layer()
+            .hybrid_attention_layer()
             .key_processing_layer()
             .cross_dimension_layer()
             .relevance_layer()

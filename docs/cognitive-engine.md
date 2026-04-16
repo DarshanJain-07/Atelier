@@ -30,6 +30,7 @@ Before an agent reacts, the signal passes through a modular attention pipeline t
 - **RDE Layer**: Filtering based on relative deprivation/enhancement.
 - **Logic Consistency**: Detecting discrepancies (Skepticism).
 - **Selective Exposure**: Blocking contradicting information (Filter Bubbles).
+- **Hybrid Attention**: Blending local individual attention with global societal attention.
 
 *See the [Attention Context (Gates)](./attention-context.md) documentation for full layer-by-layer architectural details.*
 

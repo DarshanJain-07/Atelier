@@ -119,6 +119,8 @@ The request body is modeled by `SimulationRequest`:
 
 | Field | Meaning |
 | --- | --- |
+| `use_hybrid_attention` | Enables hybrid local/global attention blending. |
+| `hybrid_attention_global_weight` | Blending ratio for the global societal mean attention. |
 | `cross_dim_interaction_strength` | Coupling strength across world dimensions. |
 | `threat_sensitivity_gain` | Amplifies negative-signal perception. |
 | `k_processing_tanh_gain` | Controls nonlinearity in key processing. |

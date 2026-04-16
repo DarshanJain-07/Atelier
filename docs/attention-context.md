@@ -38,6 +38,13 @@ Implements **Confirmation Bias**. If an event fundamentally contradicts an agent
 - **Trigger**: Activated if $CosineSimilarity(Worldview, Event) < ToleranceThreshold$.
 - **Modulation**: Agents with high **Openness** have a lower (more tolerant) threshold.
 
+### V. Hybrid Attention Layer
+Blends the individual agent's specific query with the societal mean query to simulate awareness of the broader context or "zeitgeist" (inspired by local/global attention mechanisms).
+
+$$Q_{hybrid} = (1 - \gamma) \cdot Q_{local} + \gamma \cdot Q_{global}$$
+
+- **Modulation**: The blending ratio ($\gamma$) is controlled by `hybrid_attention_global_weight`.
+
 ---
 
 ## 2. Key Processing & Threat Sensitivity

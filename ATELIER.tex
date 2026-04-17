@@ -26,7 +26,32 @@
 
 \begin{document}
 
-\title{ATELIER: A Hybrid Neuro-Symbolic Framework for Simulating Public Sentiment Dynamics, Polarization, and Narrative Backlash}
+\begin{titlepage}
+\centering
+\vspace*{\fill}
+
+{\Large \textbf{Title:}\\
+\textbf {ATELIER: A Hybrid Neuro-Symbolic Multi-Agent Framework for Predicting Public Sentiment Dynamics, Emotional Contagion, and Backlash in Digital Ecosystems} \par}
+
+\vspace*{\fill}
+
+{\Large \textbf{Applicant:}\\
+SVKM DWARKADAS J SANGHVI COLLEGE OF ENGINEERING\par}
+
+\vspace*{\fill}
+
+{\Large \textbf{Name of Authors:}\\
+Deepali Patil \\
+Darshan Jain \\
+Atharva Nagarsekar \\
+Atharva Patkar \\
+Vinayak Mestry \\
+Aryan More \par}
+
+\vspace*{\fill}
+\end{titlepage}
+
+\title{ATELIER: A Hybrid Neuro-Symbolic Multi-Agent Framework for Predicting Public Sentiment Dynamics, Emotional Contagion, and Backlash in Digital Ecosystems}
 
 \author{\IEEEauthorblockN{Darshan Jain, Atharva Nagarsekar, Atharva Patkar, \\
 Vinayak Mestry, Aryan More, and Deepali Patil}
@@ -56,23 +81,7 @@ Most of the prevalent sentiment analysis approaches solve a limited task that mi
 
 ATELIER solves this problem by means of a unified pipeline. Initially, the language model builds a world according to the description of the event in question. The next step is feeding the built world into the deterministic PyTorch pipeline which simulates a virtual society made up of various characters distinguished by personalities, possessions, influence, positions within society, memories, and neighbors.
 
-This research does not pretend to solve any sociological problems using the computer simulation. Instead, the goal of this paper is to suggest a systems design that relies on mechanics and code. Namely, stress testing is provided for all sorts of entities at once.
-\section{Literature Review}
-\label{sec:literature}
-
-ATELIER places itself at the crossroads of multiple well-established research areas.
-
-The classical tradition of sentiment analysis, later supplemented by transformer-based techniques, has made considerable progress in the classification of affective content in textual data \cite{yadollahi2016review}. Yet, these approaches are post hoc and centered around documents. They detect the sentiment of an utterance but ignore the differentiated reactions of members of a structured society.
-
-Studies of opinion dynamics and computational sociology, spanning many years now, address the problems of consensus, fragmentation, and contagion using graph theory and physics-like mathematical formalisms \cite{castellano2009statistical}. These are important in that they make interaction network structure, thresholds, and collective behavior explicit; still, these approaches usually consider opinions, not events, as the basis of simulations.
-
-More recently, research has used large language models for generating social agents. As shown by Generative Agents \cite{park2023generative} and S$^3$ \cite{gao2023s3}, LLMs have the capacity to generate socially-rich multi-agent behaviors. This is a promising feature, albeit one associated with high costs, stochasticity, and lack of transparency inherent to token-level agent simulations.
-
-Echo chamber and platform filtering studies prove that topology and recommendation systems matter for diffusion processes and polarization phenomena \cite{cinelli2021echo}. This stream of research motivates ATELIER’s focus on topology, triadic closure, selective exposure, and amplification mechanisms.
-
-Lastly, concept-level and neuro-symbolic sentiment analyses indicate that structured knowledge can contribute to model interpretability compared to end-to-end pipelines \cite{cambria2022senticnet}. We apply this insight not only to sentiment detection but to the full simulation of reactions among populations. Architecturally, ATELIER is inspired by the attention mechanism \cite{vaswani2017attention}, although we redefine its key ingredients in sociological terms such as deprivation, threat, worldview consistency, and personality-matched relevance.
-
-Our placement is strategic. ATELIER does not intend to replace LLMs with prescriptive rules and does not rely on LLMs in simulating each agent separately. It uses an LLM only once at the semantic interface and resorts to explicit tensor mathematics to enable scalability and predictability.
+This research does not aim to solve any sociological problems using the computer simulation. Instead, the goal of this paper is to suggest a systems design that relies on mechanics and code. Namely, stress testing is provided for all sorts of entities at once.
 
 \section{System Architecture}
 \label{sec:architecture}
@@ -166,11 +175,6 @@ where $g$ is a configured gain parameter. The filtered query is therefore
 \mathbf{Q}_i^{(1)} = \mathbf{Q}_i^{(0)}(1-S_i).
 \end{equation}
 Low-openness agents suppress contradictory events more strongly, while high-openness agents retain more of the signal.
-
-Following selective exposure, a hybrid attention layer optionally blends the individual agent's query with the global societal mean to simulate awareness of the broader context or ``zeitgeist.'' With a global weight $\gamma$, the updated query becomes:
-\begin{equation}
-\mathbf{Q}_i^{(2)} = (1-\gamma)\mathbf{Q}_i^{(1)} + \gamma \frac{1}{N}\sum_{j=1}^N \mathbf{Q}_j^{(1)}.
-\end{equation}
 
 After further key processing based on threats, interaction in different dimensions, thermal regulation, and engagement gating, the model produces an agent context vector. The underlying idea here is that the Q–K architecture is not simply being used as a neural analogy but rather re-purposed as a framework for deprivation, confirmation bias, and salience.
 
@@ -403,30 +407,5 @@ ATELIER goes beyond document-level sentiment classification by integrating struc
 Despite being at early stages of development, the framework allows for the demonstration of a methodological contribution that could be of interest to many researchers. Namely, ATELIER provides a mechanism of creating population with unequal class structure and local neighborhoods, differentiating reactions via mechanisms of deprivation, selective exposure, stress, and memory, and producing metrics such as virality, polarization, elites' divergence, and collective action. All this allows us to test scenarios ex-ante without implementing any change in reality. For instance, policymakers would be able to see how their announcement would be interpreted by certain classes in terms of fear/anger, communication specialists would be able to choose the most effective way of framing the upcoming news, while platforms would be able to test amplification rules in advance.
 
 Nevertheless, our next step is external calibration through better empirical benchmarking, more complex scenarios, and stronger parameter estimation. Prior to the calibration process, however, ATELIER offers much to research from an experimental perspective as well.
-
-\begin{thebibliography}{00}
-
-\bibitem{yadollahi2016review}
-A. Yadollahi, A. G. Shahraki, and O. R. Zaiane, ``Current state of text sentiment analysis from opinion to emotion mining,'' \textit{ACM Computing Surveys}, vol. 50, no. 2, 2017.
-
-\bibitem{castellano2009statistical}
-C. Castellano, S. Fortunato, and V. Loreto, ``Statistical physics of social dynamics,'' \textit{Reviews of Modern Physics}, vol. 81, no. 2, pp. 591--646, 2009.
-
-\bibitem{park2023generative}
-J. S. Park, J. O'Brien, C. J. Cai, M. R. Morris, P. Liang, and M. S. Bernstein, ``Generative agents: Interactive simulacra of human behavior,'' in \textit{Proceedings of the 36th Annual ACM Symposium on User Interface Software and Technology}, 2023.
-
-\bibitem{gao2023s3}
-C. Gao, X. Lan, Z. Lu, and collaborators, ``S$^3$: Social-network simulation system with large language model-empowered agents,'' \textit{arXiv preprint arXiv:2307.14984}, 2023.
-
-\bibitem{cinelli2021echo}
-M. Cinelli, G. D. F. Morales, A. Galeazzi, W. Quattrociocchi, and M. Starnini, ``The echo chamber effect on social media,'' \textit{Proceedings of the National Academy of Sciences}, vol. 118, no. 9, 2021.
-
-\bibitem{cambria2022senticnet}
-E. Cambria, Q. Liu, S. Decherchi, F. Xing, and K. Kwok, ``SenticNet 7: A commonsense-based neurosymbolic AI framework for explainable sentiment analysis,'' \textit{Proceedings of LREC-COLING}, 2024.
-
-\bibitem{vaswani2017attention}
-A. Vaswani, N. Shazeer, N. Parmar, J. Uszkoreit, L. Jones, A. N. Gomez, {\L}. Kaiser, and I. Polosukhin, ``Attention is all you need,'' in \textit{Advances in Neural Information Processing Systems}, vol. 30, 2017.
-
-\end{thebibliography}
 
 \end{document}

@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from typing import Optional
 
 import torch
 import torch.nn.functional as F
@@ -19,8 +18,8 @@ class BacklashDecision:
     skeptical_energy: float
     official_energy: float
     backlash_potential: float
-    sample_indices: Optional[torch.Tensor] = None
-    sample_context: Optional[torch.Tensor] = None
+    sample_indices: torch.Tensor | None = None
+    sample_context: torch.Tensor | None = None
 
     def as_dict(self) -> dict[str, float | int | bool | str]:
         return {
@@ -44,11 +43,9 @@ class CognitiveEngine:
         event_signal: torch.Tensor,  # (12,)
         personality: torch.Tensor,  # (N,5)
     ) -> torch.Tensor:
-        """
-        Continuous stochastic signal distortion.
+        """Continuous stochastic signal distortion.
         Respects self.config.use_signal_distortion.
         """
-
         device = event_signal.device
         N = personality.shape[0]
 
@@ -58,7 +55,7 @@ class CognitiveEngine:
 
         # --- Sample continuous distortion magnitude ---
         beta_dist = torch.distributions.Beta(
-            self.config.distortion_beta_a, self.config.distortion_beta_b
+            self.config.distortion_beta_a, self.config.distortion_beta_b,
         )
 
         alpha = beta_dist.sample((N,)).to(device)
@@ -80,7 +77,7 @@ class CognitiveEngine:
         # Scale distortion magnitude by the signal strength to prevent
         # overwhelming small signals with large additive noise.
         signal_magnitude = torch.norm(event_signal, p=2)
-        
+
         # Ensure alpha scales with signal strength (multiplicative noise effect)
         alpha = alpha * signal_magnitude
 
@@ -91,7 +88,7 @@ class CognitiveEngine:
     def apply_social_consensus(
         self,
         distorted_world: torch.Tensor,
-        adjacency_matrix: Optional[torch.Tensor] = None,
+        adjacency_matrix: torch.Tensor | None = None,
     ) -> torch.Tensor:
         if (
             adjacency_matrix is None
@@ -108,7 +105,7 @@ class CognitiveEngine:
         self,
         world_tensor_raw: torch.Tensor,
         personalities: torch.Tensor,
-        adjacency_matrix: Optional[torch.Tensor] = None,
+        adjacency_matrix: torch.Tensor | None = None,
     ) -> torch.Tensor:
         distorted_world = self.distort_signal(
             world_tensor_raw.squeeze().to(personalities.device),
@@ -131,11 +128,9 @@ class CognitiveEngine:
         world_tensor: torch.Tensor,
         is_personal: bool,
     ) -> tuple[torch.Tensor, torch.Tensor]:
-        """
-        Runs modular attention pipeline.
+        """Runs modular attention pipeline.
         Returns: (attention_weights, raw_energy)
         """
-
         ctx = AttentionContext(
             exposures=exposures,
             personalities=personalities,
@@ -171,13 +166,10 @@ class CognitiveEngine:
         attention_weights = F.softmax(ctx.relevance * 5.0, dim=1)
         return attention_weights, raw_energy
 
-    #
     def apply_stress_bias(self, attention_weights, personality, urgency):
-        """
-        Stress-Induced Cognitive Bias.
+        """Stress-Induced Cognitive Bias.
         Personality-dependent amplification and conformity under urgency.
         """
-
         threshold = self.config.stress_activation_threshold
 
         if not self.config.use_time_pressure or urgency < threshold:
@@ -195,7 +187,7 @@ class CognitiveEngine:
                 self.config.stress_gain * (urgency - threshold),
                 dtype=torch.float32,
                 device=attention_weights.device,
-            )
+            ),
         )  # (N,1)
 
         biased = attention_weights.clone()
@@ -248,8 +240,8 @@ class CognitiveEngine:
         world_tensor_raw: torch.Tensor,
         personalities: torch.Tensor,
         agent_affinities: torch.Tensor,
-        agent_memory: Optional[torch.Tensor] = None,
-        adjacency_matrix: Optional[torch.Tensor] = None,
+        agent_memory: torch.Tensor | None = None,
+        adjacency_matrix: torch.Tensor | None = None,
     ) -> torch.Tensor:
         device = personalities.device
 
@@ -265,7 +257,7 @@ class CognitiveEngine:
             fatigue_mask = torch.clamp(alignment, min=0.0)
             fatigue_penalty = 1.0 - torch.exp(
                 -fatigue_mask
-                * getattr(self.config, "memory_desensitization_gain", 2.0)
+                * getattr(self.config, "memory_desensitization_gain", 2.0),
             )
 
             threat_mask = (distorted_world < 0).float()
@@ -310,8 +302,8 @@ class CognitiveEngine:
         exposures: torch.Tensor,
         personalities: torch.Tensor,
         agent_affinities: torch.Tensor,
-        agent_memory: Optional[torch.Tensor] = None,
-        adjacency_matrix: Optional[torch.Tensor] = None,
+        agent_memory: torch.Tensor | None = None,
+        adjacency_matrix: torch.Tensor | None = None,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         perceived_world = self.prepare_perceived_world(
             world_tensor_raw,
@@ -357,15 +349,15 @@ class CognitiveEngine:
     def run_backlash_ab_test(
         self,
         world_tensor_off: torch.Tensor,
-        world_tensor_skp: Optional[torch.Tensor],
+        world_tensor_skp: torch.Tensor | None,
         backlash_potential: float,
         urgency: float,
         is_personal: bool,
         exposures: torch.Tensor,
         personalities: torch.Tensor,
         agent_affinities: torch.Tensor,
-        agent_memory: Optional[torch.Tensor] = None,
-        adjacency_matrix: Optional[torch.Tensor] = None,
+        agent_memory: torch.Tensor | None = None,
+        adjacency_matrix: torch.Tensor | None = None,
     ) -> BacklashDecision:
         default_decision = BacklashDecision(
             world_tensor=world_tensor_off,
@@ -449,7 +441,7 @@ class CognitiveEngine:
 
         triggered = bool(
             skeptical_energy
-            > official_energy * self.config.backlash_decision_threshold
+            > official_energy * self.config.backlash_decision_threshold,
         )
         chosen_frame = "skeptical" if triggered else "official"
         chosen_world = world_tensor_skp if triggered else world_tensor_off
@@ -477,18 +469,18 @@ class CognitiveEngine:
         exposures: torch.Tensor,
         personalities: torch.Tensor,
         agent_affinities: torch.Tensor,
-        agent_memory: Optional[torch.Tensor] = None,
-        adjacency_matrix: Optional[torch.Tensor] = None,
+        agent_memory: torch.Tensor | None = None,
+        adjacency_matrix: torch.Tensor | None = None,
     ):
-        """
-        Full cognitive simulation pipeline.
+        """Full cognitive simulation pipeline.
+
         Returns:
             context_vector: (N, 12)
             attention_weights: (N, 12)
             engagement_scores: (N,)
             updated_memory: (N, 12) or None
-        """
 
+        """
         context_vector, attention_weights, engagement_scores = (
             self.simulate_frame_response(
                 world_tensor_raw,
@@ -510,8 +502,7 @@ class CognitiveEngine:
         context_vector: torch.Tensor,
         social_rehearsal_factor: float = 0.0,
     ) -> torch.Tensor:
-        """
-        Stage 2 Memory Consolidation: Social Rehearsal.
+        """Stage 2 Memory Consolidation: Social Rehearsal.
         The decay rate is reduced if the event is globally viral/rehearsed.
         """
         if not getattr(self.config, "use_agent_memory", False):
@@ -520,14 +511,14 @@ class CognitiveEngine:
         device = agent_memory.device
         base_decay = getattr(self.config, "memory_decay_rate", 0.7)
         rehearsal_gain = getattr(self.config, "memory_social_rehearsal_gain", 0.4)
-        
-        # Effective decay: 
+
+        # Effective decay:
         # If rehearsal is high, the memory 'sticks' (decay -> 1.0)
         # If rehearsal is low, the memory fades (decay -> base_decay)
         # We blend the base decay with a higher persistence factor.
         effective_decay = base_decay + (1.0 - base_decay) * (social_rehearsal_factor * rehearsal_gain)
         effective_decay = min(0.99, effective_decay)
-        
+
         # Consolidation Update
         updated_memory = (agent_memory.to(device) * effective_decay) + context_vector.to(device)
         return updated_memory

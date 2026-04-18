@@ -20,7 +20,7 @@ def test_triadic_closure_increases_average_clustering():
     np.random.seed(settings["numpy_seed"])
     exposures = torch.randn(backbone_config.num_agents, WORLD_DIMENSION_COUNT)
     personalities = torch.sigmoid(
-        torch.randn(backbone_config.num_agents, PERSONALITY_TRAIT_COUNT)
+        torch.randn(backbone_config.num_agents, PERSONALITY_TRAIT_COUNT),
     )
     influence = np.random.lognormal(
         mean=settings["influence_mean"],
@@ -29,7 +29,7 @@ def test_triadic_closure_increases_average_clustering():
     )
 
     backbone = create_topology_for_debug(
-        backbone_config, exposures, personalities, influence
+        backbone_config, exposures, personalities, influence,
     )
     refined = apply_triadic_closure_for_debug(closure_config, backbone)
 

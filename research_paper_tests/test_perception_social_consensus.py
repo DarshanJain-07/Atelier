@@ -23,7 +23,7 @@ def test_social_consensus_aligns_neighbor_perceptions(tmp_path):
     world = build_world(settings["world"])
 
     baseline_config = get_test_scenario("perception_social_consensus_baseline").sim_config(
-        num_agents=config.num_agents
+        num_agents=config.num_agents,
     )
     baseline = distort_world_signal(
         baseline_config,
@@ -37,5 +37,5 @@ def test_social_consensus_aligns_neighbor_perceptions(tmp_path):
     )
 
     assert average_neighbor_distance(consensus, society.adjacency_matrix) < average_neighbor_distance(
-        baseline, society.adjacency_matrix
+        baseline, society.adjacency_matrix,
     )

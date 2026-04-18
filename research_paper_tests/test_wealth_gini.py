@@ -25,10 +25,10 @@ def test_evolution_increases_wealth_inequality(tmp_path):
     )
 
     baseline_gini = gini(
-        baseline_society.exposures[:, DIMENSION_INDICES["Wealth"]].numpy()
+        baseline_society.exposures[:, DIMENSION_INDICES["Wealth"]].numpy(),
     )
     evolved_gini = gini(
-        evolved_society.exposures[:, DIMENSION_INDICES["Wealth"]].numpy()
+        evolved_society.exposures[:, DIMENSION_INDICES["Wealth"]].numpy(),
     )
 
     # Downstream cognition consumes normalized wealth exposure, so the regression

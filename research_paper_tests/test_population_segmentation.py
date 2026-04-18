@@ -26,8 +26,7 @@ apply_paper_style()
 
 
 def _reconstruct_action_ready_mask(config, society, result) -> np.ndarray:
-    """
-    Mirror the non-topology action gating in physics_engine.aggregate_society().
+    """Mirror the non-topology action gating in physics_engine.aggregate_society().
 
     The debug result exposes per-agent emotions and engagement but not the final
     boolean action mask. Rebuilding the same thresholds here lets us compare
@@ -127,7 +126,7 @@ def _class_stress_profiles(tmp_path: Path):
                         "engagement": float(values["engagement"]),
                         "action_ready_rate": float(values["action_ready_rate"]),
                         "dominant_emotion": str(result.social_state["dominant_emotion"]),
-                    }
+                    },
                 )
 
     return settings, pd.DataFrame(rows), class_order
@@ -191,7 +190,7 @@ def test_generate_population_segmentation_figure(tmp_path):
             )
 
         ax.legend(loc="upper left")
-        
+
         safe_name = dimension_name.lower().replace(" ", "_")
         path = output_dir / f"segmentation_{safe_name}.png"
         save_paper_figure(fig, path)

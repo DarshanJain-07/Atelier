@@ -44,11 +44,11 @@ def test_bimodality_coefficient_detects_polarized_distribution(tmp_path):
                 settings["polarized_std"],
                 settings["polarized_count_per_mode"],
             ),
-        ]
+        ],
     )
     polarized_bc = bimodality_coefficient(polarized)
     normal_bc = bimodality_coefficient(
-        rng.normal(settings["normal_mean"], settings["normal_std"], config.num_agents)
+        rng.normal(settings["normal_mean"], settings["normal_std"], config.num_agents),
     )
     polarized_emotions = zero_emotions(config.num_agents)
     midpoint = config.num_agents // 2

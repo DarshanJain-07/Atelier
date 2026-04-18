@@ -27,7 +27,7 @@ def test_virality_multiplier_stays_bounded_by_config():
     set_emotions(outliers, settings["outlier_emotions"], rows=slice(mainstream_count, None))
 
     consensus_state = aggregate_social_state(
-        config, consensus, influence, engagement_scores=torch.ones(config.num_agents)
+        config, consensus, influence, engagement_scores=torch.ones(config.num_agents),
     )
     outlier_state = aggregate_social_state(
         config,
@@ -37,7 +37,7 @@ def test_virality_multiplier_stays_bounded_by_config():
             [
                 torch.ones(mainstream_count),
                 torch.full((settings["outlier_count"],), settings["boosted_engagement"]),
-            ]
+            ],
         ),
     )
 

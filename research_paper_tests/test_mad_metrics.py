@@ -1,6 +1,8 @@
 import numpy as np
 import torch
+
 from research_paper_tests._metrics import mad_metrics
+
 
 def test_mad_metrics_on_polarized_vs_normal():
     num_agents = 500
@@ -20,7 +22,7 @@ def test_mad_metrics_on_polarized_vs_normal():
         [
             rng.normal(-5.0, 1.0, (midpoint, 1)),
             rng.normal(5.0, 1.0, (num_agents - midpoint, 1)),
-        ]
+        ],
     )
     polarized_tensor = torch.tensor(polarized, dtype=torch.float32)
     # Perfect partition matching the two modes
@@ -37,6 +39,6 @@ def test_mad_metrics_on_polarized_vs_normal():
 
     # In a polarized society, GDR should be significantly > 1
     assert polarized_metrics["gdr"] > 2.0
-    
+
     # In a normal society with random partitions, GDR should be around 1.0
     assert 0.8 < normal_metrics["gdr"] < 1.2

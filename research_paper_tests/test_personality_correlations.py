@@ -30,10 +30,10 @@ def test_generated_personalities_follow_target_correlations(tmp_path):
 
     off_diagonal_mask = ~np.eye(len(target), dtype=bool)
     rmse_to_target = float(
-        np.sqrt(((observed - target).to_numpy()[off_diagonal_mask] ** 2).mean())
+        np.sqrt(((observed - target).to_numpy()[off_diagonal_mask] ** 2).mean()),
     )
     rmse_to_zero = float(
-        np.sqrt((observed.to_numpy()[off_diagonal_mask] ** 2).mean())
+        np.sqrt((observed.to_numpy()[off_diagonal_mask] ** 2).mean()),
     )
 
     observed_pairs = {

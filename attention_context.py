@@ -8,7 +8,7 @@ _DEVICE_CACHE = {}
 
 
 def get_cached_constant(
-    name: str, tensor: torch.Tensor, device: torch.device
+    name: str, tensor: torch.Tensor, device: torch.device,
 ) -> torch.Tensor:
     key = (name, device)
     if key not in _DEVICE_CACHE:
@@ -79,7 +79,7 @@ class AttentionContext:
         activations = torch.cat([O_act, C_act, E_act, A_act, N_act], dim=1)
 
         matrix = get_cached_constant(
-            "PERSONALITY_QUERY_MATRIX", PERSONALITY_QUERY_MATRIX, Q_base.device
+            "PERSONALITY_QUERY_MATRIX", PERSONALITY_QUERY_MATRIX, Q_base.device,
         )
         personality_mod = torch.matmul(activations, matrix)
 
@@ -87,8 +87,7 @@ class AttentionContext:
         return self
 
     def logic_consistency_layer(self):
-        """
-        The 'Skepticism' Cognitive Gate.
+        """The 'Skepticism' Cognitive Gate.
         If there is a massive discrepancy between Short_Term and Long_Term impacts,
         agents with high Openness/Conscientiousness will penalize the Short_Term signal
         and focus on the Long_Term reality (detecting 'too good to be true' flaws).
@@ -99,35 +98,35 @@ class AttentionContext:
         # Indices 10 (Short_Term) and 11 (Long_Term)
         st = self.world_tensor[:, 10:11]
         lt = self.world_tensor[:, 11:12]
-        
+
         # Calculate Logic Gap (discrepancy)
         # If one is very positive and the other very negative, gap is high.
         logic_gap = torch.abs(st - lt)
-        
+
         # Skepticism is driven by Openness (Intellectual) and Conscientiousness (Analytical)
         openness = self.personalities[:, 0:1]
         conscientiousness = self.personalities[:, 1:2]
-        
+
         # We blend them for a 'Skepticism' trait
         skepticism_trait = (openness + conscientiousness) / 2.0
-        
+
         # Sensitivity to the gap
         sensitivity = skepticism_trait * getattr(self.config, "skepticism_gain", 2.0)
-        
+
         # Penalty applies if the gap is significant
         gap_threshold = getattr(self.config, "logic_gap_threshold", 0.5)
-        
+
         # Probability of detecting the flaw (Sigmoid response)
         detection_prob = torch.sigmoid(sensitivity * (logic_gap - gap_threshold))
-        
+
         # Apply suppression to Short_Term attention (Index 10)
         # Higher detection_prob -> lower attention on Short_Term
         new_Q = self.Q.clone()
         new_Q[:, 10:11] = new_Q[:, 10:11] * (1.0 - (detection_prob * 0.85))
-        
+
         # Boost attention on Long_Term (Index 11) to focus on the 'hidden' reality
         new_Q[:, 11:12] = new_Q[:, 11:12] * (1.0 + (detection_prob * 0.6))
-        
+
         self.Q = new_Q
         return self
 
@@ -168,37 +167,36 @@ class AttentionContext:
         return self
 
     def selective_exposure_layer(self):
-        """
-        The 'Triple-Filter-Bubble' Cognitive Gate.
+        """The 'Triple-Filter-Bubble' Cognitive Gate.
         If the event fundamentally contradicts the agent's core values, and they have low Openness,
         they will strongly suppress it (Confirmation Bias).
         """
         if getattr(self.config, "use_selective_exposure", True) is False:
             return self
-            
+
         if self.Q is None:
             raise ValueError("selective_exposure_layer called before Q is initialized")
 
         # Normalize the incoming event (World Tensor) and the agent's worldview (Exposures)
         # Note: self.world_tensor is (N, 12) because of signal distortion
         event_norm = self.world_tensor / (torch.norm(self.world_tensor, dim=1, keepdim=True) + 1e-8)
-        
+
         # We use a copy of the original exposures to represent their deep-seated worldview
         # self.exposures is (N, 12)
         agent_norms = self.exposures / (torch.norm(self.exposures, dim=1, keepdim=True) + 1e-8)
-        
+
         # Cosine Similarity between agent worldview and the event per agent
         # Element-wise multiplication followed by sum along dimension 1 -> Shape: (N, 1)
         alignment = (agent_norms * event_norm).sum(dim=1, keepdim=True)
-        
+
         # Agents with low Openness are more likely to filter out opposing views
         openness = self.personalities[:, 0:1]
 
         base_tolerance = getattr(
-            self.config, "selective_exposure_base_tolerance", -0.3
+            self.config, "selective_exposure_base_tolerance", -0.3,
         )
         openness_factor = getattr(
-            self.config, "selective_exposure_openness_factor", 0.4
+            self.config, "selective_exposure_openness_factor", 0.4,
         )
         gain = getattr(self.config, "selective_exposure_gain", 8.0)
         max_suppression = torch.clamp(
@@ -225,31 +223,30 @@ class AttentionContext:
         suppression = max_suppression * torch.sigmoid(gain * suppression_pressure)
 
         self.Q = self.Q * (1.0 - suppression)
-        
+
         return self
 
     def hybrid_attention_layer(self):
-        """
-        Inspired by Gemma's hybrid local/global attention.
+        """Inspired by Gemma's hybrid local/global attention.
         Blends the individual agent's attention query (local) with
         the society's mean attention query (global) to simulate
         a broader context awareness (attending to the global zeitgeist).
         """
         if not getattr(self.config, "use_hybrid_attention", False):
             return self
-            
+
         if self.Q is None:
             raise ValueError("hybrid_attention_layer called before Q is initialized")
 
         global_weight = getattr(self.config, "hybrid_attention_global_weight", 0.2)
-        
+
         # Local attention: The agent's current specific Query state (self.Q)
         # Global attention: The society's mean Query state
         Q_global = self.Q.mean(dim=0, keepdim=True)
-        
+
         # Blend local and global
         self.Q = (1.0 - global_weight) * self.Q + global_weight * Q_global
-        
+
         return self
 
     def key_processing_layer(self):
@@ -275,7 +272,7 @@ class AttentionContext:
 
         influence = Q * self.config.cross_dim_interaction_strength
         matrix = get_cached_constant(
-            "CROSS_DIM_INTERACTIONS", CROSS_DIM_INTERACTIONS, Q.device
+            "CROSS_DIM_INTERACTIONS", CROSS_DIM_INTERACTIONS, Q.device,
         )
         Q_cross = torch.matmul(influence, matrix)
 
@@ -348,7 +345,7 @@ class AttentionContext:
         energy = torch.norm(self.relevance, dim=1, keepdim=True)
 
         engagement = torch.sigmoid(
-            self.config.engagement_gain * (energy - self.config.engagement_threshold)
+            self.config.engagement_gain * (energy - self.config.engagement_threshold),
         )
 
         self.relevance = self.relevance * engagement

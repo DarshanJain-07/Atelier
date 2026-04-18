@@ -40,7 +40,7 @@ def apply_random_mutations(exposures, personality_logits, temperature, seed):
         col_indices = torch.randint(0, num_dims, (len(mutant_indices),), generator=rng)
         # Use normal distribution for mutations to preserve bell curve
         random_values = torch.clamp(
-            torch.randn(len(mutant_indices), generator=rng) * 0.4, -1.0, 1.0
+            torch.randn(len(mutant_indices), generator=rng) * 0.4, -1.0, 1.0,
         )
         exposures[mutant_indices, col_indices] = random_values
 
@@ -99,8 +99,7 @@ def generate_structural_wealth(
     temperature,
     seed,
 ):
-    """
-    Generate raw wealth before topology exists.
+    """Generate raw wealth before topology exists.
 
     Wealth is driven by influence, productive traits, and a gated elite tail.
     """
@@ -166,7 +165,7 @@ def _select_bridge_agents(
     wealthy_candidates = np.argsort(wealth_percentile)[-wealthy_slots:]
     influence_candidates = np.argsort(influence_percentile)[-influence_slots:]
     candidate_indices = np.unique(
-        np.concatenate([wealthy_candidates, influence_candidates], axis=0)
+        np.concatenate([wealthy_candidates, influence_candidates], axis=0),
     )
 
     open_candidates = candidate_indices[openness[candidate_indices] >= 0.55]
@@ -184,8 +183,7 @@ def _select_bridge_agents(
 # Structure Builder (Wealth/Influence First)
 # ================================
 def apply_triadic_closure(config: SimConfig, adj: torch.Tensor, device: torch.device):
-    """
-    Stage 2: Community Cohesion via Iterative Triadic Closure.
+    """Stage 2: Community Cohesion via Iterative Triadic Closure.
     Forms new edges between neighbors-of-neighbors (A->B, B->C => A->C).
     """
     if not getattr(config, "triadic_closure_prob", 0.0) > 0:
@@ -194,7 +192,7 @@ def apply_triadic_closure(config: SimConfig, adj: torch.Tensor, device: torch.de
     N = config.num_agents
     prob = config.triadic_closure_prob
     iterations = getattr(config, "triadic_closure_iterations", 1)
-    
+
     current_adj = adj.coalesce()
 
     # Get features for similarity filtering
@@ -209,53 +207,53 @@ def apply_triadic_closure(config: SimConfig, adj: torch.Tensor, device: torch.de
         indices = current_adj.indices()
         vals = torch.ones_like(current_adj.values())
         binary_adj = torch.sparse_coo_tensor(indices, vals, size=(N, N)).coalesce()
-        
+
         # Paths of length 2
         paths_2 = torch.sparse.mm(binary_adj, binary_adj).coalesce()
-        
+
         p2_indices = paths_2.indices()
         p2_values = paths_2.values()
-        
+
         # 2. Filter: Remove self-loops and existing edges
         # We only want NEW edges
         mask_self = p2_indices[0] != p2_indices[1]
-        
+
         # Sample based on triadic_closure_prob
         sample_mask = torch.rand(len(p2_values), device=device) < prob
         valid_mask = mask_self & sample_mask
-        
+
         if not valid_mask.any():
             break
-            
+
         candidate_indices = p2_indices[:, valid_mask]
-        
+
         if features_norm is not None:
             # Assign weights based on actual similarity
             src_features = features_norm[candidate_indices[0]]
             dst_features = features_norm[candidate_indices[1]]
             new_similarities = (src_features * dst_features).sum(dim=1)
-            
+
             # Filter: Only keep new edges that meet a minimum homophily threshold
             homophily_threshold = getattr(config, "triadic_closure_homophily_threshold", 0.45)
             homophily_filter = new_similarities > homophily_threshold
-            
+
             final_valid_mask = homophily_filter
             if not final_valid_mask.any():
                 continue
-                
+
             final_new_indices = candidate_indices[:, final_valid_mask]
             final_new_values = new_similarities[final_valid_mask]
         else:
             # Fallback if no features available
             final_new_indices = candidate_indices
             final_new_values = torch.full((final_new_indices.shape[1],), current_adj.values().mean(), device=device)
-        
+
         # 3. Merge with original backbone
         combined_indices = torch.cat([current_adj.indices(), final_new_indices], dim=1)
         combined_values = torch.cat([current_adj.values(), final_new_values])
-        
+
         current_adj = torch.sparse_coo_tensor(combined_indices, combined_values, size=(N, N), device=device).coalesce()
-        
+
         # Cap connections to prevent exploding density
         if current_adj._nnz() > N * getattr(config, "max_connections", 100):
             break
@@ -269,8 +267,7 @@ def create_topology(
     influence_scores: np.ndarray,
     raw_wealth: np.ndarray | None = None,
 ):
-    """
-    Wealth/influence-first echo chamber construction.
+    """Wealth/influence-first echo chamber construction.
     """
     N = config.num_agents
     if N <= 1:
@@ -290,7 +287,7 @@ def create_topology(
     wealth_percentile = percentile_ranks(wealth_source)
     openness_np = personalities[:, 0].detach().cpu().numpy().astype(np.float32)
     bridge_mask_np = _select_bridge_agents(
-        wealth_percentile, influence_percentile, openness_np
+        wealth_percentile, influence_percentile, openness_np,
     )
 
     elite_strength = np.maximum(wealth_percentile, influence_percentile)
@@ -302,7 +299,7 @@ def create_topology(
                 + 1.15 * openness_np
                 + 0.35 * elite_strength
                 + 0.25 * bridge_mask_np
-            )
+            ),
         ),
         1,
         max_connections,
@@ -321,10 +318,10 @@ def create_topology(
 
     influence_scale = influence_scores / max(float(np.mean(influence_scores)), 1e-6)
     influence_scale_tensor = torch.tensor(
-        influence_scale, dtype=torch.float32, device=device
+        influence_scale, dtype=torch.float32, device=device,
     )
     influence_tensor = torch.tensor(
-        influence_percentile, dtype=torch.float32, device=device
+        influence_percentile, dtype=torch.float32, device=device,
     )
     wealth_tensor = torch.tensor(wealth_percentile, dtype=torch.float32, device=device)
     openness_tensor = torch.tensor(openness_np, dtype=torch.float32, device=device)
@@ -355,17 +352,17 @@ def create_topology(
         wealth_homophily = torch.exp(-4.0 * wealth_gap)
 
         influence_elite = torch.sqrt(
-            torch.clamp(batch_influence * influence_tensor.unsqueeze(0), min=0.0)
+            torch.clamp(batch_influence * influence_tensor.unsqueeze(0), min=0.0),
         )
         wealth_elite = torch.sqrt(
-            torch.clamp(batch_wealth * wealth_tensor.unsqueeze(0), min=0.0)
+            torch.clamp(batch_wealth * wealth_tensor.unsqueeze(0), min=0.0),
         )
         cross_elite = 0.5 * (
             torch.sqrt(
-                torch.clamp(batch_wealth * influence_tensor.unsqueeze(0), min=0.0)
+                torch.clamp(batch_wealth * influence_tensor.unsqueeze(0), min=0.0),
             )
             + torch.sqrt(
-                torch.clamp(batch_influence * wealth_tensor.unsqueeze(0), min=0.0)
+                torch.clamp(batch_influence * wealth_tensor.unsqueeze(0), min=0.0),
             )
         )
         pair_openness = 0.5 * (batch_openness + openness_tensor.unsqueeze(0))
@@ -401,7 +398,7 @@ def create_topology(
 
         prob_matrix = prob_matrix + 1e-9
         sampled_indices = torch.multinomial(prob_matrix, max_k, replacement=False)
-        
+
         sampled_vals = torch.gather(prob_matrix, 1, sampled_indices)
 
         range_tensor = torch.arange(max_k, device=device).unsqueeze(0)
@@ -421,11 +418,11 @@ def create_topology(
     values_tensor = torch.cat(values_list)
     backbone_adj = torch.sparse_coo_tensor(indices_tensor, values_tensor, size=(N, N), device=device)
 
-    setattr(config, "_features_norm_cache", features_norm)
+    config._features_norm_cache = features_norm
 
-    print(f"Applying Triadic Closure (Stage 2)...")
+    print("Applying Triadic Closure (Stage 2)...")
     final_adj = apply_triadic_closure(config, backbone_adj, device)
-    
+
     # Cleanup cache
     if hasattr(config, "_features_norm_cache"):
         delattr(config, "_features_norm_cache")
@@ -435,13 +432,13 @@ def create_topology(
     row_indices = final_adj.indices()[0]
     dense_sums = torch.sparse.sum(final_adj, dim=1).to_dense()
     dense_sums = torch.clamp(dense_sums, min=1e-8)
-    
+
     normalized_values = final_adj.values() / dense_sums[row_indices]
 
     normalized_sparse_adj = torch.sparse_coo_tensor(
-        final_adj.indices(), normalized_values, size=(N, N)
+        final_adj.indices(), normalized_values, size=(N, N),
     ).coalesce()
-    
+
     return normalized_sparse_adj
 
 
@@ -458,10 +455,10 @@ def assign_classes_from_topology(
 
     device = personalities.device
     wealth_percentile = torch.tensor(
-        percentile_ranks(raw_wealth), dtype=torch.float32, device=device
+        percentile_ranks(raw_wealth), dtype=torch.float32, device=device,
     )
     influence_percentile = torch.tensor(
-        percentile_ranks(influence_scores), dtype=torch.float32, device=device
+        percentile_ranks(influence_scores), dtype=torch.float32, device=device,
     )
     openness = personalities[:, 0]
 
@@ -469,7 +466,7 @@ def assign_classes_from_topology(
         topology = adjacency_matrix.coalesce().to(device)
         local_wealth = torch.sparse.mm(topology, wealth_percentile.unsqueeze(1)).squeeze(1)
         local_influence = torch.sparse.mm(
-            topology, influence_percentile.unsqueeze(1)
+            topology, influence_percentile.unsqueeze(1),
         ).squeeze(1)
         out_degree = torch.bincount(topology.indices()[0], minlength=n)
         in_degree = torch.bincount(topology.indices()[1], minlength=n)
@@ -543,7 +540,7 @@ def finalize_social_structure(
         )
 
     if adjacency_matrix is not None and getattr(
-        config, "personality_socialization_gain", 0.0
+        config, "personality_socialization_gain", 0.0,
     ) > 0:
         gain = getattr(config, "personality_socialization_gain", 0.05)
         print(f"Applying Personality Socialization (Stage 2, Gain={gain})...")
@@ -587,7 +584,7 @@ def generate_society(config: SimConfig, defer_structure: bool = False):
     # 2. Correlated Personalities
     # Use a higher multiplier (1.5 vs 1.0) for personalities to ensure we cover sigmoid tails
     raw_personalities = (traits[:, num_dims : num_dims + num_personalities] / config.initial_trait_std_dev) * 1.5
-    
+
     try:
         jitter = torch.eye(5) * 1e-4
         L = torch.linalg.cholesky(PERSONALITY_CORRELATIONS + jitter)
@@ -597,13 +594,13 @@ def generate_society(config: SimConfig, defer_structure: bool = False):
 
     raw_affinities = traits[:, num_dims + num_personalities :]
     exposures, raw_personalities = apply_random_mutations(
-        exposures, raw_personalities, config.mutation_temperature, config.seed
+        exposures, raw_personalities, config.mutation_temperature, config.seed,
     )
     personalities = torch.sigmoid(raw_personalities)
 
     # 3. Influence
     influence_scores = np.random.lognormal(
-        mean=1.0, sigma=0.5 + config.mutation_temperature, size=config.num_agents
+        mean=1.0, sigma=0.5 + config.mutation_temperature, size=config.num_agents,
     )
     if getattr(config, "use_power_law_influence", False):
         alpha = 1.16
@@ -626,17 +623,17 @@ def generate_society(config: SimConfig, defer_structure: bool = False):
     non_wealth_mask = torch.ones(num_dims, dtype=torch.bool)
     non_wealth_mask[wealth_idx] = False
     exposures[:, non_wealth_mask] = torch.tanh(exposures[:, non_wealth_mask])
-    
+
     cognitive_bandwidth = torch.clamp(
-        torch.randn(config.num_agents, 1) * 0.2 + 0.55, min=0.1, max=1.0
+        torch.randn(config.num_agents, 1) * 0.2 + 0.55, min=0.1, max=1.0,
     )
     positive_affinities = torch.clamp(
-        torch.abs(raw_affinities), min=config.affinity_min_strength
+        torch.abs(raw_affinities), min=config.affinity_min_strength,
     )
     if getattr(config, "normalize_affinities_by_mean", True):
         mean_affinity = positive_affinities.mean(dim=1, keepdim=True)
         normalized_affinities = positive_affinities / torch.clamp(
-            mean_affinity, min=1e-6
+            mean_affinity, min=1e-6,
         )
     else:
         normalized_affinities = positive_affinities
@@ -650,7 +647,7 @@ def generate_society(config: SimConfig, defer_structure: bool = False):
             "Influence": np.round(influence_scores, 3),
             "Raw_Wealth": np.round(wealth_values, 3),
             "Cognitive_Bandwidth": np.round(cognitive_bandwidth.squeeze().numpy(), 3),
-        }
+        },
     )
 
     adjacency_matrix = None

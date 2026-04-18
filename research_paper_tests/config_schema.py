@@ -1,23 +1,23 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Mapping
 from copy import deepcopy
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 import torch
 
 from schema import (
-    DIMENSIONS,
     DIMENSION_INDICES,
+    DIMENSIONS,
     EMOTION_LABELS,
     RUN_PROFILE_FIELDS,
     SIM_CONFIG_DEFAULTS,
     SIM_CONFIG_FIELDS,
     SimConfig,
 )
-
 
 PERSONALITY_LABELS = (
     "Openness",
@@ -66,7 +66,7 @@ def live_run_profile_defaults() -> dict[str, Any]:
 
 
 def apply_config_attrs(
-    config: SimConfig, extra_attrs: Mapping[str, Any] | None = None
+    config: SimConfig, extra_attrs: Mapping[str, Any] | None = None,
 ) -> SimConfig:
     for attr_name, attr_value in (extra_attrs or {}).items():
         setattr(config, attr_name, deepcopy(attr_value))
@@ -145,7 +145,7 @@ def requested_evolution_override() -> bool | None:
     if normalized in {"without", "off", "false"}:
         return False
     raise ValueError(
-        "evolution mode must be one of: both, with, without, on, off, true, false"
+        "evolution mode must be one of: both, with, without, on, off, true, false",
     )
 
 
@@ -175,7 +175,7 @@ class ResearchPaperTestScenario:
                     resolved.get(
                         "evolution_generations",
                         SIM_CONFIG_DEFAULTS["evolution_generations"],
-                    )
+                    ),
                 ),
                 DEFAULT_SMOKE_EVOLUTION_GENERATIONS,
             )
@@ -225,7 +225,7 @@ class ResearchPaperTestScenario:
                     profile_kwargs.get(
                         "evolution_generations",
                         SIM_CONFIG_DEFAULTS["evolution_generations"],
-                    )
+                    ),
                 ),
                 DEFAULT_SMOKE_EVOLUTION_GENERATIONS,
             )
@@ -1156,7 +1156,7 @@ def evolution_variants(mode: str = "both") -> tuple[bool, ...]:
     if normalized in {"with", "on", "true"}:
         return (True,)
     raise ValueError(
-        "evolution mode must be one of: both, with, without, on, off, true, false"
+        "evolution mode must be one of: both, with, without, on, off, true, false",
     )
 
 
@@ -1196,7 +1196,7 @@ def _validate_schema() -> None:
         if unknown_fields:
             invalid_overrides[scenario_name] = unknown_fields
         unknown_run_fields = sorted(
-            set(scenario.run_profile_overrides) - RUN_PROFILE_FIELDS
+            set(scenario.run_profile_overrides) - RUN_PROFILE_FIELDS,
         )
         if unknown_run_fields:
             invalid_run_profile_overrides[scenario_name] = unknown_run_fields
@@ -1204,7 +1204,7 @@ def _validate_schema() -> None:
         raise ValueError(f"Invalid SimConfig overrides: {invalid_overrides}")
     if invalid_run_profile_overrides:
         raise ValueError(
-            f"Invalid RunProfile overrides: {invalid_run_profile_overrides}"
+            f"Invalid RunProfile overrides: {invalid_run_profile_overrides}",
         )
     missing_society_cases = sorted(
         scenario_name
@@ -1213,7 +1213,7 @@ def _validate_schema() -> None:
     )
     if missing_society_cases:
         raise ValueError(
-            f"Unknown society evolution cases declared: {missing_society_cases}"
+            f"Unknown society evolution cases declared: {missing_society_cases}",
         )
 
 

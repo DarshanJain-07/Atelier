@@ -45,7 +45,7 @@ def test_structural_influence_improves_realized_reach(tmp_path):
         authority_bonus = 1.0 + np.log1p(influences[idx] / mean_influence)
         engaged = result.engagement_scores.detach().cpu().numpy() * authority_bonus
         realized_reach.append(
-            float(((engaged > settings["engagement_threshold"]) & sees_post_mask).sum())
+            float(((engaged > settings["engagement_threshold"]) & sees_post_mask).sum()),
         )
 
     sampled_influence = influences[seed_indices]

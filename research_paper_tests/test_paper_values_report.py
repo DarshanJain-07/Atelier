@@ -31,14 +31,16 @@ from research_paper_tests.config_schema import (
 from research_paper_tests.test_emotion_direction_and_bridge_diffusion import (
     _bridge_diffusion_metrics,
 )
-from research_paper_tests.test_response_boundaries import _run_boundary_worlds, _scaled_world
+from research_paper_tests.test_response_boundaries import (
+    _run_boundary_worlds,
+    _scaled_world,
+)
 from research_paper_tests.test_viral_scaling import _viral_scaling_curve
 from schema import (
     SimConfig,
     emotions_to_behavior_aware_sentiment_distribution,
     emotions_to_sentiment_distribution,
 )
-
 
 OUTPUT_DIR = Path(__file__).resolve().parent / "generated"
 JSON_OUTPUT_PATH = OUTPUT_DIR / "paper_values_report.json"
@@ -164,7 +166,7 @@ def _collect_semantic_alignment_values(tmp_path: Path) -> dict[str, Any]:
             "sentiment": _labelled_sentiment(positive_sentiment),
             "wasserstein_match": _round_float(positive_match["wasserstein_distance"]),
             "wasserstein_against_negative": _round_float(
-                positive_against_negative["wasserstein_distance"]
+                positive_against_negative["wasserstein_distance"],
             ),
         },
         "negative_world": {
@@ -173,12 +175,12 @@ def _collect_semantic_alignment_values(tmp_path: Path) -> dict[str, Any]:
             "sentiment": _labelled_sentiment(negative_sentiment),
             "wasserstein_match": _round_float(negative_match["wasserstein_distance"]),
             "wasserstein_against_positive": _round_float(
-                negative_against_positive["wasserstein_distance"]
+                negative_against_positive["wasserstein_distance"],
             ),
         },
         "negative_minus_positive_negative_share": _round_float(
             negative_sentiment[SENTIMENT_INDICES["Negative"]]
-            - positive_sentiment[SENTIMENT_INDICES["Negative"]]
+            - positive_sentiment[SENTIMENT_INDICES["Negative"]],
         ),
     }
 
@@ -223,11 +225,11 @@ def _collect_accuracy_metrics_values(tmp_path: Path) -> dict[str, Any]:
         "sentiment": _labelled_sentiment(sentiment),
         "matching_wasserstein": _round_float(negative_match["wasserstein_distance"]),
         "mismatched_wasserstein": _round_float(
-            positive_mismatch["wasserstein_distance"]
+            positive_mismatch["wasserstein_distance"],
         ),
         "wasserstein_gap": _round_float(
             positive_mismatch["wasserstein_distance"]
-            - negative_match["wasserstein_distance"]
+            - negative_match["wasserstein_distance"],
         ),
     }
 
@@ -257,9 +259,9 @@ def _collect_response_boundary_values(tmp_path: Path) -> dict[str, Any]:
                 "mean_engagement": _round_float(result.engagement_scores.mean().item()),
                 "acting_ratio": _round_float(result.social_state["acting_ratio"]),
                 "sentiment_valence": _round_float(
-                    result.social_state["sentiment_valence"]
+                    result.social_state["sentiment_valence"],
                 ),
-            }
+            },
         )
 
     low_scenario = get_test_scenario("boundary_low_salience")
@@ -336,24 +338,24 @@ def _collect_emotion_and_bridge_values(tmp_path: Path) -> dict[str, Any]:
         "world_directionality": worlds,
         "bridge_diffusion": {
             "acting_ratio_without_bridge": _round_float(
-                bridge_metrics["without_bridge"]["acting_ratio"]
+                bridge_metrics["without_bridge"]["acting_ratio"],
             ),
             "acting_ratio_with_bridge": _round_float(
-                bridge_metrics["with_bridge"]["acting_ratio"]
+                bridge_metrics["with_bridge"]["acting_ratio"],
             ),
             "acting_ratio_gain": _round_float(
                 bridge_metrics["with_bridge"]["acting_ratio"]
-                - bridge_metrics["without_bridge"]["acting_ratio"]
+                - bridge_metrics["without_bridge"]["acting_ratio"],
             ),
             "community_b_local_arousal_without_bridge": _round_float(
-                bridge_metrics["without_b_local_arousal"]
+                bridge_metrics["without_b_local_arousal"],
             ),
             "community_b_local_arousal_with_bridge": _round_float(
-                bridge_metrics["with_b_local_arousal"]
+                bridge_metrics["with_b_local_arousal"],
             ),
             "community_b_local_arousal_gain": _round_float(
                 bridge_metrics["with_b_local_arousal"]
-                - bridge_metrics["without_b_local_arousal"]
+                - bridge_metrics["without_b_local_arousal"],
             ),
         },
     }
@@ -378,10 +380,10 @@ def _collect_wealth_gini_values(tmp_path: Path) -> dict[str, Any]:
     )
 
     baseline_gini = gini(
-        baseline_society.exposures[:, DIMENSION_INDICES["Wealth"]].numpy()
+        baseline_society.exposures[:, DIMENSION_INDICES["Wealth"]].numpy(),
     )
     evolved_gini = gini(
-        evolved_society.exposures[:, DIMENSION_INDICES["Wealth"]].numpy()
+        evolved_society.exposures[:, DIMENSION_INDICES["Wealth"]].numpy(),
     )
 
     return {
@@ -403,7 +405,7 @@ def _collect_network_clustering_values() -> dict[str, Any]:
     np.random.seed(settings["numpy_seed"])
     exposures = torch.randn(backbone_config.num_agents, WORLD_DIMENSION_COUNT)
     personalities = torch.sigmoid(
-        torch.randn(backbone_config.num_agents, PERSONALITY_TRAIT_COUNT)
+        torch.randn(backbone_config.num_agents, PERSONALITY_TRAIT_COUNT),
     )
     influence = np.random.lognormal(
         mean=settings["influence_mean"],
@@ -559,11 +561,11 @@ def _collect_algorithmic_filter_values(tmp_path: Path) -> dict[str, Any]:
     return {
         "baseline_mean_engagement": _round_float(baseline.engagement_scores.mean().item()),
         "amplified_mean_engagement": _round_float(
-            amplified.engagement_scores.mean().item()
+            amplified.engagement_scores.mean().item(),
         ),
         "engagement_gain": _round_float(
             amplified.engagement_scores.mean().item()
-            - baseline.engagement_scores.mean().item()
+            - baseline.engagement_scores.mean().item(),
         ),
         "max_world_shift": _round_float(world_shift.max().item()),
     }
@@ -600,7 +602,7 @@ def _build_report(tmp_path: Path) -> dict[str, Any]:
             "accuracy_metrics": _collect_accuracy_metrics_values(tmp_path),
             "response_boundaries": _collect_response_boundary_values(tmp_path),
             "emotion_directionality_and_bridge_diffusion": _collect_emotion_and_bridge_values(
-                tmp_path
+                tmp_path,
             ),
             "wealth_gini": _collect_wealth_gini_values(tmp_path),
             "network_clustering": _collect_network_clustering_values(),
@@ -625,7 +627,7 @@ def _render_sentiment_rows(section: dict[str, Any]) -> list[str]:
                 negative=sentiment["Negative"],
                 neutral=sentiment["Neutral"],
                 positive=sentiment["Positive"],
-            )
+            ),
         )
     return rows
 
@@ -709,8 +711,8 @@ def _render_markdown(report: dict[str, Any]) -> str:
     for row in boundaries["dose_response"]:
         lines.append(
             "| {magnitude:.6f} | {mean_engagement:.6f} | {acting_ratio:.6f} | {sentiment_valence:.6f} |".format(
-                **row
-            )
+                **row,
+            ),
         )
 
     lines.extend(
@@ -720,7 +722,7 @@ def _render_markdown(report: dict[str, Any]) -> str:
             "",
             "| World | Mean Engagement | Acting Ratio | Sentiment Valence |",
             "| :--- | ---: | ---: | ---: |",
-        ]
+        ],
     )
 
     for label, values in boundaries["low_salience_worlds"].items():
@@ -730,7 +732,7 @@ def _render_markdown(report: dict[str, Any]) -> str:
                 mean_engagement=values["mean_engagement"],
                 acting_ratio=values["acting_ratio"],
                 sentiment_valence=values["sentiment_valence"],
-            )
+            ),
         )
 
     lines.extend(
@@ -740,7 +742,7 @@ def _render_markdown(report: dict[str, Any]) -> str:
             "",
             "| World | Dominant Emotion | Acting Ratio | Sentiment Valence |",
             "| :--- | :--- | ---: | ---: |",
-        ]
+        ],
     )
 
     for label, values in emotions["world_directionality"].items():
@@ -750,7 +752,7 @@ def _render_markdown(report: dict[str, Any]) -> str:
                 dominant_emotion=values["dominant_emotion"],
                 acting_ratio=values["acting_ratio"],
                 sentiment_valence=values["sentiment_valence"],
-            )
+            ),
         )
 
     lines.extend(
@@ -813,7 +815,7 @@ def _render_markdown(report: dict[str, Any]) -> str:
                 viral["peak_slope_segment"]["slope"],
             ),
             "",
-        ]
+        ],
     )
 
     return "\n".join(lines)

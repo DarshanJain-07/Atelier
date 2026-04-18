@@ -1,4 +1,3 @@
-import torch
 
 from main import (
     calculate_validation_metrics,

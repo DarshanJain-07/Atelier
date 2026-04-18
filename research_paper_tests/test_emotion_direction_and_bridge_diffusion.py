@@ -55,7 +55,7 @@ def _build_bridge_topologies(settings: dict[str, int]):
     b_size = settings["community_b_size"]
     total = a_size + bridge_size + b_size
 
-    a_indices = list(range(0, a_size))
+    a_indices = list(range(a_size))
     bridge_indices = list(range(a_size, a_size + bridge_size))
     b_indices = list(range(a_size + bridge_size, total))
 

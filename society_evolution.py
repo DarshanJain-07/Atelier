@@ -4,7 +4,7 @@ import torch
 
 class SocietyEvolution:
     def __init__(
-        self, config, initial_metadata, initial_exposures, initial_personalities
+        self, config, initial_metadata, initial_exposures, initial_personalities,
     ):
         self.config = config
         self.metadata = initial_metadata.copy()
@@ -19,21 +19,21 @@ class SocietyEvolution:
         )
         if self.wealth_idx is None:
             raise ValueError(
-                "Config must provide 'wealth_dim_idx' for wealth column index"
+                "Config must provide 'wealth_dim_idx' for wealth column index",
             )
 
         if "Raw_Wealth" in self.metadata:
             self.raw_wealth = torch.tensor(
-                self.metadata["Raw_Wealth"].values, dtype=torch.float32
+                self.metadata["Raw_Wealth"].values, dtype=torch.float32,
             )
         else:
             self.raw_wealth = torch.clamp(
-                self.exposures[:, self.wealth_idx].clone().float(), min=0.0
+                self.exposures[:, self.wealth_idx].clone().float(), min=0.0,
             )
 
         # Initialize influence from metadata (or calculate if needed)
         self.influence = torch.tensor(
-            self.metadata["Influence"].values, dtype=torch.float32
+            self.metadata["Influence"].values, dtype=torch.float32,
         )
         self._sync_wealth_exposure()
 
@@ -49,10 +49,10 @@ class SocietyEvolution:
         gen = torch.Generator()
         gen.manual_seed(
             self.config.seed
-            + getattr(self.config, "evolution_idiosyncrasy_seed_offset", 888)
+            + getattr(self.config, "evolution_idiosyncrasy_seed_offset", 888),
         )
-        
-        # LogNormal centered at 0 (so exp is centered at 1). 
+
+        # LogNormal centered at 0 (so exp is centered at 1).
         # Small std dev (0.01) results in factors like 0.99 or 1.01.
         # Over 10 generations, 1.02^10 = ~1.22 (+22%), creating meaningful outliers.
         self.idiosyncrasy_factors = torch.exp(torch.randn(self.num_agents, 5, generator=gen) * 0.015)
@@ -68,12 +68,11 @@ class SocietyEvolution:
 
     def _sync_wealth_exposure(self):
         self.exposures[:, self.wealth_idx] = self._normalize_wealth_values(
-            self.raw_wealth
+            self.raw_wealth,
         )
 
     def apply_idiosyncrasies(self):
-        """
-        Apply deterministic multiplicative drift to personalities.
+        """Apply deterministic multiplicative drift to personalities.
         This compounds over generations, naturally creating 'eccentric' outliers
         who drift away from the correlation matrix.
         """
@@ -81,8 +80,7 @@ class SocietyEvolution:
         self.personalities = torch.clamp(self.personalities, 0.001, 0.999)
 
     def apply_inheritance(self):
-        """
-        Simulate intergenerational inheritance with some decay and noise.
+        """Simulate intergenerational inheritance with some decay and noise.
 
         Refactored Logic:
         - 'inheritance_fraction' acts as the amount PASSED DOWN (e.g., 0.7).
@@ -114,8 +112,7 @@ class SocietyEvolution:
         self.raw_wealth = new_wealth
 
     def apply_reinvestment(self):
-        """
-        Capital reinvestment cycles: wealth grows by a factor influenced by influence score
+        """Capital reinvestment cycles: wealth grows by a factor influenced by influence score
         and stochastic returns.
         """
         base_return = self.config.base_return_rate  # e.g., 0.03
@@ -132,8 +129,7 @@ class SocietyEvolution:
         self.raw_wealth *= 1 + returns
 
     def apply_economic_shocks(self, generation):
-        """
-        Simulate economic shocks as rare but impactful negative or positive multipliers.
+        """Simulate economic shocks as rare but impactful negative or positive multipliers.
         Frequency and magnitude can be configured.
         """
         shock_freq = self.config.shock_frequency  # e.g., 0.1 per generation
@@ -144,22 +140,21 @@ class SocietyEvolution:
         # Randomly determine if shock occurs this generation
         if np.random.rand() < shock_freq:
             is_positive = np.random.rand() < positive_shock_chance
-            
+
             if is_positive:
                 shock_impact = 1 + shock_magnitude * np.random.uniform(0.5, 1.0)
                 msg = "Positive"
             else:
                 shock_impact = 1 - shock_magnitude * np.random.uniform(0.5, 1.0)
                 msg = "Negative"
-                
+
             print(
-                f"Applying {msg} economic shock at generation {generation}, multiplier {shock_impact:.2f}"
+                f"Applying {msg} economic shock at generation {generation}, multiplier {shock_impact:.2f}",
             )
             self.raw_wealth *= shock_impact
 
     def apply_mobility(self):
-        """
-        Stochastic social mobility: randomly reshuffle a small % of agents' influence and wealth,
+        """Stochastic social mobility: randomly reshuffle a small % of agents' influence and wealth,
         simulating social moves up or down.
         """
         mobility_rate = self.config.mobility_rate  # e.g., 0.05
@@ -180,8 +175,7 @@ class SocietyEvolution:
         self.raw_wealth = new_wealth
 
     def apply_ideological_drift(self):
-        """
-        Simulate generational ideological drift. Agents' traits drift slightly towards
+        """Simulate generational ideological drift. Agents' traits drift slightly towards
         the societal mean, with some random generational noise, mimicking cultural shifts.
         Occasionally (e.g. 5% chance), society drifts toward the Elite's mean instead of the global mean (Hegemony).
         Also includes "Repulsion" where alienated agents actively move away from the mainstream.
@@ -230,7 +224,7 @@ class SocietyEvolution:
         # If the target (evidence) is highly polarized (high variance), agents trust it less.
         # If there is strong consensus (low variance), agents are pulled more strongly.
         prior_var = getattr(self.config, "bayesian_prior_variance", 0.1)
-        
+
         # Calculate dynamic Bayesian update rate (Kalman Gain style)
         # Shape will be (D,) allowing per-dimension belief updating based on consensus.
         bayesian_update_rate = prior_var / (prior_var + target_var)
@@ -288,12 +282,11 @@ class SocietyEvolution:
 
         # Smoothly bound back to [-1, 1] using tanh to prevent bimodal edge cliffs
         self.exposures[:, non_wealth_mask] = torch.tanh(
-            self.exposures[:, non_wealth_mask]
+            self.exposures[:, non_wealth_mask],
         )
 
     def evolve(self):
-        """
-        Run the full evolution cycle for the configured number of generations
+        """Run the full evolution cycle for the configured number of generations
         """
         generations = self.config.evolution_generations
 

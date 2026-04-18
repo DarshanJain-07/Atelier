@@ -1,6 +1,7 @@
 import html
 import re
 from pathlib import Path
+
 from fastapi import APIRouter
 from fastapi.responses import FileResponse
 
@@ -52,7 +53,7 @@ def _collect_docs_registry() -> tuple[list[dict[str, str]], dict[str, Path], dic
                     slug.replace("-", " ").title(),
                 ),
                 "source_path": path.relative_to(PROJECT_ROOT).as_posix(),
-            }
+            },
         )
 
     for slug, path in PRIMARY_DOC_PATHS:
@@ -113,7 +114,7 @@ def _render_markdown(markdown_text: str) -> str:
 @router.get("/api/docs/pages")
 async def list_docs_pages():
     pages, slug_to_path, path_to_slug = _collect_docs_registry()
-    
+
     enriched_pages = []
     for page in pages:
         slug = page["slug"]
@@ -127,7 +128,7 @@ async def list_docs_pages():
         page_copy = dict(page)
         page_copy["markdown"] = rewritten_markdown
         enriched_pages.append(page_copy)
-        
+
     default_slug = "index" if any(page["slug"] == "index" for page in pages) else ""
     if not default_slug and pages:
         default_slug = pages[0]["slug"]

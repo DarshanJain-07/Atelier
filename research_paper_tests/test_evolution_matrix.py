@@ -9,7 +9,6 @@ from research_paper_tests.config_schema import (
     prepare_scenario_society,
 )
 
-
 EVOLUTION_MATRIX_MODE = os.getenv("RESEARCH_TEST_EVOLUTION_MATRIX", "").strip().lower()
 
 if not EVOLUTION_MATRIX_MODE:

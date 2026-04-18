@@ -5,8 +5,7 @@ from schema import EMOTION_LABELS, emotions_to_valence
 
 
 class SocialPhysicsEngine:
-    """
-    Physics Layer
+    """Physics Layer
     -----------------
     Nonlinear socio-emotional field model with:
     - Objective state
@@ -42,8 +41,7 @@ class SocialPhysicsEngine:
         personalities=None,
         is_personal=False,
     ):
-        """
-        Calculates the socio-emotional metrics for a single event over time (stewing).
+        """Calculates the socio-emotional metrics for a single event over time (stewing).
 
         Args:
             emotion_tensor: (N, 8) tensor of emotional states.
@@ -51,6 +49,7 @@ class SocialPhysicsEngine:
             engagement_scores: (N,) optional tensor from Cognitive Engine. Used to determine
                                active engagement (Skin in the Game).
             adjacency_matrix: (N, N) sparse tensor representing network topology.
+
         """
         N = emotion_tensor.shape[0]
 
@@ -63,7 +62,7 @@ class SocialPhysicsEngine:
             structural_weights = influence_scores.float()
         elif hasattr(influence_scores, "to_numpy"):
             structural_weights = torch.tensor(
-                influence_scores.to_numpy(), dtype=torch.float32
+                influence_scores.to_numpy(), dtype=torch.float32,
             )
         else:
             structural_weights = torch.ones(N, dtype=torch.float32)
@@ -137,7 +136,7 @@ class SocialPhysicsEngine:
             midpoint = self.config.saturation_midpoint
 
             outrage_boost = 1.0 + max_multiplier * torch.sigmoid(
-                outrage_gain * (viral_energy - midpoint)
+                outrage_gain * (viral_energy - midpoint),
             )
 
             viral_weights = weights * outrage_boost
@@ -165,11 +164,11 @@ class SocialPhysicsEngine:
                     + local_influence * local_centers
                     + viral_influence * viral_center.unsqueeze(0).expand(N, -1)
                 )
-                
+
                 # Restore arousal to prevent energy loss during averaging
                 new_arousal = torch.norm(new_emotions, dim=1, keepdim=True) + 1e-9
                 new_emotions = new_emotions * (target_arousal / new_arousal)
-                
+
                 current_emotions = new_emotions
 
         # ============================================================
@@ -184,13 +183,13 @@ class SocialPhysicsEngine:
         # ============================================================
         elite_percentile = self.config.elite_percentile
         k_elites = max(1, int(N * (1.0 - elite_percentile)))
-        
+
         # Get indices of top K weights
         _, top_indices = torch.topk(weights, k=k_elites)
-        
+
         elite_mask = torch.zeros(N, dtype=torch.bool, device=weights.device)
         elite_mask[top_indices] = True
-        
+
         elite_weights = weights * elite_mask
         elite_weights = elite_weights / (elite_weights.sum() + 1e-9)
         elite_center = (current_emotions * elite_weights.unsqueeze(1)).sum(dim=0)
@@ -201,24 +200,24 @@ class SocialPhysicsEngine:
         # Instead of Silhouette Score (which fails on consensus/single clusters),
         # we use Sarle's Bimodality Coefficient (BC) along the dominant emotional axis.
         # BC > 0.555 indicates a bimodal (polarized) distribution.
-        
+
         global_distances = torch.norm(current_emotions - center_of_gravity, dim=1)
         dispersion = (global_distances * weights).sum().item()
 
         dominant_axis = center_of_gravity
         dominant_axis_norm = dominant_axis / (torch.norm(dominant_axis) + 1e-9)
         projections = torch.matmul(current_emotions, dominant_axis_norm)
-        
+
         # Calculate Bimodality Coefficient using PyTorch
         mean_proj = projections.mean()
         std_proj = projections.std(unbiased=False)
-        
+
         if std_proj > 1e-6:
             # Add a small epsilon to denominator and handle small N bias
             n = projections.numel()
             skew = torch.mean(((projections - mean_proj) / std_proj) ** 3)
             kurtosis = torch.mean(((projections - mean_proj) / std_proj) ** 4)
-            
+
             # Sarle's Bimodality Coefficient: (skew^2 + 1) / kurtosis
             # For a normal distribution, BC = 0.333. For uniform, BC = 0.555.
             # We add a correction factor for small N to avoid over-estimation
@@ -230,9 +229,9 @@ class SocialPhysicsEngine:
                 bimodality_coeff = torch.tensor(0.0)
         else:
             bimodality_coeff = torch.tensor(0.0)
-            
+
         bimodality = torch.clamp(bimodality_coeff, 0.0, 1.0).item()
-        
+
         # We define structural polarization as the Bimodality Coefficient.
         polarization = bimodality
 
@@ -263,13 +262,13 @@ class SocialPhysicsEngine:
             local_centers = self._neighbor_average(topology, current_emotions)
         else:
             local_centers = center_of_gravity.unsqueeze(0).expand(N, -1)
-            
+
         # ============================================================
         # 2-Stage Action Potential (Granovetter's Threshold Model)
         # ============================================================
         # Stage 1: Individual Motivation
         # Stage 2: Critical Mass / Social Thresholds
-        
+
         final_arousal = torch.norm(current_emotions, dim=1)
         norm_emotion = current_emotions / (final_arousal.unsqueeze(1) + 1e-9)
         local_arousal = torch.norm(local_centers, dim=1)
@@ -285,39 +284,38 @@ class SocialPhysicsEngine:
             action_cost = base_cost - 0.1 * extraversion - 0.1 * neuroticism - 0.05 * torch.log1p(inf)
         else:
             action_cost = torch.full((N,), base_cost, device=current_emotions.device)
-            
+
         action_cost = torch.clamp(action_cost, min=0.05)
-        
+
         # --- Stage 1: Individual Motivation (Internal Willingness) ---
         # Motivation is raw energy minus the cost to act
         individual_motivation = (final_arousal * social_validation) - action_cost
-        
+
         # --- Stage 2: Critical Mass / Local Thresholds ---
         # Threshold: Emotion must be dominant AND motivation must be positive.
         max_vals, _ = torch.max(current_emotions, dim=1)
         is_motivated = individual_motivation > 0.1
         is_emotional = max_vals >= self.config.dominant_emotion_threshold
-        
+
         # Filter by engaged population (crucial for is_personal events)
         if is_personal:
             if engagement_scores is not None:
                 engaged_mask = engagement_scores > (engagement_scores.max() * 0.5)
             else:
                 engaged_mask = torch.rand(N, device=current_emotions.device) > 0.95
+        elif engagement_scores is not None:
+            engaged_mask = engagement_scores > (engagement_scores.mean() * 0.1)
         else:
-            if engagement_scores is not None:
-                engaged_mask = engagement_scores > (engagement_scores.mean() * 0.1)
-            else:
-                engaged_mask = torch.ones(N, dtype=torch.bool, device=current_emotions.device)
+            engaged_mask = torch.ones(N, dtype=torch.bool, device=current_emotions.device)
 
         # Initial set of acting agents: Motivated, Emotional, and Engaged
         acting_agents = (is_motivated & is_emotional & engaged_mask).float()
-        
+
         if adjacency_matrix is not None and getattr(self.config, "use_granovetter_thresholds", True):
             # Personal thresholds for "following the crowd"
             t_mean = getattr(self.config, "granovetter_threshold_mean", 0.25)
             t_std = getattr(self.config, "granovetter_threshold_std", 0.15)
-            
+
             if personalities is not None:
                 consc = personalities[:, 1].to(current_emotions.device)
                 agree = personalities[:, 3].to(current_emotions.device)
@@ -325,22 +323,22 @@ class SocialPhysicsEngine:
                 personal_thresholds = t_mean + (consc + agree - 1.0) * t_std
             else:
                 personal_thresholds = torch.full((N,), t_mean, device=current_emotions.device)
-            
+
             personal_thresholds = torch.clamp(personal_thresholds, min=0.01, max=0.9)
-            
+
             # Iterative activation (Snowball effect)
             for _ in range(3):
                 # Calculate fraction of acting neighbors
                 neighbor_acting_ratio = self._neighbor_average(
-                    topology, acting_agents.unsqueeze(1)
+                    topology, acting_agents.unsqueeze(1),
                 ).squeeze(1)
-                
+
                 # An agent acts if:
                 # 1. They were already acting (Persistence)
                 # 2. They are emotional, engaged AND (their motivation is marginal OR neighbors cross threshold)
                 marginal_motivation = individual_motivation > -0.1
                 social_trigger = neighbor_acting_ratio > personal_thresholds
-                
+
                 new_acting = (is_emotional & engaged_mask & (is_motivated | (marginal_motivation & social_trigger)))
                 acting_agents = new_acting.float()
 
@@ -364,7 +362,7 @@ class SocialPhysicsEngine:
                 action_vector[4] = -0.9  # Negative Fairness
                 action_vector[7] = 0.5   # Positive Freedom
                 action_name = "Populist Uprising"
-            
+
             # Elite Policy Shift: High Divergence + Elite-specific arousal
             elif elite_divergence > elite_div_threshold and torch.norm(elite_center) > 0.3:
                 action_vector = [0.0] * 12
@@ -372,7 +370,7 @@ class SocialPhysicsEngine:
                 action_vector[4] = -0.3  # Negative Fairness
                 action_vector[6] = 0.6   # Positive Innovation
                 action_name = "Elite Policy Shift"
-                
+
             # Civil Protest: High Polarization + High Anger/Disgust + Negative Valence
             elif polarization > pol_threshold and (dominant_label in ["Anger", "Disgust", "Sadness"]) and valence_score < -0.1:
                 action_vector = [0.0] * 12

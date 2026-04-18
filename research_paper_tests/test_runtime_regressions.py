@@ -16,11 +16,10 @@ from research_paper_tests.config_schema import (
     zero_emotions,
 )
 
-
 SMALL_POPULATION_SETTINGS = get_test_scenario("runtime_small_populations").settings()
 
 
-@pytest.fixture()
+@pytest.fixture
 def isolated_society_cache():
     with SOCIETY_CACHE_LOCK:
         snapshot = OrderedDict(SOCIETY_CACHE.items())
@@ -39,14 +38,14 @@ def test_prepare_society_cache_isolates_topology_variants(tmp_path, isolated_soc
     topo_run = topo_scenario.run_profile()
     topo_settings = topo_scenario.settings()
     flat_run = topo_run.model_copy(
-        update={"use_network_topology": topo_settings["flat_use_network_topology"]}
+        update={"use_network_topology": topo_settings["flat_use_network_topology"]},
     )
 
     _, _, _, _, _, _, adjacency_topo, warnings_topo = prepare_society_sync(
-        topo_run, str(tmp_path / "topology")
+        topo_run, str(tmp_path / "topology"),
     )
     _, _, _, _, _, _, adjacency_flat, warnings_flat = prepare_society_sync(
-        flat_run, str(tmp_path / "flat")
+        flat_run, str(tmp_path / "flat"),
     )
 
     assert adjacency_topo is not None
@@ -63,7 +62,7 @@ def test_prepare_society_cache_isolates_evolution_variants(tmp_path, isolated_so
     evolved_run = evolved_scenario.run_profile()
     evolved_settings = evolved_scenario.settings()
     baseline_run = evolved_run.model_copy(
-        update={"enable_evolution": evolved_settings["baseline_enable_evolution"]}
+        update={"enable_evolution": evolved_settings["baseline_enable_evolution"]},
     )
     expected_classes = {
         "Underclass",
@@ -74,10 +73,10 @@ def test_prepare_society_cache_isolates_evolution_variants(tmp_path, isolated_so
     }
 
     _, evolved_meta, _, _, _, _, _, _ = prepare_society_sync(
-        evolved_run, str(tmp_path / "evolved")
+        evolved_run, str(tmp_path / "evolved"),
     )
     _, baseline_meta, _, _, _, _, _, _ = prepare_society_sync(
-        baseline_run, str(tmp_path / "baseline")
+        baseline_run, str(tmp_path / "baseline"),
     )
 
     assert set(baseline_meta["Class"].unique()).issubset(expected_classes)
@@ -97,18 +96,18 @@ def test_prepare_society_returns_fresh_request_memory(tmp_path, isolated_society
     memory_settings = memory_scenario.settings()
 
     _, _, exposures, _, _, memory_first, _, _ = prepare_society_sync(
-        run, str(tmp_path / "first")
+        run, str(tmp_path / "first"),
     )
     memory_first[0, 0] = memory_settings["memory_marker"]
 
     _, _, _, _, _, memory_second, _, _ = prepare_society_sync(
-        run, str(tmp_path / "second")
+        run, str(tmp_path / "second"),
     )
 
     assert memory_first.data_ptr() != memory_second.data_ptr()
     assert memory_second.shape == exposures.shape
     assert memory_second[0, 0].item() == pytest.approx(
-        memory_settings["empty_memory_value"]
+        memory_settings["empty_memory_value"],
     )
 
 

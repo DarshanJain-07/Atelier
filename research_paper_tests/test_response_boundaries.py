@@ -28,7 +28,7 @@ def _scaled_world(direction: dict[str, float], magnitude: float):
         {
             dimension_name: dimension_value * magnitude
             for dimension_name, dimension_value in direction.items()
-        }
+        },
     )
 
 
@@ -195,9 +195,9 @@ def test_generate_response_boundaries_figure(tmp_path):
         ylabel="Mean Engagement",
     )
     ax1.plot(
-        magnitudes, 
-        mean_engagement, 
-        marker="o", 
+        magnitudes,
+        mean_engagement,
+        marker="o",
         color=PAPER_PALETTE["primary"],
     )
     path1 = output_dir / "dose_response_engagement.png"
@@ -211,9 +211,9 @@ def test_generate_response_boundaries_figure(tmp_path):
         ylabel="Acting Ratio",
     )
     ax2.plot(
-        magnitudes, 
-        acting_ratio, 
-        marker="o", 
+        magnitudes,
+        acting_ratio,
+        marker="o",
         color=PAPER_PALETTE["primary"],
     )
     path2 = output_dir / "dose_response_action.png"

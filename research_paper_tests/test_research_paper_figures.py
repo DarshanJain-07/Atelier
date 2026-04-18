@@ -196,17 +196,17 @@ def test_generate_research_paper_summary_figure(tmp_path):
     )
     distortion_world = build_world(distortion_settings["world"])
     perceived = distort_world_signal(
-        distortion_config, distortion_world, distortion_society.personalities
+        distortion_config, distortion_world, distortion_society.personalities,
     )
     neuroticism = distortion_society.personalities[
-        :, PERSONALITY_INDICES["Neuroticism"]
+        :, PERSONALITY_INDICES["Neuroticism"],
     ].numpy()
     distortion = np.abs(
         perceived[:, DIMENSION_INDICES["Physical_Safety"]].numpy()
-        - distortion_world[0, DIMENSION_INDICES["Physical_Safety"]].item()
+        - distortion_world[0, DIMENSION_INDICES["Physical_Safety"]].item(),
     )
     xs, ys = _line_of_best_fit(neuroticism, distortion)
-    
+
     fig, ax = setup_plot(
         title="Signal Distortion",
         xlabel="Neuroticism",
@@ -254,7 +254,7 @@ def test_generate_research_paper_summary_figure(tmp_path):
         isolated_curve.append(torch.norm(isolated).item())
         rehearsed_curve.append(torch.norm(rehearsed).item())
     steps = np.arange(len(isolated_curve))
-    
+
     fig, ax = setup_plot(
         title="Memory Rehearsal",
         xlabel="Step",
@@ -293,7 +293,7 @@ def test_generate_research_paper_summary_figure(tmp_path):
     gate_engagement = gate_result.engagement_scores.numpy()
     gate_openness = gate_society.personalities[:, PERSONALITY_INDICES["Openness"]].numpy()
     xs, ys = _line_of_best_fit(gate_openness, gate_engagement)
-    
+
     fig, ax = setup_plot(
         title="Cognitive Gate",
         xlabel="Openness",
@@ -346,7 +346,7 @@ def test_generate_research_paper_summary_figure(tmp_path):
         society=algo_society,
         urgency=algo_settings["urgency"],
     )
-    
+
     fig, ax = setup_plot(
         title="Algorithmic Amplification",
         xlabel="Condition",
@@ -376,9 +376,9 @@ def test_generate_research_paper_summary_figure(tmp_path):
     assert consensus_society.adjacency_matrix is not None
     consensus_world = build_world(consensus_settings["world"])
     baseline_consensus_config = get_test_scenario(
-        "perception_social_consensus_baseline"
+        "perception_social_consensus_baseline",
     ).sim_config(
-        num_agents=consensus_config.num_agents
+        num_agents=consensus_config.num_agents,
     )
     baseline_perceived = distort_world_signal(
         baseline_consensus_config,
@@ -391,7 +391,7 @@ def test_generate_research_paper_summary_figure(tmp_path):
         + consensus_config.perception_social_consensus_gain
         * torch.sparse.mm(consensus_society.adjacency_matrix, baseline_perceived)
     )
-    
+
     fig, ax = setup_plot(
         title="Perception Consensus",
         xlabel="Condition",
@@ -401,10 +401,10 @@ def test_generate_research_paper_summary_figure(tmp_path):
         ["Baseline", "Consensus"],
         [
             average_neighbor_distance(
-                baseline_perceived, consensus_society.adjacency_matrix
+                baseline_perceived, consensus_society.adjacency_matrix,
             ),
             average_neighbor_distance(
-                consensus_perceived, consensus_society.adjacency_matrix
+                consensus_perceived, consensus_society.adjacency_matrix,
             ),
         ],
         color=COMPARISON_COLORS,
@@ -457,7 +457,7 @@ def test_generate_research_paper_summary_figure(tmp_path):
         adjacency_matrix=granovetter_society.adjacency_matrix,
         personalities=granovetter_society.personalities,
     )
-    
+
     fig, ax = setup_plot(
         title="Granovetter Cascade",
         xlabel="Condition",
@@ -490,7 +490,7 @@ def test_generate_research_paper_summary_figure(tmp_path):
     )
     assert low_society.adjacency_matrix is not None
     assert high_society.adjacency_matrix is not None
-    
+
     fig, ax = setup_plot(
         title="Echo Chambers",
         xlabel="Homophily",
@@ -531,7 +531,7 @@ def test_generate_research_paper_summary_figure(tmp_path):
         ),
         high_graph,
     )
-    
+
     fig, ax = setup_plot(
         title="Louvain Modularity",
         xlabel="Homophily",
@@ -554,7 +554,7 @@ def test_generate_research_paper_summary_figure(tmp_path):
         output_name="corr",
     )
     observed_corr = np.corrcoef(corr_society.personalities.numpy().T)
-    
+
     fig, ax = setup_plot(title="Personality Correlations")
     im = ax.imshow(observed_corr, vmin=-1.0, vmax=1.0, cmap=PAPER_DIVERGING_CMAP)
     ax.grid(False)
@@ -579,7 +579,7 @@ def test_generate_research_paper_summary_figure(tmp_path):
         enable_evolution=evolved_wealth_config.enable_evolution,
         output_name="evolved_wealth",
     )
-    
+
     fig, ax = setup_plot(
         title="Wealth Gini",
         xlabel="Condition",
@@ -633,7 +633,7 @@ def test_generate_research_paper_summary_figure(tmp_path):
         urgency=relative_settings["urgency"],
     )
     anger = relative_result.final_emotions[:, EMOTION_INDICES["Anger"]]
-    
+
     fig, ax = setup_plot(
         title="Relative Deprivation",
         xlabel="Group",
@@ -689,7 +689,7 @@ def test_generate_research_paper_summary_figure(tmp_path):
     )
     x = np.arange(3)
     width = 0.35
-    
+
     fig, ax = setup_plot(
         title="Semantic Sentiment Profile",
         xlabel="Sentiment Class",
@@ -729,7 +729,7 @@ def test_generate_research_paper_summary_figure(tmp_path):
             WORLD_DIMENSION_COUNT,
         )
         clustering_personalities = torch.sigmoid(
-            torch.randn(backbone_config.num_agents, PERSONALITY_TRAIT_COUNT)
+            torch.randn(backbone_config.num_agents, PERSONALITY_TRAIT_COUNT),
         )
         clustering_influence = np.random.lognormal(
             mean=clustering_settings["influence_mean"],
@@ -763,7 +763,7 @@ def test_generate_research_paper_summary_figure(tmp_path):
     # 14. Personality socialization
     base_social_config = get_test_scenario("personality_socialization_base").sim_config()
     socialized_config = get_test_scenario(
-        "personality_socialization_socialized"
+        "personality_socialization_socialized",
     ).sim_config()
     base_social_society = prepare_scenario_society(
         "personality_socialization_base",
@@ -777,7 +777,7 @@ def test_generate_research_paper_summary_figure(tmp_path):
         enable_evolution=socialized_config.enable_evolution,
         output_name="socialized",
     )
-    
+
     fig, ax = setup_plot(
         title="Personality Socialization",
         xlabel="Condition",
@@ -819,7 +819,7 @@ def test_generate_research_paper_summary_figure(tmp_path):
     power_influence = power_influence_society.metadata["Influence"].to_numpy()
     flat_population, flat_cumulative = _lorenz_curve(flat_influence)
     power_population, power_cumulative = _lorenz_curve(power_influence)
-    
+
     fig, ax = setup_plot(
         title="Influence Tail",
         xlabel="Population Share",
@@ -896,13 +896,13 @@ def test_generate_research_paper_summary_figure(tmp_path):
                 (
                     (engaged > reach_settings["engagement_threshold"])
                     & sees_post
-                ).sum()
-            )
+                ).sum(),
+            ),
         )
     realized_reach = np.asarray(realized_reach, dtype=np.float64)
     sampled_influence = reach_influence[reach_indices]
     xs, ys = _line_of_best_fit(sampled_influence, realized_reach)
-    
+
     fig, ax = setup_plot(
         title="Influence vs. Reach",
         xlabel="Structural Influence",
@@ -930,7 +930,7 @@ def test_generate_research_paper_summary_figure(tmp_path):
     )
     fairness = polarization_society.exposures[:, DIMENSION_INDICES["Fairness"]].numpy()
     fairness_bc = bimodality_coefficient(fairness)
-    
+
     fig, ax = setup_plot(
         title="Fairness Polarization",
         xlabel="Fairness Exposure",
@@ -983,7 +983,7 @@ def test_generate_research_paper_summary_figure(tmp_path):
     )
     truth_x = np.arange(truth_config.num_agents)
     width = 0.35
-    
+
     fig, ax = setup_plot(
         title="Truth Refinement",
         xlabel="Agent Archetype",
@@ -1049,7 +1049,7 @@ def test_generate_research_paper_summary_figure(tmp_path):
         urgency=stack_settings["urgency"],
     )
     memory_steps = np.arange(1, len(repeated_curve) + 1)
-    
+
     fig, ax = setup_plot(
         title="Agent Memory",
         xlabel="Repeat Exposure",
@@ -1119,11 +1119,11 @@ def test_generate_research_paper_summary_figure(tmp_path):
                     (virality_settings["outlier_count"],),
                     virality_settings["boosted_engagement"],
                 ),
-            ]
+            ],
         ),
     )
     virality_x = np.arange(2)
-    
+
     fig, ax = setup_plot(
         title="Virality Bounds",
         xlabel="Emotion Scenario",
@@ -1170,9 +1170,9 @@ def test_generate_research_paper_summary_figure(tmp_path):
 
 
 def test_generate_research_paper_advanced_visualizations(tmp_path):
+    import umap
     from sklearn.cluster import KMeans
     from sklearn.preprocessing import StandardScaler
-    import umap
 
     output_dir = Path(__file__).resolve().parent / "generated" / "advanced_visualizations"
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -1202,7 +1202,7 @@ def test_generate_research_paper_advanced_visualizations(tmp_path):
             cluster_personalities[
                 raw_cluster_labels == cluster_idx,
                 neuroticism_idx,
-            ].mean()
+            ].mean(),
         ),
     )
     cluster_labels = np.empty_like(raw_cluster_labels)
@@ -1244,7 +1244,7 @@ def test_generate_research_paper_advanced_visualizations(tmp_path):
         [
             cluster_personalities[cluster_labels == cluster_idx].mean(axis=0)
             for cluster_idx in range(cluster_settings["cluster_count"])
-        ]
+        ],
     )
     fig2, ax2 = setup_plot(title="Cluster Trait Profiles")
     im = ax2.imshow(
@@ -1297,7 +1297,7 @@ def test_generate_research_paper_advanced_visualizations(tmp_path):
     fairness = polarization_society.exposures[:, DIMENSION_INDICES["Fairness"]].numpy()
     fairness_mean = fairness.mean()
     fairness_bc = bimodality_coefficient(fairness)
-    
+
     fig4, ax4 = setup_plot(
         title="Fairness Polarization",
         xlabel="Fairness Exposure",
@@ -1362,9 +1362,9 @@ def test_generate_research_paper_advanced_visualizations(tmp_path):
             np.array(
                 [(quartile_classes == class_name).sum() for class_name in ordered_classes],
                 dtype=np.float64,
-            )
+            ),
         )
-    
+
     fig5, ax5 = setup_plot(
         title="Class Mix by Wealth Quartile",
         xlabel="Wealth Quartile",
@@ -1403,7 +1403,7 @@ def test_generate_research_paper_advanced_visualizations(tmp_path):
         society=semantic_society,
         urgency=semantic_settings["urgency"],
     )
-    
+
     fig6, ax6 = setup_plot(
         title="Semantic Sentiment Composition",
         xlabel="World",
@@ -1460,7 +1460,7 @@ def test_generate_research_paper_advanced_visualizations(tmp_path):
         polarized_emotions,
         endogenous_influence,
     )
-    
+
     fig7, ax7 = setup_plot(
         title="Endogenous Event Trigger",
         xlabel="Social State",
@@ -1521,7 +1521,7 @@ def test_generate_research_paper_advanced_visualizations(tmp_path):
         urgency=personal_settings["urgency"],
         is_personal=True,
     )
-    
+
     fig8, ax8 = setup_plot(
         title="Event Scope Localization",
         xlabel="Event Scope",
@@ -1571,7 +1571,7 @@ def test_generate_research_paper_advanced_visualizations(tmp_path):
         cascade_sizes.append(max(0, engaged))
     cascade_sizes = np.asarray(cascade_sizes, dtype=np.int64)
     cascade_bins = np.arange(cascade_sizes.max() + 2) - 0.5
-    
+
     fig9, ax9 = setup_plot(
         title="Cascade Size Distribution",
         xlabel="Secondary Engagement Count",
@@ -1632,10 +1632,10 @@ def test_generate_research_paper_multiseed_debug_figure(tmp_path):
             output_prefix="multiseed_wealth_evolved",
         )
         wealth_baseline_gini.append(
-            gini(wealth_baseline_society.exposures[:, DIMENSION_INDICES["Wealth"]].numpy())
+            gini(wealth_baseline_society.exposures[:, DIMENSION_INDICES["Wealth"]].numpy()),
         )
         wealth_evolved_gini.append(
-            gini(wealth_evolved_society.exposures[:, DIMENSION_INDICES["Wealth"]].numpy())
+            gini(wealth_evolved_society.exposures[:, DIMENSION_INDICES["Wealth"]].numpy()),
         )
 
         _, _, echo_low_society = _prepare_seeded_society(
@@ -1655,14 +1655,14 @@ def test_generate_research_paper_multiseed_debug_figure(tmp_path):
                 echo_low_society.exposures,
                 echo_low_society.personalities,
                 echo_low_society.adjacency_matrix,
-            )
+            ),
         )
         echo_high_similarity.append(
             mean_edge_topology_similarity(
                 echo_high_society.exposures,
                 echo_high_society.personalities,
                 echo_high_society.adjacency_matrix,
-            )
+            ),
         )
 
         _, _, influence_flat_society = _prepare_seeded_society(
@@ -1689,7 +1689,7 @@ def test_generate_research_paper_multiseed_debug_figure(tmp_path):
         assert consensus_society.adjacency_matrix is not None
         consensus_world = build_world(consensus_settings["world"])
         baseline_consensus_config = get_test_scenario(
-            "perception_social_consensus_baseline"
+            "perception_social_consensus_baseline",
         ).sim_config(
             num_agents=consensus_config.num_agents,
             seed=seed,
@@ -1709,13 +1709,13 @@ def test_generate_research_paper_multiseed_debug_figure(tmp_path):
             average_neighbor_distance(
                 baseline_perceived,
                 consensus_society.adjacency_matrix,
-            )
+            ),
         )
         consensus_distance.append(
             average_neighbor_distance(
                 consensus_perceived,
                 consensus_society.adjacency_matrix,
-            )
+            ),
         )
 
         _, _, social_base_society = _prepare_seeded_society(
@@ -1734,13 +1734,13 @@ def test_generate_research_paper_multiseed_debug_figure(tmp_path):
             average_neighbor_distance(
                 social_base_society.personalities,
                 social_base_society.adjacency_matrix,
-            )
+            ),
         )
         socialized_distance.append(
             average_neighbor_distance(
                 socialized_society.personalities,
                 socialized_society.adjacency_matrix,
-            )
+            ),
         )
 
         _, _, polarization_society = _prepare_seeded_society(
@@ -1751,8 +1751,8 @@ def test_generate_research_paper_multiseed_debug_figure(tmp_path):
         )
         fairness_bimodality.append(
             bimodality_coefficient(
-                polarization_society.exposures[:, DIMENSION_INDICES["Fairness"]].numpy()
-            )
+                polarization_society.exposures[:, DIMENSION_INDICES["Fairness"]].numpy(),
+            ),
         )
 
     # Figure 1: Wealth Gini by Seed

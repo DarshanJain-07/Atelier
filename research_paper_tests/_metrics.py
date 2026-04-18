@@ -1,6 +1,6 @@
+import networkx as nx
 import numpy as np
 import torch
-import networkx as nx
 
 from schema import DIMENSION_INDICES
 
@@ -78,31 +78,31 @@ def mad_metrics(features: torch.Tensor, partition: dict[int, int]) -> dict[str, 
     n = features.shape[0]
     if n <= 1:
         return {"mad": 0.0, "mad_within": 0.0, "mad_between": 0.0, "madgap": 0.0, "gdr": 0.0}
-    
+
     distances = torch.cdist(features, features, p=2)
-    
+
     communities = torch.tensor([partition.get(i, -1) for i in range(n)], device=features.device)
     same_community = communities.unsqueeze(0) == communities.unsqueeze(1)
-    
+
     eye_mask = torch.eye(n, dtype=torch.bool, device=features.device)
-    
+
     mad = float(distances[~eye_mask].mean().item())
-    
+
     within_mask = same_community & ~eye_mask
     mad_within = float(distances[within_mask].mean().item()) if within_mask.any() else 0.0
-        
+
     between_mask = ~same_community & ~eye_mask
     mad_between = float(distances[between_mask].mean().item()) if between_mask.any() else 0.0
-        
+
     madgap = mad_between - mad_within
-    gdr = mad_between / mad_within if mad_within > 0 else float('inf')
-    
+    gdr = mad_between / mad_within if mad_within > 0 else float("inf")
+
     return {
         "mad": mad,
         "mad_within": mad_within,
         "mad_between": mad_between,
         "madgap": madgap,
-        "gdr": gdr
+        "gdr": gdr,
     }
 
 
@@ -125,19 +125,18 @@ def wl_node_hashes(adjacency_matrix: torch.Tensor, iterations: int = 3) -> dict[
 
 
 def wl_echo_chamber_structural_similarity(
-    adjacency_matrix: torch.Tensor, 
-    partition: dict[int, int], 
-    iterations: int = 3
+    adjacency_matrix: torch.Tensor,
+    partition: dict[int, int],
+    iterations: int = 3,
 ) -> dict[tuple[int, int], float]:
-    """
-    Computes pairwise structural similarity of echo chambers (communities) 
+    """Computes pairwise structural similarity of echo chambers (communities)
     using WL subgraph hashes.
     """
-    from collections import Counter
     import itertools
-    
+    from collections import Counter
+
     hashes = wl_node_hashes(adjacency_matrix, iterations=iterations)
-    
+
     # group hashes by community (use the final iteration hash as representation)
     community_hashes = {}
     for node, comm in partition.items():
@@ -145,54 +144,53 @@ def wl_echo_chamber_structural_similarity(
             community_hashes[comm] = []
         # Use the hash from the final iteration to represent the node's structural role
         community_hashes[comm].append(hashes[node][-1])
-        
+
     similarities = {}
     communities = sorted(list(community_hashes.keys()))
-    
+
     for c1, c2 in itertools.combinations(communities, 2):
         counter_a = Counter(community_hashes[c1])
         counter_b = Counter(community_hashes[c2])
-        
+
         all_keys = set(counter_a.keys()).union(counter_b.keys())
         vec_a = np.array([counter_a[k] for k in all_keys], dtype=np.float64)
         vec_b = np.array([counter_b[k] for k in all_keys], dtype=np.float64)
-        
+
         norm_a = np.linalg.norm(vec_a)
         norm_b = np.linalg.norm(vec_b)
-        
+
         sim = 0.0
         if norm_a > 0 and norm_b > 0:
             sim = float(np.dot(vec_a, vec_b) / (norm_a * norm_b))
         similarities[(c1, c2)] = sim
-        
+
     return similarities
 
 
 def wl_kernel_similarity(adj_a: torch.Tensor, adj_b: torch.Tensor, iterations: int = 3) -> float:
-    """
-    Computes a continuous structural similarity score between two graphs using 
+    """Computes a continuous structural similarity score between two graphs using
     a WL Subtree Kernel (dot product of normalized hash frequency vectors).
     """
     from collections import Counter
-    
+
     hashes_a = wl_node_hashes(adj_a, iterations=iterations)
     hashes_b = wl_node_hashes(adj_b, iterations=iterations)
-    
+
     # Flatten the hashes for all iterations
     # In WL Subtree Kernel, features are counts of all subtrees across all iterations
     flat_a = [h for node_hashes in hashes_a.values() for h in node_hashes]
     flat_b = [h for node_hashes in hashes_b.values() for h in node_hashes]
-    
+
     counter_a = Counter(flat_a)
     counter_b = Counter(flat_b)
-    
+
     all_keys = set(counter_a.keys()).union(counter_b.keys())
     vec_a = np.array([counter_a[k] for k in all_keys], dtype=np.float64)
     vec_b = np.array([counter_b[k] for k in all_keys], dtype=np.float64)
-    
+
     norm_a = np.linalg.norm(vec_a)
     norm_b = np.linalg.norm(vec_b)
-    
+
     if norm_a == 0 or norm_b == 0:
         return 0.0
     return float(np.dot(vec_a, vec_b) / (norm_a * norm_b))

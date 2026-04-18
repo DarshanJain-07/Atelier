@@ -1,7 +1,6 @@
 import asyncio
 import json
 import os
-from typing import Optional, Tuple
 
 import aiohttp
 import torch
@@ -20,13 +19,11 @@ LLM_CACHE = {}
 class LLMGenerationError(Exception):
     """Raised when the LLM API call fails or returns an unexpected format."""
 
-    pass
 
 
 class DimensionParseError(Exception):
     """Raised when the dimension extraction process fails after max retries."""
 
-    pass
 
 
 class WorldFrame(BaseModel):
@@ -108,9 +105,9 @@ def _combine_backlash_signals(
 
 async def get_world_state(
     user_input: str,
-) -> Tuple[torch.Tensor, torch.Tensor, float, bool, list[str], str, float]:
-    """
-    Analyzes the news event using the LLM.
+) -> tuple[torch.Tensor, torch.Tensor, float, bool, list[str], str, float]:
+    """Analyzes the news event using the LLM.
+
     Returns:
         1. Official frame tensor (1, 12).
         2. Skeptical frame tensor (1, 12).
@@ -119,8 +116,8 @@ async def get_world_state(
         5. Detected biases (list[str]).
         6. Reasoning (str).
         7. Backlash potential (float).
+
     """
-    
     # Check Cache
     if user_input in LLM_CACHE:
         print(f"> Using Cached LLM Result for: '{user_input[:30]}...'")
@@ -251,7 +248,7 @@ async def get_world_state(
     # 3. API Call
     max_retries = 3
     base_delay = 1
-    result: Optional[WorldState] = None
+    result: WorldState | None = None
 
     async with aiohttp.ClientSession() as session:
         for attempt in range(max_retries):
@@ -272,7 +269,7 @@ async def get_world_state(
                         text_response = data["candidates"][0]["content"]["parts"][0]["text"]
                     except (KeyError, IndexError) as e:
                         raise LLMGenerationError(
-                            f"Unexpected API response format: {data}"
+                            f"Unexpected API response format: {data}",
                         ) from e
 
                     parsed_json = json.loads(text_response)

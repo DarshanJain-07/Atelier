@@ -74,7 +74,7 @@ def apply_paper_style():
             "lines.markersize": 7,
             "patch.edgecolor": "white",
             "patch.linewidth": 0.8,
-        }
+        },
     )
 
 

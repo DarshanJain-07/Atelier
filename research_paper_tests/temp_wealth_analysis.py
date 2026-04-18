@@ -1,5 +1,6 @@
 import matplotlib
-matplotlib.use('Agg')
+
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
@@ -21,7 +22,7 @@ def visualize(seed=42):
     print(f"--- VERIFYING NETWORK SYNERGY WEALTH [Seed: {seed}] ---")
     scenario = get_test_scenario("temp_wealth_analysis")
     settings = scenario.settings()
-    
+
     # 1. Generate Society
     config = scenario.sim_config(seed=seed)
     df_meta, exposures, personalities, affinities, adjacency_matrix = generate_society(config)
@@ -29,7 +30,7 @@ def visualize(seed=42):
     # 2. Extract Data
     raw_wealth = df_meta["Raw_Wealth"].values
     influence = df_meta["Influence"].values
-    
+
     # Calculate in-degrees for correlation check
     adj_coalesced = adjacency_matrix.coalesce()
     indices = adj_coalesced.indices()
@@ -38,7 +39,7 @@ def visualize(seed=42):
     # 3. Calculate Correlations
     corr_inf, _ = spearmanr(raw_wealth, influence)
     corr_deg, _ = spearmanr(raw_wealth, in_degrees)
-    
+
     print("\n[CORRELATION ANALYSIS]")
     print(f"Wealth vs Influence: {corr_inf:.4f}")
     print(f"Wealth vs In-Degree (Social Capital): {corr_deg:.4f}")
@@ -51,16 +52,16 @@ def visualize(seed=42):
     print(f"95th Percentile: {np.percentile(raw_wealth, 95):.2f}")
     print(f"Max Wealth: {np.max(raw_wealth):.2f}")
     print(f"Min Wealth: {np.min(raw_wealth):.2f}")
-    
+
     wealth_over_threshold = np.sum(raw_wealth > settings["wealth_threshold"])
     print(
         f"Agents with Wealth > {settings['wealth_threshold']:,}: "
-        f"{wealth_over_threshold} ({wealth_over_threshold / len(raw_wealth) * 100:.2f}%)"
+        f"{wealth_over_threshold} ({wealth_over_threshold / len(raw_wealth) * 100:.2f}%)",
     )
 
     # 5. Plotting
     fig, axes = plt.subplots(1, 3, figsize=(24, 8))
-    
+
     # Plot 1: Wealth vs Influence (Scatter)
     sns.scatterplot(
         x=raw_wealth,
@@ -68,7 +69,7 @@ def visualize(seed=42):
         alpha=settings["scatter_alpha"],
         color=PAPER_PALETTE["primary"],
         ax=axes[0],
-        edgecolor=None
+        edgecolor=None,
     )
     axes[0].set_title("Wealth vs Influence\nSynergy Model")
     axes[0].set_xlabel("Raw Wealth")

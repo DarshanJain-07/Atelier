@@ -1,13 +1,13 @@
 from copy import deepcopy
 from dataclasses import dataclass, field, fields
-from typing import Any, List
+from typing import Any
 
 import torch
 
 # --- GLOBAL CONSTANTS ---
 
 # The 12 Dimensions of our World Model
-DIMENSIONS: List[str] = [
+DIMENSIONS: list[str] = [
     "Wealth",
     "Physical_Safety",
     "Stability",
@@ -25,7 +25,7 @@ DIMENSIONS: List[str] = [
 # Map Dimension Names to Indices for Robustness
 DIMENSION_INDICES = {dim: i for i, dim in enumerate(DIMENSIONS)}
 
-EMOTION_LABELS: List[str] = [
+EMOTION_LABELS: list[str] = [
     "Joy",
     "Trust",
     "Fear",
@@ -37,7 +37,7 @@ EMOTION_LABELS: List[str] = [
 ]
 
 VALENCE_WEIGHTS = torch.tensor(
-    [1.0, 0.5, -0.5, 0.0, -0.5, -0.5, -0.5, 0.5], dtype=torch.float32
+    [1.0, 0.5, -0.5, 0.0, -0.5, -0.5, -0.5, 0.5], dtype=torch.float32,
 )
 
 
@@ -143,7 +143,7 @@ PERSONALITY_QUERY_MATRIX = torch.tensor(
         [0.0, 0.0, 0.0, 0.0, 0.8, 0.0, 0.0, 0.0, 0.5, 0.6, 0.0, 0.0],
         # N: Physical_Safety (1.2), Stability (0.9)
         [0.0, 1.2, 0.9, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-    ]
+    ],
 ).float()
 
 # Realistic correlations between Big Five traits (OCEAN order)
@@ -153,16 +153,16 @@ PERSONALITY_QUERY_MATRIX = torch.tensor(
 PERSONALITY_CORRELATIONS = torch.tensor(
     [
         # O
-        [ 1.00,  0.01,  0.35,  0.01, -0.01], 
+        [ 1.00,  0.01,  0.35,  0.01, -0.01],
         # C
-        [ 0.01,  1.00,  0.01,  0.40, -0.40], 
+        [ 0.01,  1.00,  0.01,  0.40, -0.40],
         # E
-        [ 0.35,  0.01,  1.00,  0.01, -0.01], 
+        [ 0.35,  0.01,  1.00,  0.01, -0.01],
         # A
-        [ 0.01,  0.40,  0.01,  1.00, -0.40], 
+        [ 0.01,  0.40,  0.01,  1.00, -0.40],
         # N
-        [-0.01, -0.40, -0.01, -0.40,  1.00], 
-    ]
+        [-0.01, -0.40, -0.01, -0.40,  1.00],
+    ],
 ).float()
 
 # Cross Dimension Interaction Matrix
@@ -177,8 +177,7 @@ CROSS_DIM_INTERACTIONS[6, 11] = 0.3  # Innovation -> Long_Term
 
 @dataclass
 class SimConfig:
-    """
-    Central configuration for the simulation.
+    """Central configuration for the simulation.
     Controls infrastructure and research feature toggles.
     """
 
@@ -283,7 +282,7 @@ class SimConfig:
             "Agreeableness": -1.0,
             "Neuroticism": 1.0,
             "bias": 0.1,
-        }
+        },
     )
 
     use_power_law_influence: bool = False  # Enable Weighted Aggregation (Pareto)
@@ -382,7 +381,7 @@ class SimConfig:
             raise ValueError("sentiment_neutrality_leaky_slope must be >= 0.0")
         if self.sentiment_neutrality_activation not in {"relu", "leaky_relu"}:
             raise ValueError(
-                "sentiment_neutrality_activation must be one of: relu, leaky_relu"
+                "sentiment_neutrality_activation must be one of: relu, leaky_relu",
             )
 
 
@@ -410,7 +409,7 @@ SIM_CONFIG_TO_RUN_PROFILE_FIELD_MAP = {
     for run_field_name, sim_field_name in RUN_PROFILE_TO_SIM_CONFIG_FIELD_MAP.items()
 }
 RUN_PROFILE_INTERNAL_ONLY_FIELDS = frozenset(
-    {"wealth_dim_idx", "evolution_idiosyncrasy_seed_offset"}
+    {"wealth_dim_idx", "evolution_idiosyncrasy_seed_offset"},
 )
 RUN_PROFILE_EXTRA_FIELDS = frozenset({"social_class"})
 RUN_PROFILE_FIELDS = frozenset(
@@ -419,7 +418,7 @@ RUN_PROFILE_FIELDS = frozenset(
         SIM_CONFIG_TO_RUN_PROFILE_FIELD_MAP.get(field_name, field_name)
         for field_name in SIM_CONFIG_FIELDS
         if field_name not in RUN_PROFILE_INTERNAL_ONLY_FIELDS
-    }
+    },
 )
 
 

@@ -1,11 +1,13 @@
-import sys
-import os
 import asyncio
+import os
+import sys
 import threading
-import torch
+
 import pandas as pd
-from main import run_simulation, SimulationRequest, RunProfile
+import torch
 from fastapi import BackgroundTasks
+
+from main import RunProfile, SimulationRequest, run_simulation
 
 PROJECT_ROOT = os.path.abspath(os.path.dirname(__file__))
 
@@ -15,7 +17,7 @@ class LinearTracer:
         self.local = threading.local()
 
     def get_state(self):
-        if not hasattr(self.local, 'depth'):
+        if not hasattr(self.local, "depth"):
             self.local.depth = 0
             self.local.call_stack = []
         return self.local
@@ -25,21 +27,20 @@ class LinearTracer:
             if v.is_sparse:
                 return f"SparseTensor{list(v.shape)}[{v.dtype}]"
             return f"Tensor{list(v.shape)}[{v.dtype}]"
-        elif isinstance(v, pd.DataFrame):
+        if isinstance(v, pd.DataFrame):
             return f"DataFrame{v.shape}"
-        elif isinstance(v, dict):
+        if isinstance(v, dict):
             return f"dict(len={len(v)})"
-        elif isinstance(v, (list, tuple)):
+        if isinstance(v, (list, tuple)):
             if len(v) > 0 and isinstance(v[0], torch.Tensor):
                 return f"{type(v).__name__} of Tensors(len={len(v)})"
             return f"{type(v).__name__}(len={len(v)})"
-        elif type(v).__module__ == "builtins":
+        if type(v).__module__ == "builtins":
             if isinstance(v, (int, float, str, bool)):
                 rep = repr(v)
                 return rep if len(rep) < 20 else rep[:17] + "..."
             return type(v).__name__
-        else:
-            return v.__class__.__name__
+        return v.__class__.__name__
 
     def trace(self, frame, event, arg):
         if event not in ("call", "return"):
@@ -57,8 +58,8 @@ class LinearTracer:
         # 2. Ignore the tracer script itself
         if base_filename == "trace_real_simulation.py":
             return self.trace
-            
-        # 3. Keep single underscore methods (e.g., _neighbor_average, _calculate_threshold), 
+
+        # 3. Keep single underscore methods (e.g., _neighbor_average, _calculate_threshold),
         # but filter out double-underscore python internal methods (dunders) and list comprehensions
         if func_name.startswith("<") or func_name.startswith("__"):
             return self.trace
@@ -69,19 +70,19 @@ class LinearTracer:
             arg_count = co.co_argcount
             arg_names = co.co_varnames[:arg_count]
             locals_dict = frame.f_locals
-            
+
             args_str = []
             for name in arg_names:
                 if name in locals_dict and name != "self" and name != "cls":
                     val = locals_dict[name]
                     args_str.append(f"{name}={self.format_value(val)}")
-            
+
             indent = "  " * state.depth
             module_name = base_filename.replace(".py", "")
-            
+
             t_name = threading.current_thread().name
             t_prefix = f"[{t_name}]" if t_name != "MainThread" else ""
-            
+
             print(f"{t_prefix}{indent}▶ [{module_name}] {func_name}({', '.join(args_str)})")
             state.depth += 1
             state.call_stack.append(func_name)
@@ -92,10 +93,10 @@ class LinearTracer:
                 state.depth -= 1
                 indent = "  " * state.depth
                 ret_str = self.format_value(arg)
-                
+
                 t_name = threading.current_thread().name
                 t_prefix = f"[{t_name}]" if t_name != "MainThread" else ""
-                
+
                 print(f"{t_prefix}{indent}◀ Return: {ret_str}")
 
         return self.trace
@@ -111,9 +112,9 @@ async def run():
                 use_agent_memory=True,
                 use_network_topology=True,
                 use_algorithmic_amplification=True,
-                enable_evolution=True
-            )
-        ]
+                enable_evolution=True,
+            ),
+        ],
     )
     bg_tasks = BackgroundTasks()
 
@@ -121,7 +122,7 @@ async def run():
     print("\n" + "="*120)
     print("STARTING DEEP LINEAR DATA FLOW TRACE (ALL PROJECT FUNCTIONS)")
     print("="*120)
-    
+
     sys.setprofile(tracer.trace)
     threading.setprofile(tracer.trace)
     try:
@@ -131,7 +132,7 @@ async def run():
     finally:
         sys.setprofile(None)
         threading.setprofile(None)
-        
+
     print("="*120)
     print("TRACE COMPLETE")
     print("="*120)

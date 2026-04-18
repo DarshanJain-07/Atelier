@@ -23,5 +23,5 @@ def test_power_law_influence_increases_influence_inequality(tmp_path):
     )
 
     assert gini(power_society.metadata["Influence"].to_numpy()) > gini(
-        standard_society.metadata["Influence"].to_numpy()
+        standard_society.metadata["Influence"].to_numpy(),
     )

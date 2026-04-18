@@ -31,5 +31,5 @@ def test_emotional_divergence_tracks_neuroticism():
     emotions = project_emotions(config, context)
 
     assert emotions[1, EMOTION_INDICES["Fear"]].item() > emotions[
-        0, EMOTION_INDICES["Fear"]
+        0, EMOTION_INDICES["Fear"],
     ].item()

@@ -9,10 +9,11 @@ import time
 import uuid
 from collections import OrderedDict
 from copy import deepcopy
-from dataclasses import asdict, dataclass, fields as dataclass_fields, replace
+from dataclasses import asdict, dataclass, replace
+from dataclasses import fields as dataclass_fields
 from pathlib import Path
 from threading import Lock
-from typing import Any, List, Tuple, cast
+from typing import Any, cast
 
 import numpy as np
 import pandas as pd
@@ -38,13 +39,11 @@ from physics_engine import SocialPhysicsEngine
 
 # Import our Core Logic
 from schema import (
-    DIMENSIONS,
     DIMENSION_INDICES,
     EMOTION_LABELS,
-    PERSONALITY_CORRELATIONS,
-    SIM_CONFIG_FIELDS,
     RUN_PROFILE_INTERNAL_ONLY_FIELDS,
     RUN_PROFILE_TO_SIM_CONFIG_FIELD_MAP,
+    SIM_CONFIG_FIELDS,
     SimConfig,
     emotions_to_behavior_aware_sentiment_distribution,
     sim_config_default,
@@ -75,7 +74,7 @@ PRIMARY_DOC_PATHS = (
 )
 
 app = FastAPI(
-    docs_url="/api/docs"
+    docs_url="/api/docs",
 )
 validator = Validator()
 
@@ -128,7 +127,7 @@ def _collect_docs_registry() -> tuple[list[dict[str, str]], dict[str, Path], dic
                     slug.replace("-", " ").title(),
                 ),
                 "source_path": path.relative_to(PROJECT_ROOT).as_posix(),
-            }
+            },
         )
 
     for slug, path in PRIMARY_DOC_PATHS:
@@ -204,7 +203,7 @@ def _sim_config_field(
         field_kwargs["alias"] = alias
     return Field(
         default_factory=lambda sim_field_name=sim_field_name: _sim_config_default(
-            sim_field_name
+            sim_field_name,
         ),
         **field_kwargs,
     )
@@ -229,7 +228,7 @@ def _build_run_profile_model() -> type[BaseModel]:
         for run_field_name, sim_field_name in RUN_PROFILE_TO_SIM_CONFIG_FIELD_MAP.items()
     }
     field_definitions: dict[str, tuple[Any, Any]] = {
-        "social_class": (str, "All")
+        "social_class": (str, "All"),
     }
 
     for config_field in dataclass_fields(SimConfig):
@@ -255,12 +254,12 @@ def _build_run_profile_model() -> type[BaseModel]:
     )
 
 
-RunProfile = cast(type[BaseModel], _build_run_profile_model())
+RunProfile = cast("type[BaseModel]", _build_run_profile_model())
 
 
 class SimulationRequest(BaseModel):
     news_text: str
-    runs: List[RunProfile]
+    runs: list[RunProfile]
 
 
 @dataclass
@@ -365,7 +364,7 @@ def build_debug_society(
                 "Class": ["Agent"] * count,
                 "Region": ["Global"] * count,
                 "Influence": influence_np,
-            }
+            },
         )
     elif "Influence" not in metadata.columns:
         metadata = metadata.copy()
@@ -464,7 +463,7 @@ def prepare_society_for_debug(
 
     if getattr(effective_config, "enable_evolution", True):
         evolver = SocietyEvolution(
-            effective_config, metadata, exposures, personalities
+            effective_config, metadata, exposures, personalities,
         )
         metadata, exposures, personalities = evolver.evolve()
         metadata, personalities, adjacency_matrix = finalize_social_structure(
@@ -678,7 +677,7 @@ def serialize_agent_metadata(
                 "social_class": meta_row.get("Class", "Agent"),
                 "region": meta_row.get("Region", "Global"),
                 "big5": personalities[index].tolist(),
-            }
+            },
         )
     return agent_data
 
@@ -723,7 +722,7 @@ def execute_simulation_cycle(
 
     backlash_decision = None
     if world_tensor_skp is not None and getattr(
-        active_society.config, "use_backlash_ab_testing", False
+        active_society.config, "use_backlash_ab_testing", False,
     ):
         backlash_decision = cog_engine.run_backlash_ab_test(
             world_tensor_off=input_world_tensor,
@@ -968,7 +967,7 @@ def prepare_society_sync(run: RunProfile, run_output_dir: str):
         **run_profile_to_sim_config_kwargs(
             run,
             output_dir=run_output_dir,
-        )
+        ),
     )
     cache_key = build_society_cache_key(config)
 
@@ -1017,7 +1016,7 @@ def prepare_society_sync(run: RunProfile, run_output_dir: str):
     if getattr(config, "enable_evolution", True):
         try:
             evolver = SocietyEvolution(
-                config, metadata_full, exposures_full, personalities_full
+                config, metadata_full, exposures_full, personalities_full,
             )
             metadata_full, exposures_full, personalities_full = evolver.evolve()
             metadata_full, personalities_full, adjacency_matrix = finalize_social_structure(
@@ -1060,8 +1059,7 @@ def prepare_society_sync(run: RunProfile, run_output_dir: str):
 
 
 def subset_adjacency(adj, keep_indices):
-    """
-    Slices a sparse adjacency matrix to keep only rows/cols specified in 'keep_indices'.
+    """Slices a sparse adjacency matrix to keep only rows/cols specified in 'keep_indices'.
     Remaps indices to 0..len(keep_indices).
     Renormalizes rows to sum to 1.
     """
@@ -1165,7 +1163,7 @@ async def run_simulation(req: SimulationRequest, background_tasks: BackgroundTas
     os.makedirs(temp_dir, exist_ok=True)
 
     print(
-        f"[{request_id}] Received Batch Request: {req.news_text[:50]}... ({len(req.runs)} runs)"
+        f"[{request_id}] Received Batch Request: {req.news_text[:50]}... ({len(req.runs)} runs)",
     )
 
     try:
@@ -1183,7 +1181,7 @@ async def run_simulation(req: SimulationRequest, background_tasks: BackgroundTas
             run_output_dir = os.path.join(temp_dir, f"run_{i}")
             os.makedirs(run_output_dir, exist_ok=True)
             society_tasks.append(
-                asyncio.to_thread(prepare_society_sync, run, run_output_dir)
+                asyncio.to_thread(prepare_society_sync, run, run_output_dir),
             )
 
         # Wait for all tasks to complete concurrently
@@ -1200,7 +1198,7 @@ async def run_simulation(req: SimulationRequest, background_tasks: BackgroundTas
             raise llm_result
 
         llm_result = cast(
-            Tuple[torch.Tensor, torch.Tensor, float, bool, list[str], str, float],
+            "tuple[torch.Tensor, torch.Tensor, float, bool, list[str], str, float]",
             llm_result,
         )
         (
@@ -1225,20 +1223,11 @@ async def run_simulation(req: SimulationRequest, background_tasks: BackgroundTas
                 print(f"[{request_id}] Run {i} Error: {society_result}")
                 raise HTTPException(
                     status_code=500,
-                    detail=f"Simulation Run {i} failed: {str(society_result)}",
+                    detail=f"Simulation Run {i} failed: {society_result!s}",
                 )
 
             society_result = cast(
-                Tuple[
-                    SimConfig,
-                    pd.DataFrame,
-                    torch.Tensor,
-                    torch.Tensor,
-                    torch.Tensor,
-                    torch.Tensor,
-                    Any,
-                    list[str],
-                ],
+                "tuple[SimConfig, pd.DataFrame, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, Any, list[str]]",
                 society_result,
             )
 
@@ -1260,7 +1249,7 @@ async def run_simulation(req: SimulationRequest, background_tasks: BackgroundTas
             )
             if available_agents == 0:
                 all_results.append(
-                    {"error": f"No agents found for class: {run.social_class}"}
+                    {"error": f"No agents found for class: {run.social_class}"},
                 )
                 continue
 
@@ -1280,13 +1269,13 @@ async def run_simulation(req: SimulationRequest, background_tasks: BackgroundTas
             )
             if active_society is None:
                 all_results.append(
-                    {"error": f"No agents found for class: {run.social_class}"}
+                    {"error": f"No agents found for class: {run.social_class}"},
                 )
                 continue
 
             if run.social_class != "All":
                 print(
-                    f"[{request_id}] Filtered Run {i} to Class: {run.social_class} ({len(active_society.metadata)} agents)"
+                    f"[{request_id}] Filtered Run {i} to Class: {run.social_class} ({len(active_society.metadata)} agents)",
                 )
 
             debug_result = run_debug_simulation(
@@ -1302,7 +1291,7 @@ async def run_simulation(req: SimulationRequest, background_tasks: BackgroundTas
 
             if debug_result.social_state.get("endogenous_event") is not None:
                 print(
-                    f"[{request_id}] Autopoietic Trigger: {debug_result.social_state['endogenous_event']} generated."
+                    f"[{request_id}] Autopoietic Trigger: {debug_result.social_state['endogenous_event']} generated.",
                 )
 
             metadata = debug_result.society.metadata
@@ -1339,7 +1328,7 @@ async def run_simulation(req: SimulationRequest, background_tasks: BackgroundTas
                     "run_index": i,
                     "config": run.model_dump(),
                     "dominant_emotion": debug_result.social_state.get(
-                        "dominant_emotion", "Neutral"
+                        "dominant_emotion", "Neutral",
                     ),
                     "polarization": round(
                         debug_result.social_state.get("polarization") or 0.0,
@@ -1360,24 +1349,24 @@ async def run_simulation(req: SimulationRequest, background_tasks: BackgroundTas
                     "agent_influence": influence.tolist(),
                     "agent_metadata": agent_data,
                     "endogenous_event": debug_result.social_state.get(
-                        "endogenous_event"
+                        "endogenous_event",
                     ),
                     "detected_biases": detected_biases,
                     "reasoning": reasoning,
                     "negative_integral": debug_result.social_state.get(
-                        "negative_integral"
+                        "negative_integral",
                     )
                     or 0.0,
                     "acting_ratio": debug_result.social_state.get("acting_ratio"),
                     "total_eligible": debug_result.social_state.get("total_eligible"),
                     "population_size": debug_result.social_state.get("population_size"),
                     "warnings": generation_warnings,
-                }
+                },
             )
 
     except Exception as e:
         print(f"[{request_id}] Processing Error: {e}")
-        raise HTTPException(status_code=502, detail=f"Simulation Error: {str(e)}")
+        raise HTTPException(status_code=502, detail=f"Simulation Error: {e!s}")
     finally:
         if temp_dir and os.path.exists(temp_dir):
             background_tasks.add_task(shutil.rmtree, temp_dir, ignore_errors=True)

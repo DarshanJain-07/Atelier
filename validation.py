@@ -35,7 +35,7 @@ class Validator:
             try:
                 tokenizer = AutoTokenizer.from_pretrained(HF_MODEL_NAME)
                 model = AutoModelForSequenceClassification.from_pretrained(
-                    HF_MODEL_NAME
+                    HF_MODEL_NAME,
                 )
                 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
                 model.to(device)
@@ -56,7 +56,7 @@ class Validator:
             raise RuntimeError("Baseline model or tokenizer failed to load.")
 
         inputs = self.tokenizer(
-            text, return_tensors="pt", truncation=True, max_length=512
+            text, return_tensors="pt", truncation=True, max_length=512,
         ).to(self.device)
         with torch.no_grad():
             outputs = self.model(**inputs)
@@ -95,15 +95,13 @@ class Validator:
         }
 
     def validate_stewing(self, negative_integral: float, ticks: int):
-        """
-        Interprets the long-term impact based on the sustained negative emotion
+        """Interprets the long-term impact based on the sustained negative emotion
         over multiple time ticks.
         """
         avg_negativity = negative_integral / max(1, ticks)
 
         if avg_negativity > 0.8:
             return "Deep Structural Consequence (Severe, sustained outrage)"
-        elif avg_negativity > 0.4:
+        if avg_negativity > 0.4:
             return "Lingering Resentment (Slow-burn polarization)"
-        else:
-            return "Flash in the Pan (Rapid decay of negative arousal)"
+        return "Flash in the Pan (Rapid decay of negative arousal)"

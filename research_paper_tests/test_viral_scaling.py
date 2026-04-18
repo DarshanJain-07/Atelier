@@ -6,7 +6,11 @@ import numpy as np
 import torch
 
 from main import aggregate_social_state
-from research_paper_tests.config_schema import EMOTION_INDICES, get_test_scenario, zero_emotions
+from research_paper_tests.config_schema import (
+    EMOTION_INDICES,
+    get_test_scenario,
+    zero_emotions,
+)
 from research_paper_tests.plotting_utils import (
     PAPER_PALETTE,
     apply_paper_style,
@@ -77,17 +81,17 @@ def test_generate_viral_scaling_figure(tmp_path):
         ylabel="Outrage Multiplier",
     )
     ax1.plot(
-        amplitudes, 
-        mean_multiplier, 
-        marker="o", 
-        label="Mean", 
+        amplitudes,
+        mean_multiplier,
+        marker="o",
+        label="Mean",
         color=PAPER_PALETTE["primary"],
     )
     ax1.plot(
-        amplitudes, 
-        max_multiplier, 
-        marker="s", 
-        label="Max", 
+        amplitudes,
+        max_multiplier,
+        marker="s",
+        label="Max",
         color=PAPER_PALETTE["secondary"],
     )
     ax1.axhline(
@@ -97,7 +101,7 @@ def test_generate_viral_scaling_figure(tmp_path):
         label="Configured cap",
     )
     ax1.legend()
-    
+
     path1 = output_dir / "viral_scaling_curve.png"
     save_paper_figure(fig1, path1)
     plt.close(fig1)
@@ -110,9 +114,9 @@ def test_generate_viral_scaling_figure(tmp_path):
     )
     slope_x = 0.5 * (amplitudes[:-1] + amplitudes[1:])
     ax2.plot(
-        slope_x, 
-        slopes, 
-        marker="o", 
+        slope_x,
+        slopes,
+        marker="o",
         color=PAPER_PALETTE["primary"],
     )
 

@@ -1,4 +1,4 @@
-from typing import Any, Dict, List
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -8,8 +8,7 @@ from schema import DIMENSIONS, EMOTION_LABELS
 
 
 class ExplainabilityEngine:
-    """
-    Translates complex tensor mathematics and simulation states into
+    """Translates complex tensor mathematics and simulation states into
     human-readable, qualitative explanations, drawing from physics,
     cognitive, and evolutionary layers.
     """
@@ -23,23 +22,23 @@ class ExplainabilityEngine:
         self.high_virality_threshold = 3.0
         self.high_gini_threshold = 0.6
 
-    def _get_dominant_emotion_from_vector(self, vector: List[float]) -> str:
+    def _get_dominant_emotion_from_vector(self, vector: list[float]) -> str:
         """Returns the dominant emotion label from an 8D emotion vector."""
         if not vector:
             return "Neutral"
         idx = np.argmax(vector)
         return EMOTION_LABELS[idx]
 
-    def _generate_shift_story(self, social_state: Dict[str, Any]) -> str:
+    def _generate_shift_story(self, social_state: dict[str, Any]) -> str:
         """Explains the difference between objective, viral, and elite consensus."""
         objective_emotion = self._get_dominant_emotion_from_vector(
-            social_state["objective_center"]
+            social_state["objective_center"],
         )
         viral_emotion = self._get_dominant_emotion_from_vector(
-            social_state["viral_center"]
+            social_state["viral_center"],
         )
         elite_emotion = self._get_dominant_emotion_from_vector(
-            social_state["elite_center"]
+            social_state["elite_center"],
         )
 
         elite_div = social_state.get("elite_divergence") or 0.0
@@ -50,12 +49,12 @@ class ExplainabilityEngine:
         if objective_emotion == viral_emotion:
             story_parts.append(
                 f"The society reached a broad consensus. The final emotion of **{viral_emotion}** "
-                f"was felt evenly across the population and accurately reflects the objective center."
+                f"was felt evenly across the population and accurately reflects the objective center.",
             )
         else:
             story_parts.append(
                 f"While the average person leaned towards **{objective_emotion}**, a highly engaged "
-                f"and vocal group amplified **{viral_emotion}**, causing it to go viral and dominate the discourse."
+                f"and vocal group amplified **{viral_emotion}**, causing it to go viral and dominate the discourse.",
             )
 
         # 2. Add Elite Context
@@ -63,12 +62,12 @@ class ExplainabilityEngine:
             if elite_emotion != viral_emotion:
                 story_parts.append(
                     f"There was a sharp disconnect across class lines. Influential elites felt **{elite_emotion}**, "
-                    f"while the broader public narrative was driven by **{viral_emotion}**."
+                    f"while the broader public narrative was driven by **{viral_emotion}**.",
                 )
             else:
                 story_parts.append(
                     f"Despite significant differences in underlying emotional intensity between classes, "
-                    f"both elites and the general public ultimately converged on **{elite_emotion}**."
+                    f"both elites and the general public ultimately converged on **{elite_emotion}**.",
                 )
 
         return " ".join(story_parts)
@@ -77,7 +76,7 @@ class ExplainabilityEngine:
         self,
         narrative_frame: str | None = None,
         backlash_potential: float | None = None,
-        backlash_diagnostics: Dict[str, Any] | None = None,
+        backlash_diagnostics: dict[str, Any] | None = None,
         official_world_tensor: torch.Tensor | None = None,
         skeptical_world_tensor: torch.Tensor | None = None,
     ) -> str:
@@ -94,7 +93,7 @@ class ExplainabilityEngine:
         potential = float(
             backlash_potential
             if backlash_potential is not None
-            else backlash_diagnostics.get("backlash_potential") or 0.0
+            else backlash_diagnostics.get("backlash_potential") or 0.0,
         )
 
         if selected_frame == "skeptical":
@@ -135,7 +134,7 @@ class ExplainabilityEngine:
 
         return f"{base}{routing}{frame_gap}"
 
-    def _generate_tug_of_war(self, social_state: Dict[str, Any]) -> str:
+    def _generate_tug_of_war(self, social_state: dict[str, Any]) -> str:
         """Explains the polarization, fragmentation, and sentiment of the society."""
         polarization = social_state.get("polarization") or 0.0
         entropy = social_state.get("entropy") or 0.0
@@ -200,7 +199,7 @@ class ExplainabilityEngine:
 
         return desc
 
-    def _generate_viral_dynamics(self, social_state: Dict[str, Any]) -> str:
+    def _generate_viral_dynamics(self, social_state: dict[str, Any]) -> str:
         """Translates the nonlinear outrage multiplier into a virality score proxy (R0 equivalent)."""
         mean_multiplier = social_state.get("mean_outrage_multiplier") or 1.0
         max_multiplier = social_state.get("max_outrage_multiplier") or 1.0
@@ -264,9 +263,8 @@ class ExplainabilityEngine:
         metadata: pd.DataFrame,
         personalities: torch.Tensor,
         final_emotions: torch.Tensor,
-    ) -> List[Dict[str, str]]:
-        """
-        Groups agents into archetypes (e.g., Secure Elites, Vulnerable Population, Apathetic)
+    ) -> list[dict[str, str]]:
+        """Groups agents into archetypes (e.g., Secure Elites, Vulnerable Population, Apathetic)
         and explains their dominant reactions.
         """
         N = len(metadata)
@@ -296,7 +294,7 @@ class ExplainabilityEngine:
                 {
                     "name": "Secure Elites",
                     "description": f"Highly influential but emotionally stable individuals predominantly felt **{dom_emotion}**.",
-                }
+                },
             )
 
         # 2. Vulnerable Population (Low Influence, High Neuroticism)
@@ -309,7 +307,7 @@ class ExplainabilityEngine:
                 {
                     "name": "Vulnerable Population",
                     "description": f"Individuals with less influence and higher anxiety were driven by **{dom_emotion}**.",
-                }
+                },
             )
 
         # 3. The Anxious Elites (High Influence, High Neuroticism)
@@ -322,7 +320,7 @@ class ExplainabilityEngine:
                 {
                     "name": "Anxious Elites",
                     "description": f"Influential but highly reactive individuals predominantly felt **{dom_emotion}**.",
-                }
+                },
             )
 
         # 4. The Stoic Majority (Low Influence, Low Neuroticism)
@@ -335,28 +333,28 @@ class ExplainabilityEngine:
                 {
                     "name": "Stoic Public",
                     "description": f"Everyday citizens with lower emotional volatility largely reacted with **{dom_emotion}**.",
-                }
+                },
             )
 
         return archetypes
 
-    def _generate_endogenous_event_explanation(self, social_state: Dict[str, Any]) -> str:
+    def _generate_endogenous_event_explanation(self, social_state: dict[str, Any]) -> str:
         """Explains if the societal tension triggered an autopoietic macro-event."""
         action_name = social_state.get("action_name") or ""
         if not action_name:
             return "Society remained stable enough that no macro-level endogenous events were triggered."
-        
+
         polarization = social_state.get("polarization") or 0.0
         elite_divergence = social_state.get("elite_divergence") or 0.0
-        
+
         reasons = []
         if elite_divergence > self.high_elite_divergence_threshold:
             reasons.append("extreme elite divergence")
         if polarization > self.high_polarization_threshold:
             reasons.append("high structural polarization")
-            
+
         reason_str = " and ".join(reasons) if reasons else "high societal tension"
-        
+
         return (
             f"Autopoietic Trigger: The simulation generated an endogenous event "
             f"{action_name}, due to {reason_str}, combined with **sufficient individual Action Potential** across the populace, the system reached a breaking point, "
@@ -365,19 +363,18 @@ class ExplainabilityEngine:
 
     def generate_explanation(
         self,
-        social_state: Dict[str, Any],
+        social_state: dict[str, Any],
         metadata: pd.DataFrame,
         personalities: torch.Tensor,
         final_emotions: torch.Tensor,
         attention_weights: torch.Tensor,
         narrative_frame: str | None = None,
         backlash_potential: float | None = None,
-        backlash_diagnostics: Dict[str, Any] | None = None,
+        backlash_diagnostics: dict[str, Any] | None = None,
         official_world_tensor: torch.Tensor | None = None,
         skeptical_world_tensor: torch.Tensor | None = None,
-    ) -> Dict[str, Any]:
-        """
-        Main entry point to generate the full multi-layered explainability package.
+    ) -> dict[str, Any]:
+        """Main entry point to generate the full multi-layered explainability package.
         """
         narrative_competition = self._generate_narrative_competition(
             narrative_frame=narrative_frame,
@@ -398,7 +395,7 @@ class ExplainabilityEngine:
             "viral_dynamics": self._generate_viral_dynamics(social_state),
             "societal_structure": self._generate_societal_structure(metadata),
             "demographics": self._generate_demographic_summary(
-                metadata, personalities, final_emotions
+                metadata, personalities, final_emotions,
             ),
             "endogenous_events": self._generate_endogenous_event_explanation(social_state),
         }

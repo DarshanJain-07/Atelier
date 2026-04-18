@@ -1,7 +1,6 @@
 import torch
 
 from main import build_debug_society, run_debug_simulation
-from schema import DIMENSION_INDICES
 from research_paper_tests.config_schema import (
     PERSONALITY_INDICES,
     WORLD_DIMENSION_COUNT,
@@ -11,6 +10,7 @@ from research_paper_tests.config_schema import (
     set_traits,
     zero_personalities,
 )
+from schema import DIMENSION_INDICES
 
 
 def _build_openness_gradient_society(config, settings):

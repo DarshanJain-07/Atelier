@@ -1330,7 +1330,7 @@ async def run_simulation(req: SimulationRequest, background_tasks: BackgroundTas
                     "dominant_emotion": debug_result.social_state.get(
                         "dominant_emotion", "Neutral",
                     ),
-                    "polarization": round(
+                    "bimodality": round(
                         debug_result.social_state.get("polarization") or 0.0,
                         3,
                     ),
@@ -1357,6 +1357,7 @@ async def run_simulation(req: SimulationRequest, background_tasks: BackgroundTas
                         "negative_integral",
                     )
                     or 0.0,
+                    "backlash_potential": debug_result.backlash_potential,
                     "acting_ratio": debug_result.social_state.get("acting_ratio"),
                     "total_eligible": debug_result.social_state.get("total_eligible"),
                     "population_size": debug_result.social_state.get("population_size"),

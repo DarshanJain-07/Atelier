@@ -34,7 +34,6 @@ const EMOTION_ANGLES = {
 let agents = [];
 let agentMetadata = [];
 let clusterAggregates = {};
-let clusterMetrics = { silhouette_score: 0, davies_bouldin_index: 0 };
 let simulationHistory = [];
 let currentSessionIndex = -1;
 let currentRunInSessionIndex = -1;
@@ -236,7 +235,6 @@ document.getElementById("btn-add-run").addEventListener("click", () => {
     defaults = {
         temperature: parseFloat(document.getElementById("param-temp").value),
         emotion_temperature: parseFloat(document.getElementById("param-emotion-temp").value || 0.2),
-        region: "All",
         social_class: document.getElementById("filter-class").value,
         agent_count: parseInt(document.getElementById("param-count").value),
         use_distortion: document.getElementById("tog-distortion").classList.contains("active"),
@@ -276,13 +274,17 @@ function renderFilmstrip(results) {
     const card = document.createElement("div");
     card.className = `filmstrip-card ${idx === 0 ? "active" : ""}`;
     card.onclick = () => selectRun(idx);
+    const isErrorRun = Boolean(res?.error);
+    const emotion = isErrorRun ? "Neutral" : res.dominant_emotion;
+    const title = isErrorRun ? "RUN ERROR" : res.dominant_emotion.toUpperCase();
+    card.setAttribute("data-tooltip", isErrorRun ? res.error : title);
 
     card.innerHTML = `
             <div class="filmstrip-header">
                 <span class="filmstrip-tag">${idx === 0 ? "MAIN" : `EXPERIMENT ${idx}`}</span>
-                <div class="emotion-indicator" style="background: ${PALETTE[res.dominant_emotion] || "#333"}"></div>
+                <div class="emotion-indicator" style="background: ${PALETTE[emotion] || "#333"}"></div>
             </div>
-            <div class="filmstrip-emotion" style="color: ${PALETTE[res.dominant_emotion]}">${res.dominant_emotion.toUpperCase()}</div>
+            <div class="filmstrip-emotion" style="color: ${PALETTE[emotion] || "#ffffff"}">${title}</div>
         `;
     filmstrip.appendChild(card);
   });
@@ -325,7 +327,93 @@ function selectRun(index) {
   displayResult(result);
 }
 
+function syncAgentCount(count) {
+  if (agents.length > count) {
+    agents = agents.slice(0, count);
+  } else {
+    for (let i = agents.length; i < count; i++) {
+      agents.push(new Agent(i));
+    }
+  }
+
+  updateVisualScaling();
+}
+
+function resetMetricDisplay(id, value = "--") {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = value;
+  el.style.color = "";
+}
+
+function displayRunError(data) {
+  syncAgentCount(0);
+  ctx.clearRect(0, 0, width, height);
+  agentMetadata = [];
+  clusterAggregates = {};
+  totalCounts = { regions: {}, classes: {} };
+  selectedAgentIndex = null;
+  dossier.classList.add("hidden");
+  tooltip.style.opacity = "0";
+
+  resetMetricDisplay("val-majority");
+  resetMetricDisplay("val-sentiment");
+  resetMetricDisplay("val-polarization");
+  resetMetricDisplay("val-elite-divergence");
+  resetMetricDisplay("val-negative-integral");
+  resetMetricDisplay("val-active-pop");
+  resetMetricDisplay("val-backlash");
+
+  const warningsMetric = document.getElementById("warnings-metric");
+  const warningsSeparator = document.getElementById("warnings-separator");
+  const warningsEl = document.getElementById("val-warnings");
+  if (warningsMetric && warningsSeparator && warningsEl) {
+    warningsMetric.classList.add("hidden");
+    warningsSeparator.classList.add("hidden");
+    warningsEl.textContent = "0";
+    warningsEl.style.color = "";
+    warningsMetric.setAttribute(
+      "data-tooltip",
+      "Simulation warnings will appear here when generation or evolution falls back.",
+    );
+  }
+
+  const explainBtn = document.getElementById("btn-explain");
+  explainBtn.classList.add("hidden");
+  explainPanel.classList.add("hidden");
+  document.getElementById("ex-cognitive").innerHTML = "--";
+  document.getElementById("ex-reasoning").innerHTML = "--";
+  document.getElementById("ex-shift-story").innerHTML = "--";
+  document.getElementById("ex-viral").innerHTML = "--";
+  document.getElementById("ex-tug-of-war").innerHTML = "--";
+  document.getElementById("ex-structure").innerHTML = "--";
+  document.getElementById("ex-stewing-impact").innerHTML = "--";
+  document.getElementById("ex-endogenous-events").innerHTML = "--";
+  document.getElementById("ex-biases").innerHTML = "<span>None detected</span>";
+  document.getElementById("ex-demographics").innerHTML =
+    "<div>No specific demographics found.</div>";
+
+  const statusLabel = document.getElementById("sys-status");
+  if (statusLabel) {
+    statusLabel.textContent = "RUN ERROR";
+    statusLabel.style.color = "#ef4444";
+  }
+
+  showToast(data.error || "Simulation run returned no agents.", "warning");
+}
+
 function displayResult(data) {
+  if (data?.error) {
+    displayRunError(data);
+    return;
+  }
+
+  const statusLabel = document.getElementById("sys-status");
+  if (statusLabel) {
+    statusLabel.textContent = "CONVERGED";
+    statusLabel.style.color = "#10b981";
+  }
+
   // 3. Update UI Metrics
   const sentimentEl = document.getElementById("val-sentiment");
   sentimentEl.textContent = data.dominant_emotion.toUpperCase();
@@ -369,16 +457,53 @@ function displayResult(data) {
     activePopEl.textContent = isNaN(activePopVal) ? "--" : `${activePopVal.toFixed(1)}%`;
   }
 
+  const backlashVal =
+    data.backlash_potential !== undefined
+      ? parseFloat(data.backlash_potential) * 100
+      : NaN;
+  const backlashEl = document.getElementById("val-backlash");
+  if (backlashEl) {
+    backlashEl.textContent = isNaN(backlashVal) ? "--" : `${backlashVal.toFixed(1)}%`;
+    if (!isNaN(backlashVal)) {
+      if (backlashVal < 35) backlashEl.style.color = "#10b981";
+      else if (backlashVal < 65) backlashEl.style.color = "#fbbf24";
+      else backlashEl.style.color = "#ef4444";
+    }
+  }
+
+  const warnings = Array.isArray(data.warnings)
+    ? data.warnings.filter((warning) => typeof warning === "string" && warning.trim().length > 0)
+    : [];
+  const warningsMetric = document.getElementById("warnings-metric");
+  const warningsSeparator = document.getElementById("warnings-separator");
+  const warningsEl = document.getElementById("val-warnings");
+  if (warningsMetric && warningsSeparator && warningsEl) {
+    if (warnings.length > 0) {
+      warningsMetric.classList.remove("hidden");
+      warningsSeparator.classList.remove("hidden");
+      warningsEl.textContent = String(warnings.length);
+      warningsEl.style.color = "#f59e0b";
+      warningsMetric.setAttribute(
+        "data-tooltip",
+        warnings.map((warning, index) => `${index + 1}. ${warning}`).join(" "),
+      );
+    } else {
+      warningsMetric.classList.add("hidden");
+      warningsSeparator.classList.add("hidden");
+      warningsEl.textContent = "0";
+      warningsEl.style.color = "";
+      warningsMetric.setAttribute(
+        "data-tooltip",
+        "Simulation warnings will appear here when generation or evolution falls back.",
+      );
+    }
+  }
+
   // 4. Update Agents
-  const states = data.agent_states;
+  const states = Array.isArray(data.agent_states) ? data.agent_states : [];
   const influences = data.agent_influence || [];
   agentMetadata = data.agent_metadata || [];
-  
-  if (data.cluster_metrics) {
-    clusterMetrics = data.cluster_metrics;
-  } else {
-    clusterMetrics = { silhouette_score: 0, davies_bouldin_index: 0 };
-  }
+  syncAgentCount(states.length);
 
   selectedAgentIndex = null;
   dossier.classList.add("hidden");
@@ -700,15 +825,7 @@ function initAgents() {
   document.getElementById("disp-count").textContent =
     (count / 1000).toFixed(1) + "k";
 
-  if (agents.length > count) {
-    agents = agents.slice(0, count);
-  } else {
-    for (let i = agents.length; i < count; i++) {
-      agents.push(new Agent(i));
-    }
-  }
-
-  updateVisualScaling();
+  syncAgentCount(count);
 }
 
 // --- SIMULATION LOGIC ---
@@ -771,7 +888,6 @@ async function runSimulation() {
     emotion_temperature: parseFloat(
       document.getElementById("param-emotion-temp").value || 0.2,
     ),
-    region: "All",
     social_class: document.getElementById("filter-class").value,
     agent_count: parseInt(document.getElementById("param-count").value),
     use_distortion: document
@@ -837,8 +953,13 @@ async function runSimulation() {
       runs: currentBatchResults,
     });
 
-    statusLabel.textContent = "CONVERGED";
-    statusLabel.style.color = "#10b981";
+    if (currentBatchResults[0]?.error) {
+      statusLabel.textContent = "RUN ERROR";
+      statusLabel.style.color = "#ef4444";
+    } else {
+      statusLabel.textContent = "CONVERGED";
+      statusLabel.style.color = "#10b981";
+    }
   } catch (error) {
     console.error("Simulation failed:", error);
     statusLabel.textContent = "ERROR";
@@ -921,7 +1042,7 @@ function renderHistory() {
             <div class="child-nodes-wrapper">
                 ${session.runs
                   .map((run, rIdx) => {
-                    const cfg = run.config;
+                    const cfg = run.config || {};
                     const params =
                       [
                         cfg.use_distortion ? "DIST" : null,
@@ -934,14 +1055,24 @@ function renderHistory() {
                     const isActive =
                       sIdx === currentSessionIndex &&
                       rIdx === currentRunInSessionIndex;
+                    const isErrorRun = Boolean(run?.error);
+                    const emotion = isErrorRun ? "Neutral" : run.dominant_emotion;
+                    const bimodalityValue =
+                      run.bimodality !== undefined ? run.bimodality : run.polarization;
+                    const label = isErrorRun
+                      ? (run.error || "RUN ERROR")
+                      : `${run.dominant_emotion.toUpperCase()} (Seed: ${cfg.seed}, T: ${cfg.temperature})`;
+                    const statLine = isErrorRun
+                      ? "No agents available for this run."
+                      : `BC: ${bimodalityValue} | POP: ${((cfg.agent_count / 1000).toFixed(1))}k | ${cfg.social_class}`;
 
                     return `
                         <div class="run-node ${isActive ? "active" : ""}" onclick="restoreSimulation(${sIdx}, ${rIdx})">
-                            <div class="emotion-indicator" style="background: ${PALETTE[run.dominant_emotion] || "#333"}"></div>
+                            <div class="emotion-indicator" style="background: ${PALETTE[emotion] || "#333"}"></div>
                             <div class="run-info">
-                                <div class="run-label">${run.dominant_emotion.toUpperCase()} (Seed: ${cfg.seed}, T: ${cfg.temperature})</div>
+                                <div class="run-label">${label}</div>
                                 <div class="run-stats">
-                                    POL: ${run.polarization} | POP: ${(cfg.agent_count / 1000).toFixed(1)}k | ${cfg.social_class}
+                                    ${statLine}
                                 </div>
                             </div>
                             <div class="node-action" onclick="event.stopPropagation(); downloadData(${sIdx}, ${rIdx})">

@@ -41,6 +41,7 @@ from physics_engine import SocialPhysicsEngine
 from schema import (
     DIMENSION_INDICES,
     EMOTION_LABELS,
+    PERSONALITY_CORRELATIONS,
     RUN_PROFILE_INTERNAL_ONLY_FIELDS,
     RUN_PROFILE_TO_SIM_CONFIG_FIELD_MAP,
     SIM_CONFIG_FIELDS,

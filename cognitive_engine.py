@@ -4,7 +4,7 @@ import torch
 import torch.nn.functional as F
 
 from attention_context import AttentionContext
-from schema import PSYCH_PROJECTION, SimConfig
+from schema import EMOTION_LABELS, PSYCH_PROJECTION, SimConfig, emotions_to_valence
 
 
 @dataclass
@@ -270,7 +270,7 @@ class CognitiveEngine:
             )
 
             perceived_world = distorted_world * (
-                1.0 - torch.clamp(fatigue_penalty, max=0.95)
+                1.0 - torch.clamp(fatigue_penalty, max=0.7)
             ) + (distorted_world * trigger_stack_boost)
         else:
             perceived_world = distorted_world
@@ -516,9 +516,38 @@ class CognitiveEngine:
         # If rehearsal is high, the memory 'sticks' (decay -> 1.0)
         # If rehearsal is low, the memory fades (decay -> base_decay)
         # We blend the base decay with a higher persistence factor.
-        effective_decay = base_decay + (1.0 - base_decay) * (social_rehearsal_factor * rehearsal_gain)
-        effective_decay = min(0.99, effective_decay)
+        
+        # --- Sentiment-Dependent Rehearsal (Anti-Rehearsal) ---
+        # We use a rough heuristic: if context valence is positive, rehearsal is less 'sticky'
+        # This allows society to 'heal' from trauma more easily when unifying news arrives.
+        valence = emotions_to_valence(self.project_emotions(context_vector).mean(dim=0)).item()
+        
+        # Positive valence reduces the rehearsal effect (Healing)
+        # Negative valence increases it (Trauma Rehearsal)
+        valence_multiplier = 1.0 - 0.5 * max(0, valence)
+        effective_rehearsal = social_rehearsal_factor * valence_multiplier
+        
+        effective_decay = base_decay + (1.0 - base_decay) * (effective_rehearsal * rehearsal_gain)
+        
+        # Cap at 0.95 to ensure even viral memories eventually fade without reinforcement
+        effective_decay = min(0.95, effective_decay)
+        
+        # --- Reconciliation: Opposing signals should 'heal' or cancel memory ---
+        # If signal and memory have opposite signs, the signal reduces the memory's magnitude
+        # before the new context is added.
+        memory_sign = torch.sign(agent_memory)
+        signal_sign = torch.sign(context_vector)
+        
+        # Identify where the signs are opposite and signal is non-zero
+        opposing_mask = (memory_sign != signal_sign) & (signal_sign != 0) & (memory_sign != 0)
+        
+        reconciliation_gain = getattr(self.config, "memory_reconciliation_gain", 0.4)
+        reconciled_memory = agent_memory.clone().to(device)
+        reconciled_memory[opposing_mask] *= (1.0 - reconciliation_gain)
 
         # Consolidation Update
-        updated_memory = (agent_memory.to(device) * effective_decay) + context_vector.to(device)
-        return updated_memory
+        updated_memory = (reconciled_memory * effective_decay) + context_vector.to(device)
+        
+        # --- Saturation: Prevent infinite memory accumulation ---
+        max_mem = getattr(self.config, "memory_saturation_cap", 5.0)
+        return torch.clamp(updated_memory, -max_mem, max_mem)

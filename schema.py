@@ -248,7 +248,7 @@ class SimConfig:
     # --- Agent Memory Parameters ---
     use_agent_memory: bool = False
     memory_decay_rate: float = (
-        0.7  # How much memory is retained each event (0.0 to 1.0)
+        0.78  # Calibrated for Hysteresis: Phase Transition point
     )
     memory_desensitization_gain: float = (
         0.5  # How much past identical events suppress current reaction
@@ -257,6 +257,8 @@ class SimConfig:
         1.2  # How much past stress amplifies new similar threats
     )
     memory_social_rehearsal_gain: float = 0.4 # Stage 2: Social Consolidation
+    memory_reconciliation_gain: float = 0.6   # Calibrated for de-polarization healing
+    memory_saturation_cap: float = 4.0        # Max magnitude of agent memory
 
     # --- Hybrid Attention (Local + Global) ---
     use_hybrid_attention: bool = False

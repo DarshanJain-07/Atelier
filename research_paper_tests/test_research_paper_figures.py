@@ -50,6 +50,7 @@ from research_paper_tests.plotting_utils import (
     SENTIMENT_COLORS,
     apply_paper_style,
     compose_panel_grid,
+    place_legend_outside,
     save_paper_figure,
     setup_plot,
 )
@@ -63,19 +64,6 @@ def _line_of_best_fit(x: np.ndarray, y: np.ndarray) -> tuple[np.ndarray, np.ndar
     xs = np.linspace(float(x.min()), float(x.max()), 100)
     ys = slope * xs + intercept
     return xs, ys
-
-
-def _lorenz_curve(values: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    array = np.asarray(values, dtype=np.float64).flatten()
-    if array.size == 0:
-        return np.array([0.0, 1.0]), np.array([0.0, 1.0])
-
-    if np.min(array) < 0.0:
-        array = array - np.min(array)
-    array = np.sort(array + 1e-9)
-    cumulative = np.concatenate([[0.0], np.cumsum(array) / np.sum(array)])
-    population = np.linspace(0.0, 1.0, cumulative.size)
-    return population, cumulative
 
 
 def _prepare_seeded_society(
@@ -710,7 +698,7 @@ def test_generate_research_paper_summary_figure(tmp_path):
         label="Threat",
     )
     ax.set_xticks(x, ["Negative", "Neutral", "Positive"])
-    ax.legend()
+    place_legend_outside(ax, ncol=2)
     save_paper_figure(fig, output_dir / "12_semantic_sentiment.png")
     plt.close(fig)
 
@@ -817,36 +805,38 @@ def test_generate_research_paper_summary_figure(tmp_path):
     )
     flat_influence = flat_influence_society.metadata["Influence"].to_numpy()
     power_influence = power_influence_society.metadata["Influence"].to_numpy()
-    flat_population, flat_cumulative = _lorenz_curve(flat_influence)
-    power_population, power_cumulative = _lorenz_curve(power_influence)
 
     fig, ax = setup_plot(
         title="Influence Tail",
-        xlabel="Population Share",
-        ylabel="Influence Share",
+        xlabel="Influence Score",
+        ylabel="CCDF",
     )
+    
+    # Flat influence CCDF
+    flat_sorted = np.sort(flat_influence)
+    flat_ccdf = 1.0 - np.linspace(0, 1, len(flat_sorted), endpoint=False)
     ax.plot(
-        [0.0, 1.0],
-        [0.0, 1.0],
-        linestyle="--",
-        color=PAPER_PALETTE["neutral"],
-        linewidth=1.5,
-        label="Perfect equality",
-    )
-    ax.plot(
-        flat_population,
-        flat_cumulative,
+        flat_sorted,
+        flat_ccdf,
         linewidth=2,
         color=PAPER_PALETTE["primary"],
         label=f"Flat (G={gini(flat_influence):.2f})",
     )
+    
+    # Power law influence CCDF
+    power_sorted = np.sort(power_influence)
+    power_ccdf = 1.0 - np.linspace(0, 1, len(power_sorted), endpoint=False)
     ax.plot(
-        power_population,
-        power_cumulative,
+        power_sorted,
+        power_ccdf,
         linewidth=2,
         color=PAPER_PALETTE["secondary"],
         label=f"Power law (G={gini(power_influence):.2f})",
     )
+
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+    ax.grid(True, which="both", linestyle=":", alpha=0.5)
     ax.legend()
     save_paper_figure(fig, output_dir / "15_influence_tail.png")
     plt.close(fig)
@@ -1161,12 +1151,7 @@ def test_generate_research_paper_summary_figure(tmp_path):
     save_paper_figure(fig, output_dir / "20_virality_bounds.png")
     plt.close(fig)
 
-    compose_panel_grid(
-        sorted(output_dir.glob("*.png")),
-        output_dir.parent / "research_paper_summary.png",
-        title="Expanded Research Paper Summary Panels",
-        columns=4,
-    )
+
 
 
 def test_generate_research_paper_advanced_visualizations(tmp_path):
@@ -1216,9 +1201,17 @@ def test_generate_research_paper_advanced_visualizations(tmp_path):
     )
     embedding = reducer.fit_transform(scaled_personalities)
     influence = cluster_society.metadata["Influence"].to_numpy(dtype=np.float64)
-    influence_sizes = 16.0 + 48.0 * (
+    influence_sizes = 2.0 + 8.0 * (
         (influence - influence.min()) / max(np.ptp(influence), 1e-6)
     )
+    # Subsample if too many individuals to avoid cluttered visualization
+    max_plot_points = 2000
+    if len(embedding) > max_plot_points:
+        rng = np.random.default_rng(cluster_settings.get("cluster_seed", 42))
+        plot_idx = rng.choice(len(embedding), max_plot_points, replace=False)
+    else:
+        plot_idx = np.arange(len(embedding))
+
     # Figure 1: Personality Cluster UMAP
     fig1, ax1 = setup_plot(
         title="Personality Cluster UMAP",
@@ -1226,12 +1219,19 @@ def test_generate_research_paper_advanced_visualizations(tmp_path):
         ylabel="UMAP 2",
     )
     for cluster_idx in range(cluster_settings["cluster_count"]):
-        mask = cluster_labels == cluster_idx
+        mask = (cluster_labels == cluster_idx)
+        # Intersect mask with subsampled indices
+        mask_idx = np.where(mask)[0]
+        plot_mask_idx = np.intersect1d(mask_idx, plot_idx)
+        
+        if len(plot_mask_idx) == 0:
+            continue
+            
         ax1.scatter(
-            embedding[mask, 0],
-            embedding[mask, 1],
-            s=influence_sizes[mask],
-            alpha=0.65,
+            embedding[plot_mask_idx, 0],
+            embedding[plot_mask_idx, 1],
+            s=influence_sizes[plot_mask_idx],
+            alpha=0.35,
             color=CATEGORICAL_COLORS[cluster_idx % len(CATEGORICAL_COLORS)],
             label=f"C{cluster_idx + 1}",
         )
@@ -1593,12 +1593,7 @@ def test_generate_research_paper_advanced_visualizations(tmp_path):
     save_paper_figure(fig9, output_dir / "09_cascade_size_distribution.png")
     plt.close(fig9)
 
-    compose_panel_grid(
-        sorted(output_dir.glob("*.png")),
-        output_dir.parent / "research_paper_advanced_visualizations.png",
-        title="Advanced Research Paper Visualizations",
-        columns=3,
-    )
+
 
 
 def test_generate_research_paper_multiseed_debug_figure(tmp_path):

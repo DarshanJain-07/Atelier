@@ -10,6 +10,7 @@ from generate_society import generate_society
 from research_paper_tests.plotting_utils import (
     PAPER_PALETTE,
     apply_paper_style,
+    compose_panel_grid,
     save_paper_figure,
     setup_plot,
 )
@@ -44,6 +45,7 @@ def test_compare_bell_vs_polarized_distributions(tmp_path):
     # Validation: std=0.2 should have higher density near 0.5 (lower variance of the sample)
     # std=0.8 should have higher density near 0 and 1 (higher variance of the sample)
 
+    paths = []
     for i, trait in enumerate(traits):
         data_bell = pers_bell[:, i].detach().cpu().numpy()
         data_pol = pers_pol[:, i].detach().cpu().numpy()
@@ -68,6 +70,14 @@ def test_compare_bell_vs_polarized_distributions(tmp_path):
         plt.close(fig)
 
         assert path.exists()
+        paths.append(path)
+
+    compose_panel_grid(
+        paths,
+        output_dir.parent / "trait_comparisons.png",
+        title="Trait Distribution Comparison",
+        columns=3,
+    )
 
     print(f"Comparison plots generated in {output_dir}")
 

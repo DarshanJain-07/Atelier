@@ -19,7 +19,6 @@ from research_paper_tests.plotting_utils import (
     PAPER_PALETTE,
     SENTIMENT_COLORS,
     apply_paper_style,
-    compose_panel_grid,
     save_paper_figure,
     setup_plot,
 )
@@ -323,12 +322,7 @@ def test_generate_emotion_direction_and_bridge_diffusion_figure(tmp_path):
     save_paper_figure(fig4, path4)
     plt.close(fig4)
 
-    compose_panel_grid(
-        [path1, path2, path3, path4],
-        output_dir.parent / "emotion_direction_and_bridge_diffusion.png",
-        title="Emotion Direction and Bridge Diffusion",
-        columns=2,
-    )
+
 
     assert path1.exists()
     assert path2.exists()

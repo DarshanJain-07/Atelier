@@ -14,7 +14,6 @@ from research_paper_tests.config_schema import (
 from research_paper_tests.plotting_utils import (
     PAPER_PALETTE,
     apply_paper_style,
-    compose_panel_grid,
     save_paper_figure,
     setup_plot,
 )
@@ -124,12 +123,7 @@ def test_generate_viral_scaling_figure(tmp_path):
     save_paper_figure(fig2, path2)
     plt.close(fig2)
 
-    compose_panel_grid(
-        [path1, path2],
-        output_dir.parent / "viral_scaling.png",
-        title="Viral Scaling",
-        columns=2,
-    )
+
 
     assert path1.exists()
     assert path2.exists()

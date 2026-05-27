@@ -167,6 +167,12 @@ def test_generate_population_segmentation_figure(tmp_path):
 
     settings, profiles, class_order = _class_stress_profiles(tmp_path)
     panel_paths = []
+    magnitudes = np.sort(profiles["magnitude"].unique())
+    x_min = float(magnitudes.min())
+    x_max = float(magnitudes.max())
+    y_max = float(profiles["engagement"].max())
+    y_upper = y_max * 1.05 if y_max > 0.0 else 1.0
+    y_ticks = np.linspace(0.0, y_upper, 5)
 
     for dimension_name in DIMENSIONS:
         fig, ax = setup_plot(
@@ -189,7 +195,10 @@ def test_generate_population_segmentation_figure(tmp_path):
                 color=color,
             )
 
-        ax.legend(loc="upper left")
+        ax.set_xlim(x_min - 0.05, x_max + 0.05)
+        ax.set_xticks(magnitudes)
+        ax.set_ylim(0.0, y_upper)
+        ax.set_yticks(y_ticks)
 
         safe_name = dimension_name.lower().replace(" ", "_")
         path = output_dir / f"segmentation_{safe_name}.png"
@@ -204,4 +213,6 @@ def test_generate_population_segmentation_figure(tmp_path):
         output_dir.parent / "population_segmentation.png",
         title="Population Segmentation",
         columns=4,
+        legend_labels=list(class_order),
+        legend_colors=CATEGORICAL_COLORS[: len(class_order)],
     )

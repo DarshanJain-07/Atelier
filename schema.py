@@ -221,7 +221,7 @@ class SimConfig:
 
     # --- Cognitive Engine Parameters ---
     perception_social_consensus_gain: float = 0.25 # Stage 2: Socially Constructed Reality
-    skepticism_gain: float = 2.0  # How much Openness/Conscientiousness penalizes logic gaps
+    skepticism_gain: float = 4.0  # Doubled from 2.0 to reward logical consistency in cross-pressured agents
     logic_gap_threshold: float = 0.5 # Discrepancy between ST/LT that triggers skepticism
     cross_dim_interaction_strength: float = 0.3
     threat_sensitivity_gain: float = 1.5
@@ -289,6 +289,12 @@ class SimConfig:
 
     use_power_law_influence: bool = False  # Enable Weighted Aggregation (Pareto)
 
+    # --- Information Fatigue / Refractory Period ---
+    use_refractory_period: bool = True # Enabled by default now
+    refractory_arousal_threshold: float = 0.7 # Lowered from 0.8 to trigger more easily
+    refractory_threshold_duration: int = 4 # Faster burnout
+    refractory_engagement_drop: float = 0.98 # Sharper drop in engagement
+
     # Use robust lookup
     wealth_dim_idx: int = DIMENSION_INDICES["Wealth"]
 
@@ -296,11 +302,11 @@ class SimConfig:
     use_network_topology: bool = True
     base_connections: int = 15
     max_connections: int = 500
-    homophily_strength: float = 6.0  # Increased from 2.0 to ensure strong echo chambers
+    homophily_strength: float = 12.0  # Doubled from 6.0 to ensure economic inequality drives modularity
     influence_bias_exp: float = 0.4  # Controls how much influencers bridge clusters
-    triadic_closure_prob: float = 0.2
-    triadic_closure_iterations: int = 2
-    triadic_closure_homophily_threshold: float = 0.5  # Only close friends of friends become friends
+    triadic_closure_prob: float = 0.3 # Increased from 0.2 to harden echo chambers
+    triadic_closure_iterations: int = 3 # Increased from 2
+    triadic_closure_homophily_threshold: float = 0.6  # Stricter joining criteria for friends-of-friends
 
     # --- Society Evolution ---
     enable_evolution: bool = True
@@ -308,44 +314,44 @@ class SimConfig:
     inheritance_fraction: float = 0.7
     inheritance_noise_std: float = 0.05
     base_return_rate: float = 0.03
-    influence_reinvestment_factor: float = 0.1
+    influence_reinvestment_factor: float = 0.15 # Increased from 0.1
     reinvestment_noise_std: float = 0.02
     shock_frequency: float = 0.1
     shock_magnitude: float = 0.2
     shock_probability_positive: float = 0.2
-    mobility_rate: float = 0.05
+    mobility_rate: float = 0.03 # Lowered from 0.05 to decrease social fluidity
     use_dynamic_classes: bool = True
-    class_temperature: float = 0.5
+    class_temperature: float = 0.4 # Lowered from 0.5 for more rigid class structures
     elite_wealth_threshold: float = 0.95
     use_ideological_drift: bool = True
-    ideological_drift_rate: float = 0.05
+    ideological_drift_rate: float = 0.04 # Slower drift
     ideological_drift_noise: float = 0.02
     elite_influence_drift_chance: float = (
-        0.20  # Chance society drifts toward elite ideology instead of global mean
+        0.25  # Increased from 0.20
     )
     use_ideological_repulsion: bool = True
     repulsion_threshold: float = (
-        0.5  # If similarity to societal mean is less than this, agents repel
+        0.4  # Increased from 0.5? wait, similarity < 0.4 repels
     )
-    repulsion_rate: float = 0.02
+    repulsion_rate: float = 0.03 # Faster polarization
     evolution_idiosyncrasy_seed_offset: int = 888
     record_history: bool = False
 
     # --- Initialization Parameters ---
     initial_trait_std_dev: float = (
-        0.40  # Increased from 0.33 to provide more baseline variety
+        0.45  # Increased from 0.40
     )
-    personality_socialization_gain: float = 0.05 # Stage 2: Nurture/Socialization (Lowered to preserve diversity)
+    personality_socialization_gain: float = 0.08 # Increased from 0.05 to strengthen cluster identity
 
     # --- Time-Series Stewing Parameters ---
-    stewing_ticks: int = 5
-    stewing_self_retention: float = 0.6
-    stewing_local_influence: float = 0.3
+    stewing_ticks: int = 7 # Increased from 5 to allow more 'truth decay'
+    stewing_self_retention: float = 0.5 # Lowered from 0.6 to allow more social influence
+    stewing_local_influence: float = 0.4 # Increased from 0.3
     stewing_viral_influence: float = 0.1
 
     # --- Physics Engine Parameters ---
-    outrage_gain: float = 8.0
-    max_viral_multiplier: float = 10.0
+    outrage_gain: float = 10.0 # Increased from 8.0
+    max_viral_multiplier: float = 12.0 # Increased from 10.0
     saturation_midpoint: float = 0.25
     elite_percentile: float = 0.95
     dominant_emotion_threshold: float = 0.155

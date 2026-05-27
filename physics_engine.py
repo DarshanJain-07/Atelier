@@ -19,6 +19,8 @@ class SocialPhysicsEngine:
 
     def __init__(self, config):
         self.config = config
+        # Track consecutive high-arousal steps for each agent (if refractory period is enabled)
+        self._refractory_counters = None
 
     @staticmethod
     def _neighbor_average(adjacency_matrix: torch.Tensor, values: torch.Tensor) -> torch.Tensor:
@@ -52,20 +54,28 @@ class SocialPhysicsEngine:
 
         """
         N = emotion_tensor.shape[0]
+        device = emotion_tensor.device
+
+        # Initialize or reset refractory counters
+        if getattr(self.config, "use_refractory_period", False):
+            if self._refractory_counters is None or self._refractory_counters.shape[0] != N:
+                self._refractory_counters = torch.zeros(N, device=device)
+        else:
+            self._refractory_counters = None
 
         # ----------------------------
         # Influence Handling
         # ----------------------------
         if isinstance(influence_scores, (np.ndarray, list)):
-            structural_weights = torch.tensor(influence_scores, dtype=torch.float32)
+            structural_weights = torch.tensor(influence_scores, dtype=torch.float32, device=device)
         elif isinstance(influence_scores, torch.Tensor):
-            structural_weights = influence_scores.float()
+            structural_weights = influence_scores.float().to(device)
         elif hasattr(influence_scores, "to_numpy"):
             structural_weights = torch.tensor(
-                influence_scores.to_numpy(), dtype=torch.float32,
+                influence_scores.to_numpy(), dtype=torch.float32, device=device
             )
         else:
-            structural_weights = torch.ones(N, dtype=torch.float32)
+            structural_weights = torch.ones(N, dtype=torch.float32, device=device)
 
         # Influence saturation (prevents oligarch domination)
         structural_weights = torch.log1p(structural_weights)
@@ -73,9 +83,24 @@ class SocialPhysicsEngine:
         # ----------------------------
         # Active Engagement (Skin in the Game)
         # ----------------------------
-        if engagement_scores is not None:
+        current_engagement = engagement_scores if engagement_scores is not None else torch.ones(N, device=device)
+        
+        # Apply Refractory Period Penalty
+        if self._refractory_counters is not None:
+            # An agent is in refractory state if they've exceeded threshold for duration
+            duration_threshold = getattr(self.config, "refractory_threshold_duration", 5)
+            penalty = getattr(self.config, "refractory_engagement_drop", 0.95)
+            
+            in_refractory = self._refractory_counters >= duration_threshold
+            # engagement_multiplier is 1.0 normally, (1.0 - penalty) if in refractory
+            engagement_multiplier = torch.ones_like(current_engagement)
+            engagement_multiplier[in_refractory] = (1.0 - penalty)
+            
+            current_engagement = current_engagement * engagement_multiplier
+
+        if engagement_scores is not None or self._refractory_counters is not None:
             # Agents who aren't paying attention shouldn't dominate the emotional center
-            energy = engagement_scores
+            energy = current_engagement
             # Normalize energy so we don't completely crush baseline influence
             energy = energy / (energy.mean() + 1e-9)
 
@@ -92,7 +117,7 @@ class SocialPhysicsEngine:
         negative_integral = 0.0
         topology = None
         if adjacency_matrix is not None:
-            topology = adjacency_matrix.coalesce().to(current_emotions.device)
+            topology = adjacency_matrix.coalesce().to(device)
 
         for tick in range(num_ticks):
             # ============================================================
@@ -115,10 +140,17 @@ class SocialPhysicsEngine:
             # Nonlinear Outrage Contagion (Viral State)
             # ============================================================
             arousal = torch.norm(current_emotions, dim=1)
+            
+            # Update Refractory Counters based on current arousal
+            if self._refractory_counters is not None:
+                arousal_threshold = getattr(self.config, "refractory_arousal_threshold", 0.8)
+                over_threshold = arousal >= arousal_threshold
+                self._refractory_counters[over_threshold] += 1
+                self._refractory_counters[~over_threshold] = 0
 
-            if engagement_scores is not None:
-                normalized_engagement = engagement_scores / (engagement_scores.mean() + 1e-9)
-                viral_energy = arousal * normalized_engagement
+            # Use raw engagement for viral energy to allow absolute fatigue levels to suppress contagion
+            if engagement_scores is not None or self._refractory_counters is not None:
+                viral_energy = arousal * current_engagement
             else:
                 viral_energy = arousal
 

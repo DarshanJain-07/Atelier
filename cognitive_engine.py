@@ -326,7 +326,12 @@ class CognitiveEngine:
         context_vector = self.build_context_vector(perceived_world, attention_weights)
         return context_vector, attention_weights, engagement_scores
 
-    def compute_skepticism_scores(self, personalities: torch.Tensor) -> torch.Tensor:
+    def compute_skepticism_scores(
+        self, 
+        personalities: torch.Tensor,
+        agent_memory: torch.Tensor | None = None,
+        individual_benefit: torch.Tensor | None = None
+    ) -> torch.Tensor:
         weights = getattr(self.config, "backlash_trait_routing_weights", {})
         weighted_sum = (
             personalities[:, 0] * float(weights.get("Openness", 0.0))
@@ -336,6 +341,21 @@ class CognitiveEngine:
             + personalities[:, 4] * float(weights.get("Neuroticism", 0.0))
             + float(weights.get("bias", 0.0))
         )
+        
+        # --- Realism Fix: Memory-Driven Skepticism ---
+        if agent_memory is not None and getattr(self.config, "use_agent_memory", False):
+            institutional_trauma = torch.clamp(-agent_memory[:, [3, 4]], min=0.0).sum(dim=1)
+            trauma_gain = getattr(self.config, "backlash_memory_trauma_gain", 1.5)
+            weighted_sum = weighted_sum + institutional_trauma * trauma_gain
+
+        # --- Realism Fix: Skepticism Reversal (Trust Building) ---
+        # If the agent is currently receiving high benefit, their skepticism should drop.
+        if individual_benefit is not None:
+            # benefit_threshold = getattr(self.config, "self_interest_resilience_threshold", 0.15)
+            # We scale the reduction based on the benefit magnitude
+            reversal_gain = getattr(self.config, "backlash_skepticism_reversal_gain", 1.2)
+            weighted_sum = weighted_sum - (individual_benefit.squeeze() * reversal_gain)
+
         norm = (
             abs(float(weights.get("Openness", 0.0)))
             + abs(float(weights.get("Conscientiousness", 0.0)))
@@ -384,7 +404,23 @@ class CognitiveEngine:
 
         sample_indices = torch.randperm(total_agents, device=device)[:sample_size]
         sample_personalities = personalities.index_select(0, sample_indices)
-        skepticism_scores = self.compute_skepticism_scores(sample_personalities)
+        sample_exposures = exposures.index_select(0, sample_indices)
+        
+        sample_memory = None
+        if agent_memory is not None:
+            sample_memory = agent_memory.index_select(0, sample_indices)
+            
+        # Calculate individual benefit from the official signal to allow skepticism reversal
+        normalized_state = (sample_exposures + 1.0) / 2.0
+        gaps = 1.0 - normalized_state
+        positive_signal = torch.clamp(world_tensor_off, min=0.0)
+        individual_benefit = (gaps * positive_signal).sum(dim=1, keepdim=True)
+            
+        skepticism_scores = self.compute_skepticism_scores(
+            sample_personalities, 
+            agent_memory=sample_memory,
+            individual_benefit=individual_benefit
+        )
         skeptical_mask = (
             skepticism_scores >= self.config.backlash_skepticism_threshold
         )
@@ -417,8 +453,22 @@ class CognitiveEngine:
                 ),
                 adjacency_matrix=None,
             )
+            
+            # --- Realism Fix: Distrust Immunity (Trust Shield) ---
+            # If agents have positive institutional memory, they are 
+            # structurally shielded from the 'energy' of skeptical frames.
+            if agent_memory is not None:
+                skp_mem = agent_memory.index_select(0, skeptical_indices)
+                # Reputation (3) and Fairness (4) in memory drive trust
+                trust_shield = torch.clamp(skp_mem[:, [3, 4]], min=0.0).sum(dim=1)
+                shield_gain = getattr(self.config, "backlash_trust_shield_gain", 0.6)
+                # Shield reduces the perceived energy of the skeptical frame
+                shield_reduction = torch.clamp(trust_shield * shield_gain, max=0.8)
+                skeptical_raw_energy = skeptical_raw_energy * (1.0 - shield_reduction)
+            
             sample_context.index_copy_(0, skeptical_local, skeptical_context)
             skeptical_energy = skeptical_raw_energy.mean() * float(backlash_potential)
+            # print(f"DEBUG: Skeptical Count: {skeptical_local.numel()}, Raw Energy: {skeptical_raw_energy.mean():.4f}, Final Energy: {skeptical_energy:.4f}")
 
         if official_local.numel() > 0:
             official_indices = sample_indices.index_select(0, official_local)
@@ -438,6 +488,7 @@ class CognitiveEngine:
             )
             sample_context.index_copy_(0, official_local, official_context)
             official_energy = official_raw_energy.mean()
+            # print(f"DEBUG: Official Count: {official_local.numel()}, Raw Energy: {official_raw_energy.mean():.4f}")
 
         triggered = bool(
             skeptical_energy

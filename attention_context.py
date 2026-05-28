@@ -222,7 +222,27 @@ class AttentionContext:
         suppression_pressure = tolerance - alignment
         suppression = max_suppression * torch.sigmoid(gain * suppression_pressure)
 
-        self.Q = self.Q * (1.0 - suppression)
+        # --- Realism Fix: Self-Interest Resilience ---
+        # If the event directly addresses a 'gap' in the agent's exposures 
+        # (e.g., they lack Safety and the signal provides Safety), it should 
+        # bypass the confirmation bias filter. Self-interest > Worldview.
+        
+        # normalized_state is (exposures + 1.0) / 2.0 (0 to 1)
+        # gaps = 1.0 - normalized_state
+        normalized_state = (self.exposures + 1.0) / 2.0
+        gaps = 1.0 - normalized_state
+        
+        # Benefit: High Gap * High Positive Signal in that dimension
+        # world_tensor is (-1.5 to 1.5)
+        positive_signal = torch.clamp(self.world_tensor, min=0.0)
+        individual_benefit = (gaps * positive_signal).sum(dim=1, keepdim=True)
+        
+        benefit_threshold = getattr(self.config, "self_interest_resilience_threshold", 0.15)
+        # If benefit is high, suppression pressure is reduced
+        resilience = torch.sigmoid(10.0 * (individual_benefit - benefit_threshold))
+        
+        # Final suppression: misaligned events are suppressed, UNLESS they are highly beneficial
+        self.Q = self.Q * (1.0 - (suppression * (1.0 - resilience)))
 
         return self
 
@@ -298,8 +318,22 @@ class AttentionContext:
 
         is_threat = (self.K < 0).float()
         threat_amplifier = 1.0 + (is_threat * getattr(self.config, "threat_amplifier_gain", 1.5))
+        
+        # --- Realism Fix: Opportunity Amplification ---
+        # If a signal is beneficial (filling a gap), it should also get 
+        # an attention boost. Rational agents pay attention to things 
+        # that help them survive/prosper.
+        normalized_state = (self.exposures + 1.0) / 2.0
+        gaps = 1.0 - normalized_state
+        positive_signal = torch.clamp(self.world_tensor, min=0.0)
+        # benefit_mag = (gaps * positive_signal).sum(dim=1, keepdim=True)
+        # We look at per-dimension benefit
+        benefit_mask = (gaps * positive_signal) > getattr(self.config, "opportunity_threshold", 0.2)
+        
+        opportunity_gain = getattr(self.config, "opportunity_amplifier_gain", 1.5)
+        opportunity_amplifier = 1.0 + (benefit_mask.float() * opportunity_gain)
 
-        self.relevance = relevance * threat_amplifier
+        self.relevance = relevance * threat_amplifier * opportunity_amplifier
         return self
 
     def temperature_layer(self):

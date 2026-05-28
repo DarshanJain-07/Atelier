@@ -184,22 +184,74 @@ class SocialPhysicsEngine:
                 negative_integral += abs(valence_score)
 
             if tick < num_ticks - 1:
-                # Stewing Update: blend agent's current state with local echo chamber and global viral state
+                # Get base influence parameters
                 self_retention = getattr(self.config, "stewing_self_retention", 0.6)
                 local_influence = getattr(self.config, "stewing_local_influence", 0.3)
                 viral_influence = getattr(self.config, "stewing_viral_influence", 0.1)
 
-                target_arousal = torch.norm(current_emotions, dim=1, keepdim=True)
-
+                # --- Realism Fix: Saliency-Dominant Stewing ---
+                # Instead of a simple weighted average (which allows the majority to swamp
+                # the minority), we use a non-linear blend that prioritizes high-arousal
+                # negative emotions (contagion).
+                
+                # 1. Calculate Component Energy
+                self_energy = torch.norm(current_emotions, dim=1, keepdim=True)
+                local_energy = torch.norm(local_centers, dim=1, keepdim=True)
+                # viral_center is (8,), so we expand it
+                viral_energy = torch.norm(viral_center).expand(N, 1)
+                
+                # 2. Identify Saliency (Negative Outrage)
+                # Emotions: [Joy, Trust, Fear, Surprise, Sadness, Disgust, Anger, Anticipation]
+                # Outrage: Fear (2), Disgust (5), Anger (6)
+                outrage_indices = [2, 5, 6]
+                self_outrage = current_emotions[:, outrage_indices].sum(dim=1, keepdim=True)
+                local_outrage = local_centers[:, outrage_indices].sum(dim=1, keepdim=True)
+                viral_outrage = viral_center[outrage_indices].sum().expand(N, 1)
+                
+                # 3. Dynamic Weighting (Saliency Boost)
+                # If a component has high outrage, we boost its influence
+                outrage_boost_gain = getattr(self.config, "stewing_outrage_boost", 2.0)
+                
+                w_self = self_retention * (1.0 + self_outrage * outrage_boost_gain)
+                w_local = local_influence * (1.0 + local_outrage * outrage_boost_gain)
+                w_viral = viral_influence * (1.0 + viral_outrage * outrage_boost_gain)
+                
+                # Normalize weights
+                w_total = w_self + w_local + w_viral + 1e-9
+                w_self /= w_total
+                w_local /= w_total
+                w_viral /= w_total
+                
+                # --- Blend State ---
                 new_emotions = (
-                    self_retention * current_emotions
-                    + local_influence * local_centers
-                    + viral_influence * viral_center.unsqueeze(0).expand(N, -1)
+                    w_self * current_emotions
+                    + w_local * local_centers
+                    + w_viral * viral_center.unsqueeze(0).expand(N, -1)
                 )
 
                 # Restore arousal to prevent energy loss during averaging
+                # --- Realism Fix: Energy Contagion ---
+                # Old logic: new_emotions = new_emotions * (target_arousal / new_arousal)
+                # This prevented energy from spreading. We now allow high-energy 
+                # components (local/viral) to boost the agent's arousal.
+                
+                # Component arousals
+                arousal_self = torch.norm(current_emotions, dim=1, keepdim=True)
+                arousal_local = torch.norm(local_centers, dim=1, keepdim=True)
+                arousal_viral = torch.norm(viral_center).expand(N, 1)
+                
+                # The 'Infection' arousal: how much energy is in the environment?
+                environment_arousal = torch.maximum(arousal_local, arousal_viral)
+                
+                # If environment is more aroused than me, I catch some of that energy
+                energy_contagion_gain = getattr(self.config, "stewing_energy_contagion", 0.3)
+                updated_target_arousal = torch.maximum(
+                    arousal_self, 
+                    arousal_self + (environment_arousal - arousal_self) * energy_contagion_gain
+                )
+                
                 new_arousal = torch.norm(new_emotions, dim=1, keepdim=True) + 1e-9
-                new_emotions = new_emotions * (target_arousal / new_arousal)
+                new_emotions = new_emotions * (updated_target_arousal / new_arousal)
 
                 current_emotions = new_emotions
 
@@ -295,19 +347,36 @@ class SocialPhysicsEngine:
         else:
             local_centers = center_of_gravity.unsqueeze(0).expand(N, -1)
 
-        # ============================================================
-        # 2-Stage Action Potential (Granovetter's Threshold Model)
-        # ============================================================
-        # Stage 1: Individual Motivation
-        # Stage 2: Critical Mass / Social Thresholds
-
+        # --- Stage 2: 2-Stage Action Potential (Asymmetric Contagion) ---
         final_arousal = torch.norm(current_emotions, dim=1)
         norm_emotion = current_emotions / (final_arousal.unsqueeze(1) + 1e-9)
         local_arousal = torch.norm(local_centers, dim=1)
         norm_local = local_centers / (local_arousal.unsqueeze(1) + 1e-9)
+        
+        # Alignment is how much I agree with my neighbors
         alignment = (norm_emotion * norm_local).sum(dim=1)
-        social_validation = 1.0 + alignment
-
+        
+        # --- Realism Fix: Asymmetric Contagion ---
+        # In the old model, social_validation = 1.0 + alignment.
+        # This meant negative alignment (conflict) reduced motivation.
+        # In the real world, if neighbors are angry/fearful, it increases your stress/arousal
+        # regardless of whether you 'agree' with their specific reason.
+        
+        # We calculate 'Stress Arousal': The contagion of negative energy
+        # Emotions: [Joy, Trust, Fear, Surprise, Sadness, Disgust, Anger, Anticipation]
+        # Indices 2 (Fear), 5 (Disgust), 6 (Anger) are high-contagion negative emotions
+        negative_neighbor_energy = local_centers[:, [2, 5, 6]].sum(dim=1)
+        
+        # If neighbors are angry/fearful, they provide a 'contagion floor'
+        # social_validation should not drop below 1.0 if there is high negative energy nearby.
+        contagion_floor = torch.clamp(negative_neighbor_energy * 2.0, min=0.0, max=0.5)
+        
+        # Dynamic social validation:
+        # If I agree (alignment > 0), I am validated (+alignment).
+        # If I disagree (alignment < 0), I am stressed/aroused by their energy (+contagion_floor).
+        # We take the max of the two to ensure 'conflict' doesn't suppress action.
+        social_validation = 1.0 + torch.maximum(alignment, contagion_floor)
+        
         base_cost = getattr(self.config, "base_action_cost", 0.5)
         if personalities is not None:
             extraversion = personalities[:, 2].to(current_emotions.device)
@@ -336,7 +405,20 @@ class SocialPhysicsEngine:
             else:
                 engaged_mask = torch.rand(N, device=current_emotions.device) > 0.95
         elif engagement_scores is not None:
-            engaged_mask = engagement_scores > (engagement_scores.mean() * 0.1)
+            # --- Realism Fix: Social Engagement Contagion ---
+            # Old logic: engaged_mask = engagement_scores > (engagement_scores.mean() * 0.1)
+            # This prevented unengaged people from catching the 'outrage'.
+            # New logic: you are engaged if the initial signal engaged you OR
+            # if the final social environment is highly aroused (contagion).
+            
+            initial_engaged_mask = engagement_scores > (engagement_scores.mean() * 0.1)
+            
+            # Local/Viral arousal (contagion) can re-activate passive agents
+            social_arousal = torch.maximum(local_arousal, torch.norm(viral_center))
+            social_engagement_threshold = getattr(self.config, "social_engagement_trigger", 0.6)
+            contagion_engaged_mask = social_arousal >= social_engagement_threshold
+            
+            engaged_mask = initial_engaged_mask | contagion_engaged_mask
         else:
             engaged_mask = torch.ones(N, dtype=torch.bool, device=current_emotions.device)
 

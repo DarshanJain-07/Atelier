@@ -171,6 +171,7 @@ def _relocate_axis_legend(ax):
 
 def save_paper_figure(fig, path: str | Path):
     """Persist a figure using the paper-wide export settings."""
+    import warnings
     path = Path(path)
     has_outside_legend = False
     for ax in fig.axes:
@@ -180,11 +181,12 @@ def save_paper_figure(fig, path: str | Path):
     if has_outside_legend:
         # Add canvas above the axes for title + legend rather than shrinking the plot.
         fig.set_size_inches(width_in, height_in * 1.28, forward=True)
-        fig.tight_layout(rect=(0.0, 0.0, 1.0, 0.96))
+        fig.tight_layout(rect=(0.0, 0.0, 1.0, 0.94))
     else:
         fig.set_size_inches(width_in, height_in, forward=True)
         fig.tight_layout()
     fig.savefig(path, dpi=PAPER_DPI, bbox_inches="tight", pad_inches=0.02)
+    plt.close(fig)
 
 
 def compose_panel_grid(

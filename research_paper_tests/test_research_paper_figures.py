@@ -1196,6 +1196,7 @@ def test_generate_research_paper_advanced_visualizations(tmp_path):
 
     reducer = umap.UMAP(
         random_state=cluster_settings["cluster_seed"],
+        n_jobs=1,
         n_neighbors=30,
         min_dist=0.15,
     )

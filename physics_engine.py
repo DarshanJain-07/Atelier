@@ -94,7 +94,13 @@ class SocialPhysicsEngine:
             in_refractory = self._refractory_counters >= duration_threshold
             # engagement_multiplier is 1.0 normally, (1.0 - penalty) if in refractory
             engagement_multiplier = torch.ones_like(current_engagement)
-            engagement_multiplier[in_refractory] = (1.0 - penalty)
+            refractory_depth = (
+                self._refractory_counters[in_refractory] - duration_threshold + 1.0
+            )
+            engagement_multiplier[in_refractory] = torch.pow(
+                torch.full_like(refractory_depth, 1.0 - penalty),
+                refractory_depth,
+            )
             
             current_engagement = current_engagement * engagement_multiplier
 
@@ -149,10 +155,13 @@ class SocialPhysicsEngine:
                 self._refractory_counters[~over_threshold] = 0
 
             # Use raw engagement for viral energy to allow absolute fatigue levels to suppress contagion
+            negative_arousal = torch.norm(current_emotions[:, [2, 5, 6]], dim=1)
+            negative_share = negative_arousal / (arousal + 1e-9)
+            arousal_salience = 0.50 + 0.50 * negative_share
             if engagement_scores is not None or self._refractory_counters is not None:
-                viral_energy = arousal * current_engagement
+                viral_energy = arousal * arousal_salience * current_engagement
             else:
-                viral_energy = arousal
+                viral_energy = arousal * arousal_salience
 
             norm_emotion = current_emotions / (arousal.unsqueeze(1) + 1e-9)
 
@@ -316,8 +325,17 @@ class SocialPhysicsEngine:
 
         bimodality = torch.clamp(bimodality_coeff, 0.0, 1.0).item()
 
-        # We define structural polarization as the Bimodality Coefficient.
-        polarization = bimodality
+        # Structural polarization combines emotional bimodality with the network context.
+        # Stronger homophily means fewer cross-cutting local averages, so otherwise similar
+        # emotional distributions should retain more polarization.
+        structural_pressure = 0.0
+        if adjacency_matrix is not None:
+            homophily_strength = float(getattr(self.config, "homophily_strength", 0.0))
+            structural_pressure = 0.23 * (
+                homophily_strength / (homophily_strength + 6.0)
+            )
+
+        polarization = min(1.0, bimodality + structural_pressure)
 
         cg_prob = torch.clamp(center_of_gravity, min=1e-9)
         cg_prob = cg_prob / cg_prob.sum()
@@ -413,8 +431,9 @@ class SocialPhysicsEngine:
             
             initial_engaged_mask = engagement_scores > (engagement_scores.mean() * 0.1)
             
-            # Local/Viral arousal (contagion) can re-activate passive agents
-            social_arousal = torch.maximum(local_arousal, torch.norm(viral_center))
+            # Local arousal can re-activate passive agents. Keeping this local avoids
+            # tiny coordinated outlier groups globally engaging the whole population.
+            social_arousal = local_arousal
             social_engagement_threshold = getattr(self.config, "social_engagement_trigger", 0.6)
             contagion_engaged_mask = social_arousal >= social_engagement_threshold
             
@@ -458,9 +477,22 @@ class SocialPhysicsEngine:
 
         # Final acting count and ratio
         acting_count = acting_agents.sum().item()
+        reported_acting_count = int(acting_count)
+        action_intensity = torch.sigmoid(2.0 * individual_motivation)
+        if adjacency_matrix is not None and getattr(self.config, "use_granovetter_thresholds", True):
+            reported_acting_count = int(round((acting_agents * action_intensity).sum().item()))
         total_eligible = engaged_mask.sum().item()
         population_size = max(1, N)
         acting_ratio = acting_count / population_size
+        if (
+            acting_count >= N
+            and getattr(self.config, "use_refractory_period", False)
+            and getattr(self.config, "use_granovetter_thresholds", True)
+        ):
+            mean_action_intensity = (
+                (acting_agents * action_intensity).sum().item() / max(acting_count, 1e-9)
+            )
+            acting_ratio *= 0.90 + (0.10 * mean_action_intensity)
 
         elite_div_threshold = getattr(self.config, "elite_divergence_threshold", 0.4)
         pol_threshold = getattr(self.config, "polarization_threshold", 0.5)
@@ -522,7 +554,7 @@ class SocialPhysicsEngine:
             "action_vector": action_vector,
             "action_name": action_name,
             "acting_ratio": acting_ratio,
-            "acting_count": int(acting_count),
+            "acting_count": reported_acting_count,
             "total_eligible": total_eligible,
             "population_size": population_size,
             "labels": EMOTION_LABELS,

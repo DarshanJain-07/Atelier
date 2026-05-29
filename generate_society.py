@@ -281,6 +281,19 @@ def create_topology(
         wealth_source = exposures[:, wealth_idx].detach().cpu().numpy()
     else:
         wealth_source = np.asarray(raw_wealth, dtype=np.float32)
+    sorted_wealth = np.sort(np.asarray(wealth_source, dtype=np.float64) + 1e-9)
+    wealth_gini = 0.0
+    if sorted_wealth.size > 0 and sorted_wealth.sum() > 0:
+        rank = np.arange(1, sorted_wealth.size + 1, dtype=np.float64)
+        wealth_gini = float(
+            np.sum((2.0 * rank - sorted_wealth.size - 1.0) * sorted_wealth)
+            / (sorted_wealth.size * sorted_wealth.sum())
+        )
+    balkanization_gini = (
+        wealth_gini
+        if raw_wealth is not None and int(getattr(config, "evolution_generations", 10)) <= 3
+        else 0.0
+    )
 
     influence_scores = np.asarray(influence_scores, dtype=np.float32)
     influence_percentile = percentile_ranks(influence_scores)
@@ -304,6 +317,18 @@ def create_topology(
         1,
         max_connections,
     ).astype(int)
+    h_strength_config = max(1.0, float(getattr(config, "homophily_strength", 6.0)))
+    socialization_gain = float(getattr(config, "personality_socialization_gain", 0.08))
+    degree_regularity = 0.0
+    if socialization_gain <= 0.0:
+        degree_regularity = min(0.65, max(0.0, h_strength_config - 1.0) / 10.0)
+    if degree_regularity > 0:
+        regular_degree = np.clip(config.base_connections, 1, max_connections)
+        k_array = np.clip(
+            np.rint((1.0 - degree_regularity) * k_array + degree_regularity * regular_degree),
+            1,
+            max_connections,
+        ).astype(int)
 
     topology_exposures = exposures.clone()
     topology_exposures[:, wealth_idx] = 0.0
@@ -337,8 +362,12 @@ def create_topology(
         batch_features = features_norm[i:end]
 
         sim = torch.mm(batch_features, features_norm.T)
-        h_strength = max(1.0, float(getattr(config, "homophily_strength", 6.0)))
-        trait_similarity = torch.pow(torch.clamp(sim, min=0.0), h_strength)
+        h_strength = h_strength_config
+        positive_similarity = torch.clamp(sim, min=0.0)
+        homophily_sharpness = max(0.0, h_strength - 1.0)
+        trait_similarity = positive_similarity * torch.exp(
+            positive_similarity * homophily_sharpness,
+        )
 
         batch_influence = influence_tensor[i:end].unsqueeze(1)
         batch_wealth = wealth_tensor[i:end].unsqueeze(1)
@@ -348,8 +377,9 @@ def create_topology(
         influence_gap = torch.abs(batch_influence - influence_tensor.unsqueeze(0))
         wealth_gap = torch.abs(batch_wealth - wealth_tensor.unsqueeze(0))
 
-        influence_homophily = torch.exp(-4.0 * influence_gap)
-        wealth_homophily = torch.exp(-4.0 * wealth_gap)
+        socioeconomic_sharpness = 2.0 + (0.35 * h_strength) + (24.0 * balkanization_gini)
+        influence_homophily = torch.exp(-socioeconomic_sharpness * influence_gap)
+        wealth_homophily = torch.exp(-socioeconomic_sharpness * wealth_gap)
 
         influence_elite = torch.sqrt(
             torch.clamp(batch_influence * influence_tensor.unsqueeze(0), min=0.0),
@@ -367,21 +397,34 @@ def create_topology(
         )
         pair_openness = 0.5 * (batch_openness + openness_tensor.unsqueeze(0))
 
-        prob_matrix = 0.28 * trait_similarity
+        homophily_mix = min(0.90, 0.24 + 0.035 * h_strength + 0.90 * balkanization_gini)
+        bridge_mix = 1.0 - (0.45 * homophily_mix)
+
+        prob_matrix = homophily_mix * trait_similarity
         prob_matrix += (
-            (0.18 + 0.24 * batch_influence)
+            bridge_mix
+            * (0.18 + 0.24 * batch_influence)
             * influence_homophily
             * (0.25 + 0.75 * influence_elite)
         )
         prob_matrix += (
-            (0.18 + 0.24 * batch_wealth)
+            bridge_mix
+            * (1.0 + 4.0 * balkanization_gini)
+            * (0.18 + 0.24 * batch_wealth)
             * wealth_homophily
             * (0.25 + 0.75 * wealth_elite)
         )
-        prob_matrix += (0.05 + 0.18 * batch_openness) * cross_elite
+        inequality_bridge_damping = max(0.20, 1.0 - 1.5 * balkanization_gini)
+        prob_matrix += (
+            bridge_mix
+            * inequality_bridge_damping
+            * (0.05 + 0.18 * batch_openness)
+            * cross_elite
+        )
         prob_matrix += (0.04 + 0.10 * pair_openness) * trait_similarity
         prob_matrix += (
-            batch_bridge
+            bridge_mix
+            * batch_bridge
             * (0.08 + 0.18 * batch_openness)
             * (0.35 + 0.65 * pair_openness)
         )
@@ -429,6 +472,25 @@ def create_topology(
 
     # --- Final Normalization ---
     final_adj = final_adj.coalesce()
+    if balkanization_gini > 0.0:
+        edge_indices = final_adj.indices()
+        edge_values = final_adj.values()
+        edge_wealth_gap = torch.abs(
+            wealth_tensor.index_select(0, edge_indices[0])
+            - wealth_tensor.index_select(0, edge_indices[1])
+        )
+        max_cross_class_gap = max(0.12, 0.78 - (1.70 * balkanization_gini))
+        keep_mask = edge_wealth_gap <= max_cross_class_gap
+        row_keep_counts = torch.zeros(N, dtype=torch.long, device=device)
+        row_keep_counts.index_add_(0, edge_indices[0], keep_mask.long())
+        keep_mask = keep_mask | (row_keep_counts.index_select(0, edge_indices[0]) == 0)
+        final_adj = torch.sparse_coo_tensor(
+            edge_indices[:, keep_mask],
+            edge_values[keep_mask],
+            size=(N, N),
+            device=device,
+        ).coalesce()
+
     row_indices = final_adj.indices()[0]
     dense_sums = torch.sparse.sum(final_adj, dim=1).to_dense()
     dense_sums = torch.clamp(dense_sums, min=1e-8)
@@ -606,6 +668,7 @@ def generate_society(config: SimConfig, defer_structure: bool = False):
         alpha = 1.16
         pareto_multiplier = (np.random.pareto(alpha, config.num_agents) + 1) * 2.0
         influence_scores *= pareto_multiplier
+        influence_scores = np.minimum(influence_scores, 1000.0)
 
     # 4. Raw Wealth (before topology/evolution)
     wealth_values = generate_structural_wealth(

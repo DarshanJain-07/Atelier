@@ -700,6 +700,73 @@ def apply_triadic_closure_for_debug(config: SimConfig, adjacency_matrix: torch.T
     return apply_triadic_closure(clone_sim_config(config), adjacency_matrix, adjacency_matrix.device)
 
 
+ALGORITHMIC_DENSE_REWEIGHT_MAX_AGENTS = 500
+
+
+def _row_normalize_sparse_adjacency(
+    indices: torch.Tensor,
+    values: torch.Tensor,
+    size: torch.Size,
+) -> torch.Tensor:
+    row_sums = torch.zeros(size[0], dtype=values.dtype, device=values.device)
+    row_sums.index_add_(0, indices[0], values)
+    normalized_values = values / row_sums[indices[0]].clamp_min(1e-8)
+    return torch.sparse_coo_tensor(
+        indices,
+        normalized_values,
+        size=size,
+        device=values.device,
+    ).coalesce()
+
+
+def reweight_algorithmic_adjacency(
+    adjacency_matrix: torch.Tensor,
+    exposures: torch.Tensor,
+    amplified_dims: torch.Tensor,
+    *,
+    homophily_threshold: float = 0.8,
+    boost_factor: float = 1.5,
+    dense_max_agents: int = ALGORITHMIC_DENSE_REWEIGHT_MAX_AGENTS,
+) -> tuple[torch.Tensor, str]:
+    """Reweight existing topology edges toward algorithmically amplified topics.
+
+    Small offline checks may use dense all-pairs homophily. Larger societies only
+    score existing sparse edges, avoiding an NxN allocation.
+    """
+    adjacency = adjacency_matrix.coalesce()
+    if amplified_dims.numel() == 0 or adjacency._nnz() == 0:
+        return adjacency, "none"
+
+    amplified_dims = amplified_dims.to(device=exposures.device, dtype=torch.long)
+    topic_exposures = exposures.index_select(1, amplified_dims)
+    normalized_topics = topic_exposures / topic_exposures.norm(
+        dim=1,
+        keepdim=True,
+    ).clamp_min(1e-8)
+
+    num_agents = exposures.shape[0]
+    if num_agents <= dense_max_agents:
+        adjacency_dense = adjacency.to_dense()
+        homophily = torch.mm(normalized_topics, normalized_topics.t())
+        adjacency_dense[homophily > homophily_threshold] *= boost_factor
+        row_sums = adjacency_dense.sum(dim=1, keepdim=True)
+        adjacency_dense = adjacency_dense / row_sums.clamp_min(1e-8)
+        return adjacency_dense.to_sparse_coo().coalesce(), "dense"
+
+    indices = adjacency.indices()
+    values = adjacency.values()
+    edge_similarity = (
+        normalized_topics.index_select(0, indices[0])
+        * normalized_topics.index_select(0, indices[1])
+    ).sum(dim=1)
+    boosted_values = values * torch.where(
+        edge_similarity > homophily_threshold,
+        torch.as_tensor(boost_factor, dtype=values.dtype, device=values.device),
+        torch.ones((), dtype=values.dtype, device=values.device),
+    )
+    return _row_normalize_sparse_adjacency(indices, boosted_values, adjacency.size()), "sparse"
+
+
 def execute_simulation_cycle(
     society: PreparedSociety,
     world_tensor_raw: torch.Tensor,
@@ -767,6 +834,16 @@ def execute_simulation_cycle(
         agent_memory=memory,
         adjacency_matrix=active_society.adjacency_matrix,
     )
+    if getattr(active_society.config, "use_power_law_influence", False):
+        influence = torch.tensor(
+            active_society.metadata["Influence"].to_numpy(dtype=np.float32),
+            dtype=engagement_scores.dtype,
+            device=engagement_scores.device,
+        )
+        influence_scale = influence / influence.mean().clamp_min(1e-8)
+        engagement_scores = engagement_scores * (
+            1.0 + 0.45 * torch.log1p(influence_scale)
+        )
 
     if active_society.config.use_algorithmic_amplification:
         sample_size = max(
@@ -795,9 +872,8 @@ def execute_simulation_cycle(
         algorithmic_bias = torch.zeros(12, device=final_world_tensor.device)
         exaggeration = active_society.config.algo_exaggeration_factor
         signal_floor = 0.05
-        
-        # We also create a mask for dynamic graph convolution
-        is_algo_active = False
+
+        active_algorithmic_dims: list[torch.Tensor] = []
 
         for dim_idx in top_dims:
             current_val = final_world_tensor[0, dim_idx].item()
@@ -807,30 +883,26 @@ def execute_simulation_cycle(
                 continue
             # Multiplicative bias for the attention pipeline
             algorithmic_bias[dim_idx] = exaggeration - 1.0
-            is_algo_active = True
+            active_algorithmic_dims.append(dim_idx)
+
+        is_algo_active = bool(active_algorithmic_dims)
 
         # Dynamic Graph Convolution (Filter Bubble Creation)
         algorithmic_adjacency = active_society.adjacency_matrix
-        if is_algo_active and algorithmic_adjacency is not None and getattr(active_society.config, "use_network_topology", True):
-            N = active_society.personalities.shape[0]
-            if N <= 5000:  # Prevent OOM on very large societies
-                adj_dense = algorithmic_adjacency.to_dense()
-                
-                # Agents who share similar worldview on the amplified dimensions are pushed together
-                top_exposures = active_society.exposures[:, top_dims]
-                # Cosine similarity for homophily
-                norm_exp = top_exposures / (torch.norm(top_exposures, dim=1, keepdim=True) + 1e-8)
-                homophily = torch.mm(norm_exp, norm_exp.t())
-                
-                # Boost edges between agents who share similar views on the algorithmic topics
-                boost_mask = homophily > 0.8
-                adj_dense[boost_mask] *= 1.5
-                
-                # Re-normalize rows to maintain transition matrix properties
-                row_sums = adj_dense.sum(dim=1, keepdim=True)
-                adj_dense = adj_dense / (row_sums + 1e-8)
-                
-                algorithmic_adjacency = adj_dense.to_sparse_coo()
+        if (
+            is_algo_active
+            and algorithmic_adjacency is not None
+            and getattr(active_society.config, "use_network_topology", True)
+        ):
+            amplified_dims = torch.stack(active_algorithmic_dims).to(
+                device=active_society.exposures.device,
+                dtype=torch.long,
+            )
+            algorithmic_adjacency, _ = reweight_algorithmic_adjacency(
+                algorithmic_adjacency,
+                active_society.exposures,
+                amplified_dims,
+            )
 
         context_vector, attention_weights, engagement_scores = cog_engine.run(
             world_tensor_raw=final_world_tensor,
@@ -843,6 +915,16 @@ def execute_simulation_cycle(
             adjacency_matrix=algorithmic_adjacency,
             algorithmic_bias=algorithmic_bias if is_algo_active else None,
         )
+        if getattr(active_society.config, "use_power_law_influence", False):
+            influence = torch.tensor(
+                active_society.metadata["Influence"].to_numpy(dtype=np.float32),
+                dtype=engagement_scores.dtype,
+                device=engagement_scores.device,
+            )
+            influence_scale = influence / influence.mean().clamp_min(1e-8)
+            engagement_scores = engagement_scores * (
+                1.0 + 0.45 * torch.log1p(influence_scale)
+            )
 
     final_emotions = cog_engine.project_emotions(context_vector)
     social_state = phys_engine.aggregate_society(

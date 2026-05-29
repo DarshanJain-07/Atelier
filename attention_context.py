@@ -242,8 +242,13 @@ class AttentionContext:
         # If benefit is high, suppression pressure is reduced
         resilience = torch.sigmoid(10.0 * (individual_benefit - benefit_threshold))
         
-        # Final suppression: misaligned events are suppressed, UNLESS they are highly beneficial
-        self.Q = self.Q * (1.0 - (suppression * (1.0 - resilience)))
+        # Final suppression: misaligned events are suppressed, UNLESS they are highly beneficial.
+        # High-openness agents also retain curiosity under contradiction, preserving the intended
+        # gradient instead of treating openness only as an added query preference.
+        misalignment = torch.clamp(-alignment, min=0.0)
+        curiosity_gain = getattr(self.config, "openness_misalignment_gain", 2.0)
+        curiosity_boost = 1.0 + (openness * misalignment * curiosity_gain)
+        self.Q = self.Q * (1.0 - (suppression * (1.0 - resilience))) * curiosity_boost
 
         return self
 

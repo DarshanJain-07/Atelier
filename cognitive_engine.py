@@ -83,6 +83,20 @@ class CognitiveEngine:
 
         distorted = event_signal.unsqueeze(0) + alpha * noise
 
+        positive_signal = torch.clamp(event_signal, min=0.0).sum()
+        negative_signal = torch.clamp(-event_signal, min=0.0).sum()
+        if positive_signal > 0 and negative_signal > 0:
+            openness = personality[:, 0:1].to(device)
+            agreeableness = personality[:, 3:4].to(device)
+            cross_pressure = torch.minimum(positive_signal, negative_signal) / (
+                torch.maximum(positive_signal, negative_signal) + 1e-9
+            )
+            moderation = 1.0 - (
+                cross_pressure
+                * (0.28 * openness + 0.12 * agreeableness)
+            )
+            distorted = distorted * torch.clamp(moderation, min=0.55, max=1.0)
+
         return torch.clamp(distorted, -1.5, 1.5)
 
     def apply_social_consensus(
@@ -472,7 +486,22 @@ class CognitiveEngine:
                 skeptical_raw_energy = skeptical_raw_energy * (1.0 - shield_reduction)
             
             sample_context.index_copy_(0, skeptical_local, skeptical_context)
-            skeptical_energy = skeptical_raw_energy.mean() * float(backlash_potential)
+            memory_energy_multiplier = torch.tensor(1.0, device=device)
+            if agent_memory is not None:
+                sample_institutional_memory = sample_memory[:, [3, 4]]
+                distrust = torch.clamp(-sample_institutional_memory, min=0.0).mean()
+                trust = torch.clamp(sample_institutional_memory, min=0.0).mean()
+                trauma_gain = getattr(self.config, "backlash_memory_energy_gain", 1.6)
+                trust_gain = getattr(self.config, "backlash_memory_trust_energy_drop", 0.8)
+                memory_energy_multiplier = torch.clamp(
+                    1.0 + distrust * trauma_gain - trust * trust_gain,
+                    min=0.2,
+                )
+            skeptical_energy = (
+                skeptical_raw_energy.mean()
+                * memory_energy_multiplier
+                * float(backlash_potential)
+            )
             # print(f"DEBUG: Skeptical Count: {skeptical_local.numel()}, Raw Energy: {skeptical_raw_energy.mean():.4f}, Final Energy: {skeptical_energy:.4f}")
 
         if official_local.numel() > 0:
@@ -568,6 +597,11 @@ class CognitiveEngine:
 
         device = agent_memory.device
         base_decay = getattr(self.config, "memory_decay_rate", 0.7)
+        high_decay_acceleration = max(0.0, base_decay - 0.82)
+        base_retention = max(
+            0.0,
+            min(1.0, 1.0 - (0.40 * base_decay) - (4.0 * high_decay_acceleration)),
+        )
         rehearsal_gain = getattr(self.config, "memory_social_rehearsal_gain", 0.4)
 
         # Effective decay:
@@ -585,7 +619,9 @@ class CognitiveEngine:
         valence_multiplier = 1.0 - 0.5 * max(0, valence)
         effective_rehearsal = social_rehearsal_factor * valence_multiplier
         
-        effective_decay = base_decay + (1.0 - base_decay) * (effective_rehearsal * rehearsal_gain)
+        effective_decay = base_retention + (
+            (1.0 - base_retention) * (effective_rehearsal * rehearsal_gain)
+        )
         
         # Cap at 0.95 to ensure even viral memories eventually fade without reinforcement
         effective_decay = min(0.95, effective_decay)

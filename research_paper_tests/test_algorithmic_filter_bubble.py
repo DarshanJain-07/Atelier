@@ -1,6 +1,10 @@
 import torch
 import numpy as np
-from main import run_debug_simulation
+from main import (
+    ALGORITHMIC_DENSE_REWEIGHT_MAX_AGENTS,
+    reweight_algorithmic_adjacency,
+    run_debug_simulation,
+)
 from research_paper_tests.config_schema import (
     build_world,
     get_test_scenario,
@@ -11,6 +15,113 @@ from research_paper_tests.stats_utils import (
     assert_statistically_greater,
     assert_monotonic_relationship
 )
+
+
+def _two_cluster_sparse_adjacency(num_agents: int) -> tuple[torch.Tensor, torch.Tensor]:
+    assert num_agents % 2 == 0
+    half = num_agents // 2
+    exposures = torch.zeros(num_agents, 12)
+    exposures[:half, 0] = 1.0
+    exposures[half:, 0] = -1.0
+
+    rows = []
+    cols = []
+    for agent_idx in range(num_agents):
+        if agent_idx < half:
+            same_neighbor = (agent_idx + 1) % half
+            cross_neighbor = half + agent_idx
+        else:
+            same_neighbor = half + ((agent_idx - half + 1) % half)
+            cross_neighbor = agent_idx - half
+        rows.extend([agent_idx, agent_idx])
+        cols.extend([same_neighbor, cross_neighbor])
+
+    indices = torch.tensor([rows, cols], dtype=torch.long)
+    values = torch.full((len(rows),), 0.5, dtype=torch.float32)
+    adjacency = torch.sparse_coo_tensor(
+        indices,
+        values,
+        size=(num_agents, num_agents),
+    ).coalesce()
+    return adjacency, exposures
+
+
+def _same_and_cross_edge_means(
+    adjacency: torch.Tensor,
+    num_agents: int,
+) -> tuple[float, float]:
+    adjacency = adjacency.coalesce()
+    half = num_agents // 2
+    rows = adjacency.indices()[0]
+    cols = adjacency.indices()[1]
+    values = adjacency.values()
+    same_cluster = (rows < half) == (cols < half)
+    return (
+        float(values[same_cluster].mean().item()),
+        float(values[~same_cluster].mean().item()),
+    )
+
+
+def test_algorithmic_reweighting_uses_dense_small_population(n_seeds):
+    def runner(seed: int):
+        torch.manual_seed(seed)
+        num_agents = min(256, ALGORITHMIC_DENSE_REWEIGHT_MAX_AGENTS)
+        adjacency, exposures = _two_cluster_sparse_adjacency(num_agents)
+
+        reweighted, mode = reweight_algorithmic_adjacency(
+            adjacency,
+            exposures,
+            torch.tensor([0]),
+        )
+
+        row_sums = torch.sparse.sum(reweighted, dim=1).to_dense()
+        same_mean, cross_mean = _same_and_cross_edge_means(reweighted, num_agents)
+        return {
+            "mode": mode,
+            "row_sum_error": float((row_sums - 1.0).abs().max().item()),
+            "same_mean": same_mean,
+            "cross_mean": cross_mean,
+        }
+
+    results = run_monte_carlo(runner, n_seeds=min(n_seeds, 3))
+    assert {result["mode"] for result in results} == {"dense"}
+    assert max(result["row_sum_error"] for result in results) < 1e-6
+    assert_statistically_greater(
+        [result["same_mean"] for result in results],
+        [result["cross_mean"] for result in results],
+    )
+
+
+def test_algorithmic_reweighting_uses_sparse_large_population(n_seeds):
+    def runner(seed: int):
+        torch.manual_seed(seed)
+        num_agents = 1200
+        adjacency, exposures = _two_cluster_sparse_adjacency(num_agents)
+
+        reweighted, mode = reweight_algorithmic_adjacency(
+            adjacency,
+            exposures,
+            torch.tensor([0]),
+        )
+
+        row_sums = torch.sparse.sum(reweighted, dim=1).to_dense()
+        same_mean, cross_mean = _same_and_cross_edge_means(reweighted, num_agents)
+        return {
+            "mode": mode,
+            "nnz": reweighted._nnz(),
+            "row_sum_error": float((row_sums - 1.0).abs().max().item()),
+            "same_mean": same_mean,
+            "cross_mean": cross_mean,
+        }
+
+    results = run_monte_carlo(runner, n_seeds=min(n_seeds, 3))
+    assert {result["mode"] for result in results} == {"sparse"}
+    assert {result["nnz"] for result in results} == {2400}
+    assert max(result["row_sum_error"] for result in results) < 1e-6
+    assert_statistically_greater(
+        [result["same_mean"] for result in results],
+        [result["cross_mean"] for result in results],
+    )
 
 def test_algorithmic_amplification_intensity_gradient(tmp_path, n_seeds):
     """

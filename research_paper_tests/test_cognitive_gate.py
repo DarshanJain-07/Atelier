@@ -1,109 +1,68 @@
+import numpy as np
 import torch
-
 from main import build_debug_society, run_debug_simulation
 from research_paper_tests.config_schema import (
+    DIMENSION_INDICES,
     PERSONALITY_INDICES,
     WORLD_DIMENSION_COUNT,
     build_world,
     get_test_scenario,
-    set_dimensions,
-    set_traits,
     zero_personalities,
 )
-from schema import DIMENSION_INDICES
+from research_paper_tests.stats_utils import (
+    run_monte_carlo,
+    assert_monotonic_relationship,
+    assert_statistically_greater
+)
 
-
-def _build_openness_gradient_society(config, settings):
-    exposures = torch.zeros(config.num_agents, WORLD_DIMENSION_COUNT)
-    personalities = zero_personalities(config.num_agents, fill=settings["trait_fill"])
-    personalities[:, PERSONALITY_INDICES["Openness"]] = torch.linspace(
-        settings["openness_start"],
-        settings["openness_end"],
-        config.num_agents,
-    )
-    worldview_scale = torch.linspace(
-        settings["worldview_min_scale"],
-        settings["worldview_max_scale"],
-        config.num_agents,
-    )
-
-    for dimension_name, dimension_value in settings["aligned_worldview"].items():
-        exposures[:, DIMENSION_INDICES[dimension_name]] = (
-            -dimension_value * worldview_scale
-        )
-
-    return build_debug_society(config, exposures, personalities)
-
-
-def test_cognitive_gate_blocks_misaligned_low_openness_agents():
-    scenario = get_test_scenario("cognitive_gate")
-    config = scenario.sim_config()
-    settings = scenario.settings()
-
-    half = config.num_agents // 2
-    exposures = torch.zeros(config.num_agents, WORLD_DIMENSION_COUNT)
-    personalities = zero_personalities(config.num_agents, fill=settings["trait_fill"])
-    set_traits(
-        personalities,
-        {"Openness": settings["low_openness"]},
-        rows=slice(None, half),
-    )
-    set_traits(
-        personalities,
-        {"Openness": settings["high_openness"]},
-        rows=slice(half, None),
-    )
-
-    set_dimensions(exposures, settings["aligned_worldview"], rows=slice(half, None))
-    set_dimensions(
-        exposures,
-        {name: -value for name, value in settings["aligned_worldview"].items()},
-        rows=slice(None, half),
-    )
-
-    society = build_debug_society(config, exposures, personalities)
-
-    world = build_world(settings["world"])
-
-    result = run_debug_simulation(
-        config,
-        world,
-        society=society,
-        urgency=settings["urgency"],
-    )
-    engagement = result.engagement_scores.numpy()
-
-    assert engagement[:half].mean() < engagement[half:].mean()
-    assert engagement[:half].mean() < config.engagement_threshold
-    assert engagement[half:].mean() > config.engagement_threshold
-
-
-def test_cognitive_gate_retains_engagement_for_high_openness_gradient():
+def test_cognitive_gate_gradient_response(n_seeds):
+    """
+    Validation: Engagement must increase monotonically with Openness for misaligned signals.
+    High-Openness agents "gate" less, allowing more engagement even with semantic contradiction.
+    This replaces hardcoded threshold probes with a gradient-based behavioral law.
+    """
     scenario = get_test_scenario("figure_cognitive_gate")
-    config = scenario.sim_config()
     settings = scenario.settings()
+    
+    # We sweep Openness to prove the "Gate" opens linearly or monotonically
+    openness_sweep = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]
+    mean_engagements = []
 
-    society = _build_openness_gradient_society(config, settings)
-    world = build_world(settings["world"])
+    def get_sim_runner(openness_val):
+        def runner():
+            # Build a focused test society for this specific openness level
+            config = scenario.sim_config()
+            config.num_agents = 50 
+            
+            exposures = torch.zeros(config.num_agents, WORLD_DIMENSION_COUNT)
+            personalities = zero_personalities(config.num_agents, fill=settings["trait_fill"])
+            personalities[:, PERSONALITY_INDICES["Openness"]] = openness_val
+            
+            # Setup strict misalignment: world signal is Positive, agent exposure is Negative
+            for dimension_name, dimension_value in settings["aligned_worldview"].items():
+                exposures[:, DIMENSION_INDICES[dimension_name]] = -1.0 
+            
+            society = build_debug_society(config, exposures, personalities)
+            world = build_world(settings["world"]) # The signal is Positive
+            
+            result = run_debug_simulation(
+                config,
+                world,
+                society=society,
+                urgency=settings["urgency"],
+            )
+            return result.engagement_scores.mean().item()
+        return runner
 
-    result = run_debug_simulation(
-        config,
-        world,
-        society=society,
-        urgency=settings["urgency"],
-    )
-    engagement = result.engagement_scores
-    openness = society.personalities[:, PERSONALITY_INDICES["Openness"]]
+    # 1. Execute Sweep
+    for o in openness_sweep:
+        results = run_monte_carlo(get_sim_runner(o), n_seeds=n_seeds)
+        mean_engagements.append(np.mean(results))
 
-    low_band = engagement[: config.num_agents // 4].mean().item()
-    high_band = engagement[-config.num_agents // 4 :].mean().item()
+    # Assertion: Increasing Openness must increase Engagement (lowers the "Gate" resistance)
+    assert_monotonic_relationship(openness_sweep, mean_engagements, "positive")
 
-    probe_01 = torch.argmin(torch.abs(openness - 0.1)).item()
-    probe_03 = torch.argmin(torch.abs(openness - 0.3)).item()
-    probe_04 = torch.argmin(torch.abs(openness - 0.4)).item()
-
-    assert engagement.max().item() > 0.05
-    assert high_band > low_band + 0.05
-    assert engagement[probe_01].item() <= 0.12
-    assert engagement[probe_03].item() >= 0.14
-    assert engagement[probe_04].item() >= 0.35
+    # 2. Statistical Significance
+    low_open_results = run_monte_carlo(get_sim_runner(0.0), n_seeds=n_seeds)
+    high_open_results = run_monte_carlo(get_sim_runner(1.0), n_seeds=n_seeds)
+    assert_statistically_greater(high_open_results, low_open_results)

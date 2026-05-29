@@ -9,7 +9,6 @@ import numpy as np
 import torch
 
 from main import (
-    DIMENSION_INDICES,
     build_debug_society,
     calculate_validation_metrics,
     clone_sim_config,
@@ -19,11 +18,15 @@ from main import (
 )
 from research_paper_tests._metrics import adjacency_to_graph, average_clustering, gini
 from research_paper_tests.config_schema import (
+    DIMENSION_INDICES,
     EMOTION_INDICES,
     PERSONALITY_TRAIT_COUNT,
     SENTIMENT_INDICES,
+    SimConfig,
     WORLD_DIMENSION_COUNT,
     build_world,
+    emotions_to_behavior_aware_sentiment_distribution,
+    emotions_to_sentiment_distribution,
     get_test_scenario,
     prepare_scenario_society,
     set_dimensions,
@@ -36,11 +39,6 @@ from research_paper_tests.test_response_boundaries import (
     _scaled_world,
 )
 from research_paper_tests.test_viral_scaling import _viral_scaling_curve
-from schema import (
-    SimConfig,
-    emotions_to_behavior_aware_sentiment_distribution,
-    emotions_to_sentiment_distribution,
-)
 
 OUTPUT_DIR = Path(__file__).resolve().parent / "generated"
 JSON_OUTPUT_PATH = OUTPUT_DIR / "paper_values_report.json"

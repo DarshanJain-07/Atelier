@@ -2,7 +2,7 @@ import networkx as nx
 import numpy as np
 import torch
 
-from schema import DIMENSION_INDICES
+from research_paper_tests.config_schema import DIMENSION_INDICES
 
 
 def gini(values) -> float:
@@ -194,4 +194,3 @@ def wl_kernel_similarity(adj_a: torch.Tensor, adj_b: torch.Tensor, iterations: i
     if norm_a == 0 or norm_b == 0:
         return 0.0
     return float(np.dot(vec_a, vec_b) / (norm_a * norm_b))
-

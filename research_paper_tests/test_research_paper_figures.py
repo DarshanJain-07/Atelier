@@ -7,7 +7,6 @@ import numpy as np
 import torch
 
 from main import (
-    DIMENSION_INDICES,
     aggregate_social_state,
     apply_triadic_closure_for_debug,
     build_debug_society,
@@ -28,6 +27,7 @@ from research_paper_tests._metrics import (
     mean_edge_topology_similarity,
 )
 from research_paper_tests.config_schema import (
+    DIMENSION_INDICES,
     EMOTION_INDICES,
     PERSONALITY_INDICES,
     PERSONALITY_TRAIT_COUNT,

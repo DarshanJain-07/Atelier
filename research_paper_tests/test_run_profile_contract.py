@@ -1,8 +1,11 @@
 from dataclasses import fields
 
 from main import RunProfile, create_sim_config, run_profile_to_sim_config_kwargs
-from research_paper_tests.config_schema import live_run_profile_defaults
-from schema import RUN_PROFILE_INTERNAL_ONLY_FIELDS, SimConfig
+from research_paper_tests.config_schema import (
+    RUN_PROFILE_INTERNAL_ONLY_FIELDS,
+    SimConfig,
+    live_run_profile_defaults,
+)
 
 
 def test_run_profile_defaults_follow_sim_config_defaults():

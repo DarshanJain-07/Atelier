@@ -1,5 +1,5 @@
 import os
-
+import numpy as np
 import pytest
 
 from research_paper_tests.config_schema import (
@@ -8,6 +8,7 @@ from research_paper_tests.config_schema import (
     get_test_scenario,
     prepare_scenario_society,
 )
+from research_paper_tests.stats_utils import run_monte_carlo
 
 EVOLUTION_MATRIX_MODE = os.getenv("RESEARCH_TEST_EVOLUTION_MATRIX", "").strip().lower()
 
@@ -32,26 +33,33 @@ def test_generated_society_cases_support_requested_evolution_modes(
     tmp_path,
     scenario_name,
     enable_evolution,
+    n_seeds,
 ):
     scenario = get_test_scenario(scenario_name)
     expected_config = scenario.sim_config(
         enable_evolution=enable_evolution,
         smoke=True,
     )
-    society = prepare_scenario_society(
-        scenario_name,
-        tmp_path,
-        enable_evolution=enable_evolution,
-        smoke=True,
-    )
 
-    assert society.config.enable_evolution is enable_evolution
-    assert society.exposures.shape[0] == expected_config.num_agents
-    assert society.personalities.shape[0] == expected_config.num_agents
-    assert society.affinities.shape == society.exposures.shape
-    assert society.memory.shape == society.exposures.shape
+    def runner():
+        society = prepare_scenario_society(
+            scenario_name,
+            tmp_path / f"evo_{np.random.randint(1e9)}",
+            enable_evolution=enable_evolution,
+            smoke=True,
+        )
 
-    if expected_config.use_network_topology:
-        assert society.adjacency_matrix is not None
-    else:
-        assert society.adjacency_matrix is None
+        assert society.config.enable_evolution is enable_evolution
+        assert society.exposures.shape[0] == expected_config.num_agents
+        assert society.personalities.shape[0] == expected_config.num_agents
+        assert society.affinities.shape == society.exposures.shape
+        assert society.memory.shape == society.exposures.shape
+
+        if expected_config.use_network_topology:
+            assert society.adjacency_matrix is not None
+        else:
+            assert society.adjacency_matrix is None
+        return True
+
+    results = run_monte_carlo(runner, n_seeds=n_seeds)
+    assert all(results)

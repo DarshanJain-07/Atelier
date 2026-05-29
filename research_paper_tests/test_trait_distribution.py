@@ -1,5 +1,5 @@
-from main import DIMENSION_INDICES
 from research_paper_tests.config_schema import (
+    DIMENSION_INDICES,
     get_test_scenario,
     prepare_scenario_society,
 )

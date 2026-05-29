@@ -1,7 +1,7 @@
 import torch
 
 from cognitive_engine import CognitiveEngine
-from schema import SimConfig
+from research_paper_tests.config_schema import SimConfig
 
 
 def test_tensor_magnitudes_stay_finite_and_probabilistic():

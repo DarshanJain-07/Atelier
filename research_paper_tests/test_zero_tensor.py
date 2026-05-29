@@ -3,7 +3,7 @@ import torch
 from cognitive_engine import CognitiveEngine
 from main import build_debug_society, run_debug_simulation
 from physics_engine import SocialPhysicsEngine
-from schema import SimConfig
+from research_paper_tests.config_schema import SimConfig
 
 
 def test_zero_tensor_produces_neutral_inert_state():

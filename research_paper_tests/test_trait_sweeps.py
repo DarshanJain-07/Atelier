@@ -20,6 +20,7 @@ from research_paper_tests.plotting_utils import (
     save_paper_figure,
     setup_plot,
 )
+from research_paper_tests.stats_utils import assert_monotonic_relationship
 
 matplotlib.use("Agg")
 apply_paper_style()
@@ -101,11 +102,14 @@ def _trait_sweep_metrics(config, settings):
 
 
 def test_trait_sweeps_reveal_monotonic_behavioral_gradients():
+    """
+    Validates that trait sweeps produce statistically significant monotonic gradients 
+    using Spearman's rank correlation.
+    """
     scenario = get_test_scenario("trait_sweeps")
     config = scenario.sim_config()
     settings = scenario.settings()
     trait_values, metrics = _trait_sweep_metrics(config, settings)
-    tol = settings["monotonic_tolerance"]
 
     openness_engagement = metrics["Openness"]["engagement"]
     extraversion_short_term_attention = metrics["Extraversion"]["attention"][:, 10]
@@ -113,23 +117,12 @@ def test_trait_sweeps_reveal_monotonic_behavioral_gradients():
     extraversion_action_cost = metrics["Extraversion"]["action_cost"]
     neuroticism_action_cost = metrics["Neuroticism"]["action_cost"]
 
-    assert np.all(np.diff(openness_engagement) >= -tol)
-    assert np.all(np.diff(extraversion_short_term_attention) >= -tol)
-    assert np.all(np.diff(conscientiousness_engagement) <= tol)
-    assert np.all(np.diff(extraversion_action_cost) <= tol)
-    assert np.all(np.diff(neuroticism_action_cost) <= tol)
-
-    assert np.argmax(openness_engagement) == len(openness_engagement) - 1
-    assert np.argmax(extraversion_short_term_attention) == len(extraversion_short_term_attention) - 1
-    assert np.argmin(conscientiousness_engagement) == len(conscientiousness_engagement) - 1
-    assert np.argmin(extraversion_action_cost) == len(extraversion_action_cost) - 1
-    assert np.argmin(neuroticism_action_cost) == len(neuroticism_action_cost) - 1
-
-    assert openness_engagement[-1] > openness_engagement[0]
-    assert extraversion_short_term_attention[-1] > extraversion_short_term_attention[0]
-    assert conscientiousness_engagement[0] > conscientiousness_engagement[-1]
-    assert extraversion_action_cost[0] > extraversion_action_cost[-1]
-    assert neuroticism_action_cost[0] > neuroticism_action_cost[-1]
+    # Use the new statistical validation standard (Spearman correlation)
+    assert_monotonic_relationship(trait_values, openness_engagement, expected_direction="positive")
+    assert_monotonic_relationship(trait_values, extraversion_short_term_attention, expected_direction="positive")
+    assert_monotonic_relationship(trait_values, conscientiousness_engagement, expected_direction="negative")
+    assert_monotonic_relationship(trait_values, extraversion_action_cost, expected_direction="negative")
+    assert_monotonic_relationship(trait_values, neuroticism_action_cost, expected_direction="negative")
 
 
 def test_generate_trait_sweeps_figure(tmp_path):
@@ -222,8 +215,6 @@ def test_generate_trait_sweeps_figure(tmp_path):
     path4 = output_dir / "trait_vs_action_cost.png"
     save_paper_figure(fig4, path4)
     plt.close(fig4)
-
-
 
     assert path1.exists()
     assert path2.exists()

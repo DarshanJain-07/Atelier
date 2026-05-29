@@ -791,18 +791,47 @@ def execute_simulation_cycle(
         avg_attention_per_dim = engagement_weighted_attention.mean(dim=0)
         top_dims = torch.topk(avg_attention_per_dim, k=2).indices
 
-        final_world_tensor = final_world_tensor.clone()
+        # Attention-Driven Amplification
+        algorithmic_bias = torch.zeros(12, device=final_world_tensor.device)
         exaggeration = active_society.config.algo_exaggeration_factor
         signal_floor = 0.05
+        
+        # We also create a mask for dynamic graph convolution
+        is_algo_active = False
+
         for dim_idx in top_dims:
             current_val = final_world_tensor[0, dim_idx].item()
             # Amplification should only strengthen existing signal, not invent
             # a negative narrative for neutral or near-zero inputs.
             if abs(current_val) <= signal_floor:
                 continue
-            final_world_tensor[0, dim_idx] *= exaggeration
+            # Multiplicative bias for the attention pipeline
+            algorithmic_bias[dim_idx] = exaggeration - 1.0
+            is_algo_active = True
 
-        final_world_tensor = torch.clamp(final_world_tensor, -1.0, 1.0)
+        # Dynamic Graph Convolution (Filter Bubble Creation)
+        algorithmic_adjacency = active_society.adjacency_matrix
+        if is_algo_active and algorithmic_adjacency is not None and getattr(active_society.config, "use_network_topology", True):
+            N = active_society.personalities.shape[0]
+            if N <= 5000:  # Prevent OOM on very large societies
+                adj_dense = algorithmic_adjacency.to_dense()
+                
+                # Agents who share similar worldview on the amplified dimensions are pushed together
+                top_exposures = active_society.exposures[:, top_dims]
+                # Cosine similarity for homophily
+                norm_exp = top_exposures / (torch.norm(top_exposures, dim=1, keepdim=True) + 1e-8)
+                homophily = torch.mm(norm_exp, norm_exp.t())
+                
+                # Boost edges between agents who share similar views on the algorithmic topics
+                boost_mask = homophily > 0.8
+                adj_dense[boost_mask] *= 1.5
+                
+                # Re-normalize rows to maintain transition matrix properties
+                row_sums = adj_dense.sum(dim=1, keepdim=True)
+                adj_dense = adj_dense / (row_sums + 1e-8)
+                
+                algorithmic_adjacency = adj_dense.to_sparse_coo()
+
         context_vector, attention_weights, engagement_scores = cog_engine.run(
             world_tensor_raw=final_world_tensor,
             urgency=urgency,
@@ -811,7 +840,8 @@ def execute_simulation_cycle(
             personalities=active_society.personalities,
             agent_affinities=active_society.affinities,
             agent_memory=memory,
-            adjacency_matrix=active_society.adjacency_matrix,
+            adjacency_matrix=algorithmic_adjacency,
+            algorithmic_bias=algorithmic_bias if is_algo_active else None,
         )
 
     final_emotions = cog_engine.project_emotions(context_vector)
@@ -819,7 +849,7 @@ def execute_simulation_cycle(
         final_emotions,
         active_society.metadata["Influence"].to_numpy(dtype=np.float32),
         engagement_scores=engagement_scores,
-        adjacency_matrix=active_society.adjacency_matrix,
+        adjacency_matrix=algorithmic_adjacency if active_society.config.use_algorithmic_amplification else active_society.adjacency_matrix,
         personalities=active_society.personalities,
         is_personal=is_personal,
     )

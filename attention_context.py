@@ -17,12 +17,13 @@ def get_cached_constant(
 
 
 class AttentionContext:
-    def __init__(self, exposures, personalities, world_tensor, is_personal, config):
+    def __init__(self, exposures, personalities, world_tensor, is_personal, config, algorithmic_bias=None):
         self.exposures = exposures
         self.personalities = personalities
         self.world_tensor = world_tensor
         self.is_personal = is_personal
         self.config = config
+        self.algorithmic_bias = algorithmic_bias
 
         # Intermediate states
         self.Q = None
@@ -237,7 +238,7 @@ class AttentionContext:
         positive_signal = torch.clamp(self.world_tensor, min=0.0)
         individual_benefit = (gaps * positive_signal).sum(dim=1, keepdim=True)
         
-        benefit_threshold = getattr(self.config, "self_interest_resilience_threshold", 0.15)
+        benefit_threshold = self.config.self_interest_resilience_threshold
         # If benefit is high, suppression pressure is reduced
         resilience = torch.sigmoid(10.0 * (individual_benefit - benefit_threshold))
         
@@ -267,6 +268,19 @@ class AttentionContext:
         # Blend local and global
         self.Q = (1.0 - global_weight) * self.Q + global_weight * Q_global
 
+        return self
+
+    def algorithmic_amplification_layer(self):
+        """Attention-Driven Amplification.
+        Instead of altering the source reality (World Tensor), the algorithmic feed
+        skews the agent's attention query to disproportionately favor the amplified topics.
+        """
+        if self.Q is None:
+            raise ValueError("algorithmic_amplification_layer called before Q is initialized")
+        if self.algorithmic_bias is not None:
+            # Multiplicative bias: if bias is > 0, attention query is amplified for those dims.
+            bias = self.algorithmic_bias.unsqueeze(0).expand(self.Q.shape[0], -1)
+            self.Q = self.Q * (1.0 + bias)
         return self
 
     def key_processing_layer(self):

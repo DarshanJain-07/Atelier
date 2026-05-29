@@ -127,6 +127,7 @@ class CognitiveEngine:
         personalities: torch.Tensor,
         world_tensor: torch.Tensor,
         is_personal: bool,
+        algorithmic_bias: torch.Tensor | None = None,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         """Runs modular attention pipeline.
         Returns: (attention_weights, raw_energy)
@@ -137,6 +138,7 @@ class CognitiveEngine:
             world_tensor=world_tensor,
             is_personal=is_personal,
             config=self.config,
+            algorithmic_bias=algorithmic_bias,
         )
 
         # Ordered pipeline
@@ -147,6 +149,7 @@ class CognitiveEngine:
             .personal_event_layer()
             .selective_exposure_layer()
             .hybrid_attention_layer()
+            .algorithmic_amplification_layer()
             .key_processing_layer()
             .cross_dimension_layer()
             .relevance_layer()
@@ -304,6 +307,7 @@ class CognitiveEngine:
         agent_affinities: torch.Tensor,
         agent_memory: torch.Tensor | None = None,
         adjacency_matrix: torch.Tensor | None = None,
+        algorithmic_bias: torch.Tensor | None = None,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         perceived_world = self.prepare_perceived_world(
             world_tensor_raw,
@@ -317,6 +321,7 @@ class CognitiveEngine:
             personalities,
             perceived_world,
             is_personal,
+            algorithmic_bias=algorithmic_bias,
         )
         attention_weights = self.apply_stress_bias(
             attention_weights,
@@ -522,6 +527,7 @@ class CognitiveEngine:
         agent_affinities: torch.Tensor,
         agent_memory: torch.Tensor | None = None,
         adjacency_matrix: torch.Tensor | None = None,
+        algorithmic_bias: torch.Tensor | None = None,
     ):
         """Full cognitive simulation pipeline.
 
@@ -542,6 +548,7 @@ class CognitiveEngine:
                 agent_affinities=agent_affinities,
                 agent_memory=agent_memory,
                 adjacency_matrix=adjacency_matrix,
+                algorithmic_bias=algorithmic_bias,
             )
         )
 

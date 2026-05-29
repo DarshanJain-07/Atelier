@@ -8,6 +8,7 @@ import torch
 
 from main import run_debug_simulation
 from research_paper_tests.config_schema import (
+    DIMENSIONS,
     build_world,
     get_test_scenario,
     prepare_scenario_society,
@@ -19,7 +20,7 @@ from research_paper_tests.plotting_utils import (
     save_paper_figure,
     setup_plot,
 )
-from schema import DIMENSIONS
+from research_paper_tests.stats_utils import assert_statistically_greater, run_monte_carlo
 
 matplotlib.use("Agg")
 apply_paper_style()
@@ -73,7 +74,7 @@ def _reconstruct_action_ready_mask(config, society, result) -> np.ndarray:
     return (is_motivated & is_emotional & engaged_mask).detach().cpu().numpy()
 
 
-def _class_stress_profiles(tmp_path: Path):
+def _class_stress_profiles(tmp_path: Path, output_name: str = "population_segmentation"):
     scenario = get_test_scenario("population_segmentation")
     config = scenario.sim_config()
     settings = scenario.settings()
@@ -81,7 +82,7 @@ def _class_stress_profiles(tmp_path: Path):
         "population_segmentation",
         tmp_path,
         enable_evolution=config.enable_evolution,
-        output_name="population_segmentation",
+        output_name=output_name,
     )
 
     class_order = [
@@ -133,36 +134,58 @@ def _class_stress_profiles(tmp_path: Path):
 
 
 def test_same_event_produces_distinct_subgroup_response_profiles(tmp_path):
-    settings, profiles, _ = _class_stress_profiles(tmp_path)
+    def run_segmentation_analysis():
+        seed = torch.initial_seed()
+        settings, profiles, _ = _class_stress_profiles(
+            tmp_path,
+            output_name=f"segmentation_{seed}",
+        )
 
-    grouped = profiles.groupby(["dimension", "magnitude"], observed=False)
-    gap_table = grouped.agg(
-        engagement_gap=("engagement", lambda series: float(series.max() - series.min())),
-        action_gap=(
-            "action_ready_rate",
-            lambda series: float(series.max() - series.min()),
-        ),
-    ).reset_index()
+        grouped = profiles.groupby(["dimension", "magnitude"], observed=False)
+        gap_table = grouped.agg(
+            engagement_gap=(
+                "engagement",
+                lambda series: float(series.max() - series.min()),
+            ),
+            action_gap=(
+                "action_ready_rate",
+                lambda series: float(series.max() - series.min()),
+            ),
+        ).reset_index()
 
-    zero_magnitude = min(settings["magnitudes"])
-    max_magnitude = max(settings["magnitudes"])
-    zero_gap = gap_table[gap_table["magnitude"] == zero_magnitude].set_index("dimension")
-    max_gap = gap_table[gap_table["magnitude"] == max_magnitude].set_index("dimension")
-    engagement_peak_rows = gap_table.loc[
-        gap_table.groupby("dimension", observed=False)["engagement_gap"].idxmax()
-    ].set_index("dimension")
-    action_peak_rows = gap_table.loc[
-        gap_table.groupby("dimension", observed=False)["action_gap"].idxmax()
-    ].set_index("dimension")
+        zero_magnitude = min(settings["magnitudes"])
+        max_magnitude = max(settings["magnitudes"])
 
-    assert (engagement_peak_rows["magnitude"] == max_magnitude).all()
-    assert (action_peak_rows["magnitude"] > zero_magnitude).all()
-    assert (max_gap["engagement_gap"] > zero_gap["engagement_gap"]).all()
-    assert (max_gap["action_gap"] > zero_gap["action_gap"]).all()
+        zero_gap = gap_table[gap_table["magnitude"] == zero_magnitude].set_index(
+            "dimension",
+        )
+        max_gap = gap_table[gap_table["magnitude"] == max_magnitude].set_index(
+            "dimension",
+        )
+
+        return {
+            "max_engagement_gaps": max_gap["engagement_gap"].to_list(),
+            "zero_engagement_gaps": zero_gap["engagement_gap"].to_list(),
+            "max_action_gaps": max_gap["action_gap"].to_list(),
+            "zero_action_gaps": zero_gap["action_gap"].to_list(),
+        }
+
+    results = run_monte_carlo(run_segmentation_analysis)
+
+    # Aggregate across Monte Carlo runs
+    max_eng = [np.mean(r["max_engagement_gaps"]) for r in results]
+    zero_eng = [np.mean(r["zero_engagement_gaps"]) for r in results]
+    max_act = [np.mean(r["max_action_gaps"]) for r in results]
+    zero_act = [np.mean(r["zero_action_gaps"]) for r in results]
+
+    assert_statistically_greater(max_eng, zero_eng)
+    assert_statistically_greater(max_act, zero_act)
 
 
 def test_generate_population_segmentation_figure(tmp_path):
-    output_dir = Path(__file__).resolve().parent / "generated" / "population_segmentation"
+    output_dir = (
+        Path(__file__).resolve().parent / "generated" / "population_segmentation"
+    )
     output_dir.mkdir(parents=True, exist_ok=True)
 
     settings, profiles, class_order = _class_stress_profiles(tmp_path)
@@ -183,10 +206,9 @@ def test_generate_population_segmentation_figure(tmp_path):
         dimension_rows = profiles[profiles["dimension"] == dimension_name]
 
         for color, class_name in zip(CATEGORICAL_COLORS, class_order, strict=False):
-            class_rows = (
-                dimension_rows[dimension_rows["class_name"] == class_name]
-                .sort_values("magnitude")
-            )
+            class_rows = dimension_rows[
+                dimension_rows["class_name"] == class_name
+            ].sort_values("magnitude")
             ax.plot(
                 class_rows["magnitude"].to_numpy(),
                 class_rows["engagement"].to_numpy(),

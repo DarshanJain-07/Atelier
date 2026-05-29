@@ -13,10 +13,17 @@ from schema import (
     DIMENSION_INDICES,
     DIMENSIONS,
     EMOTION_LABELS,
+    PERSONALITY_CORRELATIONS,
+    PERSONALITY_QUERY_MATRIX,
+    PSYCH_PROJECTION,
     RUN_PROFILE_FIELDS,
+    RUN_PROFILE_INTERNAL_ONLY_FIELDS,
     SIM_CONFIG_DEFAULTS,
     SIM_CONFIG_FIELDS,
     SimConfig,
+    emotions_to_behavior_aware_sentiment_distribution,
+    emotions_to_sentiment_distribution,
+    emotions_to_valence,
 )
 
 PERSONALITY_LABELS = (

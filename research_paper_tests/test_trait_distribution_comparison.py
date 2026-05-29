@@ -14,7 +14,7 @@ from research_paper_tests.plotting_utils import (
     save_paper_figure,
     setup_plot,
 )
-from schema import SimConfig
+from research_paper_tests.config_schema import SimConfig
 
 matplotlib.use("Agg")
 apply_paper_style()

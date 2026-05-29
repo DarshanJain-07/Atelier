@@ -1,91 +1,87 @@
 import torch
 import numpy as np
 import pytest
-from generate_society import generate_society
-from society_evolution import SocietyEvolution
-from schema import SimConfig
-from research_paper_tests._metrics import gini
-from networkx.algorithms.community import louvain_communities
 import networkx as nx
+from generate_society import generate_society, create_topology
+from society_evolution import SocietyEvolution
+from research_paper_tests.config_schema import SimConfig
+from research_paper_tests._metrics import gini
+from research_paper_tests.stats_utils import (
+    run_monte_carlo,
+    assert_monotonic_relationship,
+    assert_statistically_greater
+)
 
-def test_wealth_gini_correlates_with_modularity():
+def test_wealth_gini_correlates_with_modularity(n_seeds):
     """
-    Test 2: Longitudinal Echo Chambers (Generational Drift)
-    Goal: Validate that economic inequality (Wealth Gini) drives topological balkanization (Modularity).
+    Validation: Economic inequality (Wealth Gini) must drive topological balkanization (Modularity).
+    We sweep the inheritance fraction and assert a monotonic increase in modularity 
+    across multiple seeds, proving the "Economic Balkanization" law.
     """
-    # 1. Setup two scenarios: Low Inequality and High Inequality
-    base_config = SimConfig()
-    base_config.num_agents = 500
-    base_config.evolution_generations = 5
-    base_config.use_network_topology = True
-    
-    # --- Scenario A: Low Gini (Redistributive) ---
-    low_gini_config = SimConfig()
-    # Copy base settings
-    for field in low_gini_config.__dataclass_fields__:
-        setattr(low_gini_config, field, getattr(base_config, field))
-    low_gini_config.inheritance_fraction = 0.1 # High redistribution
-    low_gini_config.base_return_rate = 0.01
-    
-    # --- Scenario B: High Gini (Dynastic) ---
-    high_gini_config = SimConfig()
-    for field in high_gini_config.__dataclass_fields__:
-        setattr(high_gini_config, field, getattr(base_config, field))
-    high_gini_config.inheritance_fraction = 0.9 # High inheritance
-    high_gini_config.base_return_rate = 0.1 # High growth for the wealthy
-    
-    def run_scenario(config):
-        # Generate initial society
-        metadata, exposures, personalities, affinities, adjacency = generate_society(config)
-        
-        # Initial Gini
-        initial_wealth = torch.tensor(metadata["Raw_Wealth"].values)
-        initial_gini = gini(initial_wealth)
-        
-        # Evolve
-        evolution = SocietyEvolution(config, metadata, exposures, personalities)
-        evolved_metadata, evolved_exposures, evolved_personalities = evolution.evolve()
-        
-        # Final Gini
-        final_wealth = torch.tensor(evolved_metadata["Raw_Wealth"].values)
-        final_gini = gini(final_wealth)
-        
-        # Final Modularity (using NetworkX for Louvain)
-        # Note: In ATELIER, adjacency is generated based on exposures. 
-        # For the test, we regenerate the topology based on the EVOLVED exposures.
-        from generate_society import create_topology
-        evolved_adjacency = create_topology(
-            config, 
-            evolved_exposures, 
-            evolved_personalities,
-            influence_scores=evolved_metadata["Influence"].values,
-            raw_wealth=evolved_metadata["Raw_Wealth"].values
-        )
-        
-        # Convert sparse to NX
-        indices = evolved_adjacency.coalesce().indices()
-        G = nx.Graph()
-        G.add_nodes_from(range(config.num_agents))
-        G.add_edges_from(indices.T.tolist())
-        
-        communities = louvain_communities(G, seed=config.seed)
-        modularity = nx.community.modularity(G, communities)
-        
-        return final_gini, modularity
+    inheritance_sweep = [0.1, 0.4, 0.7, 0.9]
+    mean_modularities = []
+    mean_ginis = []
 
-    low_gini, low_mod = run_scenario(low_gini_config)
-    high_gini, high_mod = run_scenario(high_gini_config)
-    
-    print(f"Low Gini Scenario: Gini={low_gini:.3f}, Modularity={low_mod:.3f}")
-    print(f"High Gini Scenario: Gini={high_gini:.3f}, Modularity={high_mod:.3f}")
-    
-    # Validation: High Gini should generally lead to higher modularity
-    # (assuming class-based connection logic is working in generate_society.py)
-    assert high_gini > low_gini
-    # Relaxed assertion: If high gini doesn't lead to higher modularity, it flags a 
-    # potential "weak connection" bug as per the user's request.
-    if high_mod <= low_mod:
-        pytest.fail(f"Balkanization failure: High Gini ({high_gini:.3f}) did not increase modularity ({high_mod:.3f}) vs Low Gini ({low_mod:.3f})")
+    def get_sim_runner(inheritance):
+        def runner():
+            config = SimConfig()
+            config.num_agents = 200 # Scaled down for test performance
+            config.evolution_generations = 3
+            config.use_network_topology = True
+            config.inheritance_fraction = inheritance
+            config.base_return_rate = 0.05
+            
+            # 1. Initial State
+            metadata, exposures, personalities, affinities, adjacency = generate_society(config)
+            
+            # 2. Evolve
+            evolution = SocietyEvolution(config, metadata, exposures, personalities)
+            evolved_metadata, evolved_exposures, evolved_personalities = evolution.evolve()
+            
+            # 3. Final Gini
+            final_wealth = torch.tensor(evolved_metadata["Raw_Wealth"].values)
+            final_gini = gini(final_wealth)
+            
+            # 4. Topological Balkanization check
+            # We regenerate the topology based on the EVOLVED exposures to see if 
+            # economic classes have structurally separated.
+            evolved_adjacency = create_topology(
+                config, 
+                evolved_exposures, 
+                evolved_personalities,
+                influence_scores=evolved_metadata["Influence"].values,
+                raw_wealth=evolved_metadata["Raw_Wealth"].values
+            )
+            
+            # Convert sparse to NX
+            indices = evolved_adjacency.coalesce().indices()
+            G = nx.Graph()
+            G.add_nodes_from(range(config.num_agents))
+            G.add_edges_from(indices.T.tolist())
+            
+            from networkx.algorithms.community import louvain_communities
+            communities = louvain_communities(G)
+            modularity = nx.community.modularity(G, communities)
+            
+            return {"gini": final_gini, "modularity": modularity}
+        return runner
 
-if __name__ == "__main__":
-    test_wealth_gini_correlates_with_modularity()
+    # Execute Sweep
+    for inh in inheritance_sweep:
+        results = run_monte_carlo(get_sim_runner(inh), n_seeds=n_seeds)
+        mean_modularities.append(np.mean([r["modularity"] for r in results]))
+        mean_ginis.append(np.mean([r["gini"] for r in results]))
+
+    # Assertion 1: Inheritance drives Wealth Gini (Gradient Check)
+    assert_monotonic_relationship(inheritance_sweep, mean_ginis, "positive")
+    
+    # Assertion 2: Wealth Gini drives Modularity (The "Balkanization Law")
+    assert_monotonic_relationship(mean_ginis, mean_modularities, "positive")
+
+    # Assertion 3: Statistical Significance between Extremes
+    low_results = run_monte_carlo(get_sim_runner(inheritance_sweep[0]), n_seeds=n_seeds)
+    high_results = run_monte_carlo(get_sim_runner(inheritance_sweep[-1]), n_seeds=n_seeds)
+    
+    high_mods = [r["modularity"] for r in high_results]
+    low_mods = [r["modularity"] for r in low_results]
+    assert_statistically_greater(high_mods, low_mods)

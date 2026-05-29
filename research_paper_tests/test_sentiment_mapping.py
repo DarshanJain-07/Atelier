@@ -1,6 +1,6 @@
 import torch
 
-from schema import (
+from research_paper_tests.config_schema import (
     SimConfig,
     emotions_to_behavior_aware_sentiment_distribution,
     emotions_to_sentiment_distribution,

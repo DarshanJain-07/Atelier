@@ -207,6 +207,7 @@ class SimConfig:
     selective_exposure_openness_factor: float = 0.4
     selective_exposure_gain: float = 8.0
     selective_exposure_max_suppression: float = 0.85
+    self_interest_resilience_threshold: float = 0.4
 
     use_time_pressure: bool = True  # Enable "Cognitive Tunneling" (Urgency)
     stress_activation_threshold: float = 0.3

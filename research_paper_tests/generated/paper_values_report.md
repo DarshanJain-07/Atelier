@@ -18,46 +18,46 @@ Regenerate with `.venv/bin/pytest research_paper_tests/test_paper_values_report.
 
 ## Semantic Alignment
 
-- Positive world Wasserstein match: `0.293700`
-- Positive world mismatch against negative baseline: `1.306300`
-- Negative world Wasserstein match: `0.435600`
-- Negative world mismatch against positive baseline: `1.164400`
-- Negative-minus-positive negative sentiment share: `0.365898`
+- Positive world Wasserstein match: `0.283800`
+- Positive world mismatch against negative baseline: `1.316200`
+- Negative world Wasserstein match: `0.433900`
+- Negative world mismatch against positive baseline: `1.166100`
+- Negative-minus-positive negative sentiment share: `0.373362`
 
 ## Accuracy Metrics
 
-- Matching Wasserstein distance: `0.546500`
-- Mismatched Wasserstein distance: `1.153500`
-- Wasserstein gap: `0.607000`
+- Matching Wasserstein distance: `0.544500`
+- Mismatched Wasserstein distance: `1.155500`
+- Wasserstein gap: `0.611000`
 
 ## Response Boundaries
 
 | Magnitude | Mean Engagement | Acting Ratio | Sentiment Valence |
 | :--- | ---: | ---: | ---: |
 | 0.000000 | 0.000000 | 0.000000 | 0.000000 |
-| 0.150000 | 0.106356 | 0.777344 | -0.110000 |
-| 0.300000 | 0.231087 | 0.847656 | -0.204000 |
-| 0.450000 | 0.327931 | 0.882812 | -0.280000 |
-| 0.600000 | 0.401527 | 0.898438 | -0.339000 |
-| 0.750000 | 0.458063 | 0.921875 | -0.384000 |
-| 0.900000 | 0.502383 | 0.925781 | -0.420000 |
+| 0.150000 | 0.106133 | 0.773438 | -0.118000 |
+| 0.300000 | 0.230850 | 0.847656 | -0.227000 |
+| 0.450000 | 0.327785 | 0.886719 | -0.321000 |
+| 0.600000 | 0.401611 | 1.000000 | -0.393000 |
+| 0.750000 | 0.458504 | 1.000000 | -0.447000 |
+| 0.900000 | 0.503015 | 1.000000 | -0.488000 |
 
 ### Low-Salience Worlds
 
 | World | Mean Engagement | Acting Ratio | Sentiment Valence |
 | :--- | ---: | ---: | ---: |
 | Zero | 0.000000 | 0.000000 | 0.000000 |
-| Faint Threat | 0.007493 | 0.000000 | -0.019000 |
-| Mixed Weak | 0.011567 | 0.000000 | -0.002000 |
-| Salient Threat | 0.384224 | 0.890625 | -0.320000 |
+| Faint Threat | 0.007371 | 0.000000 | -0.020000 |
+| Mixed Weak | 0.011636 | 0.000000 | -0.002000 |
+| Salient Threat | 0.383651 | 1.000000 | -0.375000 |
 
 ## Emotion Directionality
 
 | World | Dominant Emotion | Acting Ratio | Sentiment Valence |
 | :--- | :--- | ---: | ---: |
-| Prosperity | Joy | 0.886719 | 0.711000 |
-| Threat | Fear | 0.921875 | -0.369000 |
-| Injustice | Anger | 0.898438 | -0.361000 |
+| Prosperity | Joy | 1.000000 | 0.831000 |
+| Threat | Fear | 1.000000 | -0.439000 |
+| Injustice | Anger | 1.000000 | -0.417000 |
 
 ## Bridge Diffusion
 
@@ -69,20 +69,20 @@ Regenerate with `.venv/bin/pytest research_paper_tests/test_paper_values_report.
 ## Inequality And Topology
 
 - Baseline wealth Gini: `0.199135`
-- Evolved wealth Gini: `0.323614`
-- Wealth Gini delta: `0.124479`
-- Backbone clustering: `0.065414`
-- Clustering with triadic closure: `0.615779`
-- Clustering gain: `0.550366`
-- Low-homophily Louvain modularity: `0.099969`
-- High-homophily Louvain modularity: `0.285240`
-- Modularity gain: `0.185271`
+- Evolved wealth Gini: `0.357948`
+- Wealth Gini delta: `0.158813`
+- Backbone clustering: `0.065598`
+- Clustering with triadic closure: `0.810497`
+- Clustering gain: `0.744899`
+- Low-homophily Louvain modularity: `0.138839`
+- High-homophily Louvain modularity: `0.333521`
+- Modularity gain: `0.194682`
 
 ## Memory, Amplification, And Virality
 
 - Memory final norm gain from rehearsal: `5.592401`
-- Algorithmic amplification engagement gain: `0.044439`
-- Algorithmic amplification max world shift: `0.100000`
-- Configured viral cap: `11.000000`
-- Peak viral slope: `39.125000`
+- Algorithmic amplification engagement gain: `0.064467`
+- Algorithmic amplification max world shift: `0.000000`
+- Configured viral cap: `13.000000`
+- Peak viral slope: `57.950000`
 
